@@ -44,6 +44,7 @@ class RecordingController(
         "act-${System.currentTimeMillis()}-${Random.nextInt(1 shl 30)}"
     },
     private val tickMs: Long = 1000,
+    private val tickEnabled: Boolean = true,
 ) {
     private val _state = MutableStateFlow(RecordingState())
     val state: StateFlow<RecordingState> = _state
@@ -74,10 +75,12 @@ class RecordingController(
         _state.value = RecordingState(phase = Phase.STARTING, quality = GpsQuality.NONE)
 
         job = scope.launch { source.fixes().collect { onFix(it) } }
-        tickJob = scope.launch {
-            while (isActive) {
-                delay(tickMs)
-                refreshQuality()
+        if (tickEnabled) {
+            tickJob = scope.launch {
+                while (isActive) {
+                    delay(tickMs)
+                    refreshQuality()
+                }
             }
         }
     }
