@@ -144,8 +144,11 @@ fun RecordingScreen(
                 color = Palette.accent,
                 fontSize = 64.sp,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.semantics { contentDescription = "${t.details} ${state.distanceM}" },
+                modifier = Modifier.semantics {
+                    contentDescription = "${formatDistance(state.distanceM)} ${t.km}"
+                },
             )
+            Text(text = t.km, color = Palette.textSecondary, fontSize = 12.sp)
             Text(text = formatDuration(state.elapsedNanos), color = Palette.text, fontSize = 22.sp)
             Text(text = "${t.points}: ${state.fixCount}", color = Palette.textSecondary, fontSize = 14.sp)
             coachLine?.let {
@@ -155,7 +158,7 @@ fun RecordingScreen(
             if (g != null && state.phase == Phase.RECORDING) {
                 val d = ghostDeltaM(g, state.distanceM, state.elapsedNanos).toInt()
                 Text(
-                    text = "${t.ghost}: ${if (d >= 0) "+" else ""}$d م",
+                    text = "${t.ghost}: ${if (d >= 0) "+" else ""}$d ${t.metre}",
                     color = Palette.accent,
                     fontSize = 13.sp,
                 )

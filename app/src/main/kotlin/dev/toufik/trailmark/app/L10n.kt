@@ -37,6 +37,13 @@ data class Texts(
     val delete: String,
     val mapRegions: String,
     val language: String,
+    val km: String,
+    val metre: String,
+    val kmh: String,
+    val run: String,
+    val walk: String,
+    val bike: String,
+    val hike: String,
 )
 
 /** Arabic (RTL) — the app's first language. */
@@ -72,6 +79,13 @@ val AR_TEXTS = Texts(
     delete = "حذف",
     mapRegions = "مناطق الخرائط",
     language = "اللغة",
+    km = "كم",
+    metre = "م",
+    kmh = "كم/س",
+    run = "جري",
+    walk = "مشي",
+    bike = "دراجة",
+    hike = "مشي جبلي",
 )
 val FR_TEXTS = Texts(
     appName = "Trailmark",
@@ -105,6 +119,13 @@ val FR_TEXTS = Texts(
     delete = "Supprimer",
     mapRegions = "Régions de carte",
     language = "Langue",
+    km = "km",
+    metre = "m",
+    kmh = "km/h",
+    run = "Course",
+    walk = "Marche",
+    bike = "Vélo",
+    hike = "Rando",
 )
 
 val EN_TEXTS = Texts(
@@ -139,6 +160,13 @@ val EN_TEXTS = Texts(
     delete = "Delete",
     mapRegions = "Map regions",
     language = "Language",
+    km = "km",
+    metre = "m",
+    kmh = "km/h",
+    run = "Run",
+    walk = "Walk",
+    bike = "Bike",
+    hike = "Hike",
 )
 
 fun textsFor(lang: Lang): Texts = when (lang) {

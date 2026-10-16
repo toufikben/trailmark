@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import dev.toufik.trailmark.app.AppGraph
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
+import dev.toufik.trailmark.app.Texts
 import dev.toufik.trailmark.app.formatDate
 import dev.toufik.trailmark.app.formatDistance
 import dev.toufik.trailmark.app.formatDuration
@@ -140,6 +141,7 @@ fun HistoryScreen(onOpen: (Long) -> Unit, onBack: () -> Unit) {
 
 @Composable
 private fun HistoryRow(row: ActivityRow, onClick: () -> Unit) {
+    val t = LocalTexts.current
     val pace = if (row.distanceM < 50) null else (row.elapsedNanos / 1e9) / (row.distanceM / 1000)
     Column(
         modifier = Modifier
@@ -151,25 +153,25 @@ private fun HistoryRow(row: ActivityRow, onClick: () -> Unit) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(sportLabel(row.sport), color = Palette.text, fontSize = 16.sp)
+            Text(sportLabel(t, row.sport), color = Palette.text, fontSize = 16.sp)
             Text(formatDate(row.startWallMillis), color = Palette.textSecondary, fontSize = 12.sp)
         }
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text("كم ${formatDistance(row.distanceM)}", color = Palette.text, fontSize = 14.sp)
+            Text("${t.km} ${formatDistance(row.distanceM)}", color = Palette.text, fontSize = 14.sp)
             Text(formatDuration(row.elapsedNanos), color = Palette.text, fontSize = 14.sp)
             Text(pace?.let { formatPace(it) } ?: "--:--", color = Palette.text, fontSize = 14.sp)
-            if (row.isOpen) Text("قيد التسجيل", color = Palette.accent, fontSize = 13.sp)
+            if (row.isOpen) Text(t.active, color = Palette.accent, fontSize = 13.sp)
         }
     }
 }
 
-private fun sportLabel(sport: String): String = when (sport) {
-    "RUN" -> "جري"
-    "WALK" -> "مشي"
-    "BIKE" -> "دراجة"
-    "HIKE" -> "مشي جبلي"
+private fun sportLabel(t: Texts, sport: String): String = when (sport) {
+    "RUN" -> t.run
+    "WALK" -> t.walk
+    "BIKE" -> t.bike
+    "HIKE" -> t.hike
     else -> sport
 }

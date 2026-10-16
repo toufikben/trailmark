@@ -102,12 +102,12 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text(
-                            "${t.elevation} ${a.elevationGainM.toInt()} م",
+                            "${t.elevation} ${a.elevationGainM.toInt()} ${t.metre}",
                             color = Palette.textSecondary,
                             fontSize = 14.sp,
                         )
                         Text(
-                            "${t.maxSpeed} ${"%.1f".format(a.maxSpeedMps * 3.6)}",
+                            "${t.maxSpeed} ${"%.1f".format(a.maxSpeedMps * 3.6)} ${t.kmh}",
                             color = Palette.textSecondary,
                             fontSize = 14.sp,
                         )
