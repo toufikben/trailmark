@@ -10,6 +10,7 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:geo"))
     implementation(project(":core:time"))
+    api(libs.kotlinx.coroutines.core)
     testImplementation(libs.junit.jupiter)
 }
 

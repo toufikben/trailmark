@@ -55,6 +55,7 @@ class RecorderEngine(
     private var distanceM = resumeDistanceM
 
     val storedPoints: List<StoredPoint> get() = points.toList()
+    val storedCount: Int get() = points.size
     val distanceMeters: Double get() = distanceM
     val isIdle: Boolean get() = idle
     val stats: EngineStats

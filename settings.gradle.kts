@@ -14,4 +14,4 @@ pluginManagement {
 
 rootProject.name = "trailmark"
 
-include(":core:model", ":core:geo", ":core:time", ":engine", ":data", ":app")
+include(":core:model", ":core:geo", ":core:time", ":engine", ":data", ":recording", ":app")
