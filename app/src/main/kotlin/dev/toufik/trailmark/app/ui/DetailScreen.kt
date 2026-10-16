@@ -39,6 +39,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
     val context = LocalContext.current
     var detail by remember { mutableStateOf<Detail?>(null) }
     var loading by remember { mutableStateOf(true) }
+    val packPath = remember { dev.toufik.trailmark.app.maps.MapPacks.installedMapPack(context)?.absolutePath }
 
     LaunchedEffect(activityId) {
         detail = withContext(Dispatchers.IO) {
@@ -89,6 +90,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                     TrailmarkMap(
                         points = d.points,
                         modifier = Modifier.fillMaxWidth().height(360.dp).padding(top = 12.dp),
+                        mbtilesPath = packPath,
                     )
                 }
             }

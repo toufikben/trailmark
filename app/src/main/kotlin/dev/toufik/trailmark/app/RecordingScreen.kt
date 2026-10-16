@@ -47,7 +47,7 @@ private fun stopService(context: Context) {
 }
 
 @Composable
-fun RecordingScreen(onHistory: () -> Unit) {
+fun RecordingScreen(onHistory: () -> Unit, onRegions: () -> Unit) {
     val context = LocalContext.current
     val state by RecordingHolder.state.collectAsState()
 
@@ -71,6 +71,9 @@ fun RecordingScreen(onHistory: () -> Unit) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = onHistory) {
                     Text("سجل الأنشطة", color = Palette.accent)
+                }
+                TextButton(onClick = onRegions) {
+                    Text("الخرائط", color = Palette.accent)
                 }
             }
             Text(

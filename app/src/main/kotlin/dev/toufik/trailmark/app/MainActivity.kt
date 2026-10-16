@@ -10,10 +10,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import dev.toufik.trailmark.app.ui.DetailScreen
 import dev.toufik.trailmark.app.ui.HistoryScreen
+import dev.toufik.trailmark.app.ui.RegionsScreen
 
 sealed interface Screen {
     data object Record : Screen
     data object History : Screen
+    data object Regions : Screen
     data class Detail(val id: Long) : Screen
 }
 
@@ -31,11 +33,15 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 when (val s = screen) {
-                    Screen.Record -> RecordingScreen(onHistory = { screen = Screen.History })
+                    Screen.Record -> RecordingScreen(
+                        onHistory = { screen = Screen.History },
+                        onRegions = { screen = Screen.Regions },
+                    )
                     Screen.History -> HistoryScreen(
                         onOpen = { screen = Screen.Detail(it) },
                         onBack = { screen = Screen.Record },
                     )
+                    Screen.Regions -> RegionsScreen(onBack = { screen = Screen.Record })
                     is Screen.Detail -> DetailScreen(
                         activityId = s.id,
                         onBack = { screen = Screen.History },

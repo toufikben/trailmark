@@ -24,14 +24,36 @@ import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
 
+private const val FLAT_STYLE =
+    """{"version":8,"name":"trailmark-dark","sources":{},"layers":[
+       {"id":"background","type":"background","paint":{"background-color":"#0E1113"}}]}"""
+
+/** A compact OpenMapTiles style: background, landcover, water, roads (no glyphs needed). */
+private fun vectorStyle(mbtilesPath: String): String = """
+    {"version":8,"name":"trailmark-omt",
+     "sources":{"openmaptiles":{"type":"vector","url":"mbtiles://$mbtilesPath"}},
+     "layers":[
+       {"id":"background","type":"background","paint":{"background-color":"#0E1113"}},
+       {"id":"landcover","type":"fill","source":"openmaptiles","source-layer":"landcover",
+        "paint":{"fill-color":"#141A16"}},
+       {"id":"water","type":"fill","source":"openmaptiles","source-layer":"water",
+        "paint":{"fill-color":"#12232E"}},
+       {"id":"roads","type":"line","source":"openmaptiles","source-layer":"transportation",
+        "paint":{"line-color":"#39444E","line-width":["interpolate",["linear"],["zoom"],8,1.0,14,4.0]}}
+     ]}
+""".trimIndent()
+
 /**
- * A MapLibre map that draws the recorded route as a GeoJSON line over the
- * bundled dark style. Offline vector packs are installed separately (:regions)
- * and will be wired as the style's tile source; until then the base is the
- * flat background and the route is the content.
+ * A MapLibre map that draws the recorded route as a GeoJSON line. When an
+ * offline MBTiles pack is installed it is used as the vector basemap; otherwise
+ * the base is a flat dark background with the route over it.
  */
 @Composable
-fun TrailmarkMap(points: List<StoredPoint>, modifier: Modifier = Modifier) {
+fun TrailmarkMap(
+    points: List<StoredPoint>,
+    modifier: Modifier = Modifier,
+    mbtilesPath: String? = null,
+) {
     val context = LocalContext.current
     val route = remember(points) { points.filter { it.type != WaypointType.REJECTED } }
 
@@ -51,9 +73,12 @@ fun TrailmarkMap(points: List<StoredPoint>, modifier: Modifier = Modifier) {
         }
     }
 
-    LaunchedEffect(route) {
+    LaunchedEffect(route, mbtilesPath) {
         mapView.getMapAsync { map ->
-            map.setStyle(Style.Builder().fromUri("asset://style_trailmark_dark.json")) { style ->
+            val builder =
+                if (mbtilesPath != null) Style.Builder().fromJson(vectorStyle(mbtilesPath))
+                else Style.Builder().fromJson(FLAT_STYLE)
+            map.setStyle(builder) { style ->
                 if (style.getLayer("route-layer") != null) style.removeLayer("route-layer")
                 if (style.getSource("route-source") != null) style.removeSource("route-source")
 
