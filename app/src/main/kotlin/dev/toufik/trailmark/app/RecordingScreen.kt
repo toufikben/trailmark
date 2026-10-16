@@ -81,6 +81,14 @@ private fun qualityLabel(t: Texts, q: GpsQuality): String = when (q) {
     GpsQuality.DEGRADED -> t.weak
     GpsQuality.LOST -> t.lost
 }
+
+@Composable
+private fun StatCell(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(text = value, color = Palette.text, fontSize = 16.sp)
+        Text(text = label, color = Palette.textSecondary, fontSize = 11.sp)
+    }
+}
 @Composable
 fun RecordingScreen(
     onHistory: () -> Unit,
@@ -232,7 +240,17 @@ fun RecordingScreen(
                     )
                 }
                 Text(text = formatDuration(state.elapsedNanos), color = Palette.text, fontSize = 20.sp)
-                Text(text = "${t.points}: ${state.fixCount}", color = Palette.textSecondary, fontSize = 13.sp)
+                val paceText = if (state.distanceM < 50) "--:--"
+                else formatPace((state.elapsedNanos / 1e9) / (state.distanceM / 1000))
+                val speedText = state.currentSpeedMps?.let { "%.1f".format(it * 3.6) } ?: "--"
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                ) {
+                    StatCell(t.pace, paceText)
+                    StatCell(t.speed, speedText)
+                    StatCell(t.points, state.fixCount.toString())
+                }
                 coachLine?.let {
                     Text(text = it, color = Palette.textSecondary, fontSize = 12.sp)
                 }

@@ -32,6 +32,7 @@ data class RecordingState(
     val currentLat: Double? = null,
     val currentLon: Double? = null,
     val currentBearing: Double? = null,
+    val currentSpeedMps: Double? = null,
     val activityId: Long? = null,
     val storageError: String? = null,
     val lastActivityId: Long? = null,
@@ -116,6 +117,7 @@ class RecordingController(
             currentLat = fix.lat,
             currentLon = fix.lon,
             currentBearing = fix.bearingDeg,
+            currentSpeedMps = fix.speedMps,
             activityId = activityId,
         )
         persist(e)
