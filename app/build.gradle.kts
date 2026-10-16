@@ -38,6 +38,7 @@ android {
 
 dependencies {
     implementation(project(":core:model"))
+    implementation(project(":core:geo"))
     implementation(project(":engine"))
     implementation(project(":data"))
     implementation(project(":recording"))
