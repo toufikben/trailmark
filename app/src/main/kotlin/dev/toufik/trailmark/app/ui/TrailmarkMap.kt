@@ -29,9 +29,9 @@ private const val FLAT_STYLE =
        {"id":"background","type":"background","paint":{"background-color":"#0E1113"}}]}"""
 
 /** A compact OpenMapTiles style: background, landcover, water, roads (no glyphs needed). */
-private fun vectorStyle(mbtilesPath: String): String = """
+private fun vectorStyle(packPath: String): String = """
     {"version":8,"name":"trailmark-omt",
-     "sources":{"openmaptiles":{"type":"vector","url":"mbtiles://$mbtilesPath"}},
+     "sources":{"openmaptiles":{"type":"vector","url":"pmtiles://file://$packPath"}},
      "layers":[
        {"id":"background","type":"background","paint":{"background-color":"#0E1113"}},
        {"id":"landcover","type":"fill","source":"openmaptiles","source-layer":"landcover",
@@ -52,7 +52,7 @@ private fun vectorStyle(mbtilesPath: String): String = """
 fun TrailmarkMap(
     points: List<StoredPoint>,
     modifier: Modifier = Modifier,
-    mbtilesPath: String? = null,
+    packPath: String? = null,
 ) {
     val context = LocalContext.current
     val route = remember(points) { points.filter { it.type != WaypointType.REJECTED } }
@@ -73,10 +73,10 @@ fun TrailmarkMap(
         }
     }
 
-    LaunchedEffect(route, mbtilesPath) {
+    LaunchedEffect(route, packPath) {
         mapView.getMapAsync { map ->
             val builder =
-                if (mbtilesPath != null) Style.Builder().fromJson(vectorStyle(mbtilesPath))
+                if (packPath != null) Style.Builder().fromJson(vectorStyle(packPath))
                 else Style.Builder().fromJson(FLAT_STYLE)
             map.setStyle(builder) { style ->
                 if (style.getLayer("route-layer") != null) style.removeLayer("route-layer")

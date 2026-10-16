@@ -90,7 +90,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                     TrailmarkMap(
                         points = d.points,
                         modifier = Modifier.fillMaxWidth().height(360.dp).padding(top = 12.dp),
-                        mbtilesPath = packPath,
+                        packPath = packPath,
                     )
                 }
             }
