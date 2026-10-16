@@ -1,7 +1,8 @@
 package dev.toufik.trailmark.app.ui
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickableimport androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,6 +20,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,14 +35,57 @@ import dev.toufik.trailmark.app.formatDistance
 import dev.toufik.trailmark.app.formatDuration
 import dev.toufik.trailmark.app.formatPace
 import dev.toufik.trailmark.data.ActivityRow
+import dev.toufik.trailmark.core.geo.haversineMeters
+import dev.toufik.trailmark.core.model.StoredPoint
+import dev.toufik.trailmark.core.model.WaypointType
+import dev.toufik.trailmark.portable.Gpx
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
 fun HistoryScreen(onOpen: (Long) -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
     val t = LocalTexts.current
+    val scope = rememberCoroutineScope()
     var items by remember { mutableStateOf<List<ActivityRow>?>(null) }
+
+    fun reload() {
+        scope.launch {
+            items = withContext(Dispatchers.IO) { AppGraph.repository(context).listActivities() }
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            withContext(Dispatchers.IO) {
+                val text = context.contentResolver.openInputStream(uri)
+                    ?.bufferedReader()?.use { it.readText() } ?: return@withContext
+                val imported = Gpx.read(text)
+                if (imported.size < 2) return@withContext
+                val t0 = imported.first().timeMillis ?: System.currentTimeMillis()
+                var dist = 0.0
+                val pts = ArrayList<StoredPoint>(imported.size)
+                imported.forEachIndexed { i, p ->
+                    if (i > 0) {
+                        dist += haversineMeters(
+                            imported[i - 1].lat, imported[i - 1].lon, p.lat, p.lon,
+                        )
+                    }
+                    val tn = ((p.timeMillis ?: t0) - t0) * 1_000_000L
+                    pts.add(StoredPoint(p.lat, p.lon, tn, 5.0, WaypointType.NORMAL, altitudeM = p.altitudeM))
+                }
+                val repo = AppGraph.repository(context)
+                val id = repo.insertActivity("import-${System.currentTimeMillis()}", "RUN", t0)
+                repo.appendPoints(id, pts)
+                repo.finishActivity(id, pts.last().timeNanos, dist, pts.size.toLong(), 0, false)
+            }
+            reload()
+        }
+    }
     LaunchedEffect(Unit) {
         items = withContext(Dispatchers.IO) { AppGraph.repository(context).listActivities() }
     }
@@ -53,6 +98,11 @@ fun HistoryScreen(onOpen: (Long) -> Unit, onBack: () -> Unit) {
             ) {
                 TextButton(onClick = onBack) { Text(t.back, color = Palette.accent) }
                 Text(t.history, color = Palette.text, fontSize = 22.sp)
+                TextButton(onClick = {
+                    importLauncher.launch(
+                        arrayOf("application/gpx+xml", "application/octet-stream", "*/*"),
+                    )
+                }) { Text(t.importGpx, color = Palette.accent) }
             }
 
             val list = items

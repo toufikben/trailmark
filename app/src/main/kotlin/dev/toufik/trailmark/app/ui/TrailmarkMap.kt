@@ -28,7 +28,7 @@ private const val FLAT_STYLE =
     """{"version":8,"name":"trailmark-dark","sources":{},"layers":[
        {"id":"background","type":"background","paint":{"background-color":"#0E1113"}}]}"""
 
-/** A compact OpenMapTiles style: background, landcover, water, roads (no glyphs needed). */
+/** A richer OpenMapTiles style (no glyphs, so labels are omitted for now). */
 private fun vectorStyle(packPath: String): String = """
     {"version":8,"name":"trailmark-omt",
      "sources":{"openmaptiles":{"type":"vector","url":"pmtiles://file://$packPath"}},
@@ -36,10 +36,27 @@ private fun vectorStyle(packPath: String): String = """
        {"id":"background","type":"background","paint":{"background-color":"#0E1113"}},
        {"id":"landcover","type":"fill","source":"openmaptiles","source-layer":"landcover",
         "paint":{"fill-color":"#141A16"}},
+       {"id":"landuse","type":"fill","source":"openmaptiles","source-layer":"landuse",
+        "paint":{"fill-color":"#161C17"}},
+       {"id":"park","type":"fill","source":"openmaptiles","source-layer":"park",
+        "paint":{"fill-color":"#16241A"}},
        {"id":"water","type":"fill","source":"openmaptiles","source-layer":"water",
         "paint":{"fill-color":"#12232E"}},
-       {"id":"roads","type":"line","source":"openmaptiles","source-layer":"transportation",
-        "paint":{"line-color":"#39444E","line-width":["interpolate",["linear"],["zoom"],8,1.0,14,4.0]}}
+       {"id":"waterway","type":"line","source":"openmaptiles","source-layer":"waterway",
+        "paint":{"line-color":"#12232E","line-width":1.0}},
+       {"id":"building","type":"fill","source":"openmaptiles","source-layer":"building","minzoom":13,
+        "paint":{"fill-color":"#1E2429"}},
+       {"id":"road-minor","type":"line","source":"openmaptiles","source-layer":"transportation",
+        "filter":["in","class","tertiary","minor","service","residential"],
+        "paint":{"line-color":"#333E48","line-width":["interpolate",["linear"],["zoom"],12,0.6,14,2.4]}},
+       {"id":"road-major","type":"line","source":"openmaptiles","source-layer":"transportation",
+        "filter":["in","class","motorway","trunk","primary","secondary"],
+        "paint":{"line-color":"#4A5560","line-width":["interpolate",["linear"],["zoom"],8,1.2,14,5.0]}},
+       {"id":"rail","type":"line","source":"openmaptiles","source-layer":"transportation",
+        "filter":["==","class","rail"],
+        "paint":{"line-color":"#2A3138","line-width":1.0}},
+       {"id":"boundary","type":"line","source":"openmaptiles","source-layer":"boundary",
+        "paint":{"line-color":"#3A444E","line-width":1.0}}
      ]}
 """.trimIndent()
 

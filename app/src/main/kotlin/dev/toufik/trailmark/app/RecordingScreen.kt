@@ -36,6 +36,8 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import dev.toufik.trailmark.app.service.RecordingHolder
 import dev.toufik.trailmark.app.service.RecordingService
+import dev.toufik.trailmark.analytics.Ghost
+import dev.toufik.trailmark.analytics.ghostDeltaM
 import dev.toufik.trailmark.coach.Coach
 import dev.toufik.trailmark.coach.CoachEvent
 import dev.toufik.trailmark.coach.Locale
@@ -76,21 +78,26 @@ fun RecordingScreen(
     val t = LocalTexts.current
     val state by RecordingHolder.state.collectAsState()
     var coachLine by remember { mutableStateOf<String?>(null) }
+    var ghost by remember { mutableStateOf<Ghost?>(null) }
 
     LaunchedEffect(Unit) {
-        val last = withContext(Dispatchers.IO) {
-            AppGraph.repository(context).listActivities()
-                .firstOrNull { !it.isOpen && it.distanceM > 0 }
+        val loaded = withContext(Dispatchers.IO) {
+            val repo = AppGraph.repository(context)
+            val last = repo.listActivities().firstOrNull { !it.isOpen && it.distanceM > 0 }
+                ?: return@withContext null
+            last to repo.loadPoints(last.id)
         }
-        coachLine = last?.let {
-            Coach.message(
+        if (loaded != null) {
+            val (row, points) = loaded
+            coachLine = Coach.message(
                 CoachEvent.PreviousBest(
-                    distanceM = it.distanceM,
-                    seconds = it.elapsedNanos / 1_000_000_000L,
-                    targetM = it.distanceM,
+                    distanceM = row.distanceM,
+                    seconds = row.elapsedNanos / 1_000_000_000L,
+                    targetM = row.distanceM,
                 ),
                 Locale.AR,
             )
+            if (points.size >= 2) ghost = Ghost(points, points.first().timeNanos)
         }
     }
 
@@ -143,6 +150,15 @@ fun RecordingScreen(
             Text(text = "${t.points}: ${state.fixCount}", color = Palette.textSecondary, fontSize = 14.sp)
             coachLine?.let {
                 Text(text = it, color = Palette.textSecondary, fontSize = 13.sp, textAlign = TextAlign.Center)
+            }
+            val g = ghost
+            if (g != null && state.phase == Phase.RECORDING) {
+                val d = ghostDeltaM(g, state.distanceM, state.elapsedNanos).toInt()
+                Text(
+                    text = "${t.ghost}: ${if (d >= 0) "+" else ""}$d م",
+                    color = Palette.accent,
+                    fontSize = 13.sp,
+                )
             }
             Text(text = qualityLabel(t, state.quality), color = Palette.textSecondary, fontSize = 13.sp)
             if (state.isIdle) {
