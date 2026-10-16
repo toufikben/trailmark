@@ -45,6 +45,7 @@ class MainActivity : ComponentActivity() {
                             Screen.Record -> RecordingScreen(
                                 onHistory = { screen = Screen.History },
                                 onRegions = { screen = Screen.Regions },
+                                onOpenDetail = { id -> screen = Screen.Detail(id) },
                                 lang = lang,
                                 onLang = { lang = it },
                             )

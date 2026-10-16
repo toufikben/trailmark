@@ -7,15 +7,24 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -28,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -75,6 +85,7 @@ private fun qualityLabel(t: Texts, q: GpsQuality): String = when (q) {
 fun RecordingScreen(
     onHistory: () -> Unit,
     onRegions: () -> Unit,
+    onOpenDetail: (Long) -> Unit,
     lang: Lang,
     onLang: (Lang) -> Unit,
 ) {
@@ -147,23 +158,41 @@ fun RecordingScreen(
                     modifier = Modifier.fillMaxSize(),
                 )
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(6.dp),
+                    modifier = Modifier.fillMaxWidth().padding(8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row {
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(Palette.surface.copy(alpha = 0.85f))
+                            .padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         Lang.entries.forEach { l ->
-                            TextButton(onClick = { onLang(l) }) {
+                            TextButton(
+                                onClick = { onLang(l) },
+                                modifier = Modifier.heightIn(min = 44.dp),
+                            ) {
                                 Text(
                                     l.code.uppercase(),
                                     color = if (l == lang) Palette.accent else Palette.textSecondary,
+                                    fontSize = 12.sp,
                                 )
                             }
                         }
                     }
-                    Row {
-                        TextButton(onClick = onHistory) { Text(t.history, color = Palette.accent) }
-                        TextButton(onClick = onRegions) { Text(t.regions, color = Palette.accent) }
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(Palette.surface.copy(alpha = 0.85f)),
+                    ) {
+                        IconButton(onClick = onHistory, modifier = Modifier.size(48.dp)) {
+                            Icon(Icons.Filled.History, contentDescription = t.history, tint = Palette.text)
+                        }
+                        IconButton(onClick = onRegions, modifier = Modifier.size(48.dp)) {
+                            Icon(Icons.Filled.Map, contentDescription = t.regions, tint = Palette.text)
+                        }
                     }
                 }
                 Text(
@@ -255,6 +284,13 @@ fun RecordingScreen(
                             contentColor = Palette.text,
                         ),
                     ) { Text(t.start) }
+                }
+
+                val lastId = state.lastActivityId
+                if (state.phase == Phase.STOPPED && lastId != null) {
+                    TextButton(onClick = { onOpenDetail(lastId) }) {
+                        Text(t.details, color = Palette.accent)
+                    }
                 }
             }
         }
