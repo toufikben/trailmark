@@ -1,0 +1,86 @@
+CREATE TABLE activity (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  uuid TEXT NOT NULL,
+  sport TEXT NOT NULL,
+  start_wall_millis INTEGER NOT NULL,
+  elapsed_nanos INTEGER NOT NULL DEFAULT 0,
+  distance_m REAL NOT NULL DEFAULT 0,
+  climb_m REAL NOT NULL DEFAULT 0,
+  fix_count INTEGER NOT NULL DEFAULT 0,
+  rejected_count INTEGER NOT NULL DEFAULT 0,
+  mock_detected INTEGER NOT NULL DEFAULT 0,
+  is_deleted INTEGER NOT NULL DEFAULT 0,
+  server_uuid TEXT,
+  updated_at INTEGER
+);
+
+CREATE TABLE track_point (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  activity_id INTEGER NOT NULL REFERENCES activity(id),
+  time_nanos INTEGER NOT NULL,
+  lat REAL NOT NULL,
+  lon REAL NOT NULL,
+  alt_gnss REAL,
+  accuracy_m REAL,
+  speed_mps REAL,
+  bearing_deg REAL,
+  waypoint_type TEXT NOT NULL
+);
+
+CREATE TABLE track_state (
+  key TEXT NOT NULL PRIMARY KEY,
+  activity_id INTEGER NOT NULL,
+  last_time_nanos INTEGER NOT NULL,
+  last_lat REAL NOT NULL,
+  last_lon REAL NOT NULL,
+  last_accuracy_m REAL,
+  last_type TEXT NOT NULL,
+  distance_m REAL NOT NULL,
+  last_elapsed_nanos INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE app_flag (
+  key TEXT NOT NULL PRIMARY KEY,
+  value INTEGER NOT NULL
+);
+
+insertActivity:
+INSERT INTO activity(uuid, sport, start_wall_millis) VALUES (?, ?, ?);
+
+lastId:
+SELECT last_insert_rowid();
+
+insertPoint:
+INSERT INTO track_point(activity_id, time_nanos, lat, lon, alt_gnss, accuracy_m, speed_mps, bearing_deg, waypoint_type)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+countPoints:
+SELECT count(*) FROM track_point WHERE activity_id = ?;
+
+finishActivity:
+UPDATE activity SET elapsed_nanos = ?, distance_m = ?, fix_count = ?, rejected_count = ?, mock_detected = ? WHERE id = ?;
+
+selectActivity:
+SELECT * FROM activity WHERE id = ? LIMIT 1;
+
+selectPoints:
+SELECT * FROM track_point WHERE activity_id = ? ORDER BY id ASC;
+
+listActivities:
+SELECT * FROM activity WHERE is_deleted = 0 ORDER BY start_wall_millis DESC, id DESC;
+
+upsertResume:
+INSERT OR REPLACE INTO track_state(key, activity_id, last_time_nanos, last_lat, last_lon, last_accuracy_m, last_type, distance_m, last_elapsed_nanos)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectResume:
+SELECT * FROM track_state WHERE key = 'resume' LIMIT 1;
+
+clearResume:
+DELETE FROM track_state WHERE key = 'resume' AND activity_id = ?;
+
+getFlag:
+SELECT value FROM app_flag WHERE key = ? LIMIT 1;
+
+setFlag:
+INSERT OR REPLACE INTO app_flag(key, value) VALUES (?, ?);

@@ -4,9 +4,7 @@ pluginManagement {
         mavenCentral()
         gradlePluginPortal()
     }
-}
-
-dependencyResolutionManagement {
+}dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
@@ -16,4 +14,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "trailmark"
 
-include(":core:model", ":core:geo", ":core:time", ":engine")
+include(":core:model", ":core:geo", ":core:time", ":engine", ":data")
