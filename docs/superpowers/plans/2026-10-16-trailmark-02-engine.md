@@ -1,6 +1,6 @@
 # Trailmark — خطة 02: نقل محرّك التسجيل
 
-> **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development or superpowers:executing-plans. Steps use `- [ ]`.
+> **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development or superpowers:executing-plans. Steps use `- [x]`.
 
 **Goal:** نقل قواعد محرّك التسجيل من Dart إلى وحدة `:engine` نقية على JVM مع اختباراتها.
 
@@ -25,17 +25,17 @@
 ## Task 1: `SportConfig` + `GpsQuality`
 **Files:** `engine/build.gradle.kts`, `SportConfig.kt`, `GpsQuality.kt` + tests.
 **Produces:** `enum Sport { WALK, RUN, BIKE }`; `SportConfig(...).gateFor(Double)`; `forSport(Sport)`; `enum GpsQuality`; `GpsQualityX.fromAccuracy`; `isFixGoodEnough`; `UNMEASURED_ACCURACY_M`; `FixQualityGate(nowNanos).add/quality`.
-- [ ] اختبارات: `max(3,2a)` بلا سقف؛ infinite ⇒ infinite gate؛ tiers؛ ر7 نقطتان؛ ر8 = 20s.
-- [ ] تنفيذ ثم PASS ثم commit.
+- [x] اختبارات: `max(3,2a)` بلا سقف؛ infinite ⇒ infinite gate؛ tiers؛ ر7 نقطتان؛ ر8 = 20s.
+- [x] تنفيذ ثم PASS ثم commit.
 
 ## Task 2: `RecorderEngine`
 **Files:** `RecorderEngine.kt` (+ `EngineStats`, `RawFixSink`).
 **Produces:** `RecorderEngine(config, startNanos, rawSink=null, resumeFrom=null, resumeDistanceM=0.0)`; `onFix(RawFix)`; `storedPoints`, `distanceMeters`, `elapsedNanos`, `isIdle`, `stats`.
-- [ ] اختبارات: القواعد كاملة (بوابة، اندفاع، R39، R40، R41، خمول، نبضة، unmeasured، ترتيب زمني).
-- [ ] تنفيذ ثم PASS ثم commit.
+- [x] اختبارات: القواعد كاملة (بوابة، اندفاع، R39، R40، R41، خمول، نبضة، unmeasured، ترتيب زمني).
+- [x] تنفيذ ثم PASS ثم commit.
 
 ## Task 3: `Splits`
 **Files:** `Splits.kt` + test.
 **Produces:** `data class Split(...)`; `computeSplits(List<StoredPoint>): List<Split>`.
-- [ ] اختبارات: 1km split صحيح؛ تخطّي المرفوض؛ مقاطع متعددة الحدود؛ صفر امتداد.
-- [ ] تنفيذ ثم PASS ثم commit.
+- [x] اختبارات: 1km split صحيح؛ تخطّي المرفوض؛ مقاطع متعددة الحدود؛ صفر امتداد.
+- [x] تنفيذ ثم PASS ثم commit.
