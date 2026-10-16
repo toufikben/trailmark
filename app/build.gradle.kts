@@ -16,7 +16,24 @@ android {
         versionName = "0.1.0"
     }
 
+    signingConfigs {
+        create("sharedDebug") {
+            val shared = file("shared-debug.jks")
+            if (shared.exists()) {
+                storeFile = shared
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            if (file("shared-debug.jks").exists()) {
+                signingConfig = signingConfigs.getByName("sharedDebug")
+            }
+        }
         release {
             isMinifyEnabled = false
         }
