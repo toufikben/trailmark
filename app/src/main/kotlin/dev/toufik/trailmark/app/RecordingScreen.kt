@@ -19,8 +19,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -188,10 +188,10 @@ fun RecordingScreen(
                             .background(Palette.surface.copy(alpha = 0.85f)),
                     ) {
                         IconButton(onClick = onHistory, modifier = Modifier.size(48.dp)) {
-                            Icon(Icons.Filled.History, contentDescription = t.history, tint = Palette.text)
+                            Icon(Icons.Filled.List, contentDescription = t.history, tint = Palette.text)
                         }
                         IconButton(onClick = onRegions, modifier = Modifier.size(48.dp)) {
-                            Icon(Icons.Filled.Map, contentDescription = t.regions, tint = Palette.text)
+                            Icon(Icons.Filled.Place, contentDescription = t.regions, tint = Palette.text)
                         }
                     }
                 }
