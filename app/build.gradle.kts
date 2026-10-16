@@ -44,6 +44,7 @@ dependencies {
     implementation(project(":recording"))
     implementation(project(":regions"))
     implementation(project(":analytics"))
+    implementation(project(":coach"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)

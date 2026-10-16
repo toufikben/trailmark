@@ -19,8 +19,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -30,7 +34,12 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import dev.toufik.trailmark.app.service.RecordingHolder
 import dev.toufik.trailmark.app.service.RecordingService
+import dev.toufik.trailmark.coach.Coach
+import dev.toufik.trailmark.coach.CoachEvent
+import dev.toufik.trailmark.coach.Locale
 import dev.toufik.trailmark.recording.Phase
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private fun granted(context: Context, permission: String): Boolean =
     ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
@@ -50,6 +59,24 @@ private fun stopService(context: Context) {
 fun RecordingScreen(onHistory: () -> Unit, onRegions: () -> Unit) {
     val context = LocalContext.current
     val state by RecordingHolder.state.collectAsState()
+    var coachLine by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        val last = withContext(Dispatchers.IO) {
+            AppGraph.repository(context).listActivities()
+                .firstOrNull { !it.isOpen && it.distanceM > 0 }
+        }
+        coachLine = last?.let {
+            Coach.message(
+                CoachEvent.PreviousBest(
+                    distanceM = it.distanceM,
+                    seconds = it.elapsedNanos / 1_000_000_000L,
+                    targetM = it.distanceM,
+                ),
+                Locale.AR,
+            )
+        }
+    }
 
     val permissions = buildList {
         add(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -84,6 +111,9 @@ fun RecordingScreen(onHistory: () -> Unit, onRegions: () -> Unit) {
             )
             Text(text = formatDuration(state.elapsedNanos), color = Palette.text, fontSize = 22.sp)
             Text(text = "النقاط: ${state.fixCount}", color = Palette.textSecondary, fontSize = 14.sp)
+            coachLine?.let {
+                Text(text = it, color = Palette.textSecondary, fontSize = 13.sp, textAlign = TextAlign.Center)
+            }
             state.storageError?.let {
                 Text(
                     text = "التسجيل مستمر لكن النقاط لا تُحفظ",
