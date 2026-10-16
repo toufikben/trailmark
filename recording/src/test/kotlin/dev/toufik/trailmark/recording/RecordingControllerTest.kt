@@ -33,7 +33,7 @@ class RecordingControllerTest {
     @Test
     fun recordsEveryStoredPointAndFinalizesOnStop() = runTest {
         val r = repo()
-        val c = RecordingController(r, ListSource(walkFixes(5)), this, nowNanos = { 0L })
+        val c = RecordingController(r, ListSource(walkFixes(5)), backgroundScope, nowNanos = { 0L })
         c.start()
         advanceUntilIdle()
 
@@ -60,7 +60,7 @@ class RecordingControllerTest {
             distanceM = 100.0,
             elapsedNanos = 50_000_000_000L,
         )
-        val c = RecordingController(r, ListSource(walkFixes(4)), this, nowNanos = { 0L })
+        val c = RecordingController(r, ListSource(walkFixes(4)), backgroundScope, nowNanos = { 0L })
         c.start()
         advanceUntilIdle()
 
@@ -78,7 +78,7 @@ class RecordingControllerTest {
         val bad = (0 until 5).map {
             RawFix(36.7538 + it * (10.0 / 111111.0), 3.1856, it * 10_000_000_000L, 90.0, speedMps = 1.0)
         }
-        val c = RecordingController(r, ListSource(bad), this, nowNanos = { 0L })
+        val c = RecordingController(r, ListSource(bad), backgroundScope, nowNanos = { 0L })
         c.start()
         advanceUntilIdle()
 
