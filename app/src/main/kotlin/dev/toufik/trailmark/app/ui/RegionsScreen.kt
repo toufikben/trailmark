@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.maps.HttpBytesFetcher
 import dev.toufik.trailmark.app.maps.MANIFEST_URL
@@ -39,6 +40,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun RegionsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
+    val t = LocalTexts.current
     val scope = rememberCoroutineScope()
     var manifest by remember { mutableStateOf<RegionManifest?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -66,15 +68,15 @@ fun RegionsScreen(onBack: () -> Unit) {
     Surface(color = Palette.bg, modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onBack) { Text("رجوع ›", color = Palette.accent) }
-                Text("مناطق الخرائط", color = Palette.text, fontSize = 22.sp)
+                TextButton(onClick = onBack) { Text(t.back, color = Palette.accent) }
+                Text(t.mapRegions, color = Palette.text, fontSize = 22.sp)
             }
 
             val m = manifest
             when {
                 error != null -> Text(error!!, color = Palette.textSecondary, fontSize = 14.sp)
-                m == null -> Text("جارٍ التحميل…", color = Palette.textSecondary, fontSize = 14.sp)
-                m.packs.isEmpty() -> Text("لا حِزَم متاحة", color = Palette.textSecondary)
+                m == null -> Text(t.searching, color = Palette.textSecondary, fontSize = 14.sp)
+                m.packs.isEmpty() -> Text(t.noActivities, color = Palette.textSecondary)
                 else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(m.packs, key = { it.id }) { pack ->
                         Column(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
@@ -89,13 +91,13 @@ fun RegionsScreen(onBack: () -> Unit) {
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 if (pack.id in installed) {
-                                    Text("مثبّت", color = Palette.accent, fontSize = 13.sp)
+                                    Text(t.installed, color = Palette.accent, fontSize = 13.sp)
                                     TextButton(onClick = {
                                         scope.launch {
                                             withContext(Dispatchers.IO) { manager.remove(pack) }
                                             refreshInstalled(m.packs)
                                         }
-                                    }) { Text("حذف", color = Palette.textSecondary) }
+                                    }) { Text(t.delete, color = Palette.textSecondary) }
                                 } else {
                                     Button(
                                         enabled = installing == null,
@@ -116,7 +118,7 @@ fun RegionsScreen(onBack: () -> Unit) {
                                             containerColor = Palette.accent,
                                             contentColor = Palette.onAccent,
                                         ),
-                                    ) { Text(if (installing == pack.id) "…جارٍ التنزيل" else "تنزيل") }
+                                    ) { Text(if (installing == pack.id) t.installing else t.download) }
                                 }
                             }
                         }

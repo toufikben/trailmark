@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.toufik.trailmark.app.AppGraph
+import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.formatDate
 import dev.toufik.trailmark.app.formatDistance
@@ -38,6 +39,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun HistoryScreen(onOpen: (Long) -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
+    val t = LocalTexts.current
     var items by remember { mutableStateOf<List<ActivityRow>?>(null) }
     LaunchedEffect(Unit) {
         items = withContext(Dispatchers.IO) { AppGraph.repository(context).listActivities() }
@@ -49,8 +51,8 @@ fun HistoryScreen(onOpen: (Long) -> Unit, onBack: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = onBack) { Text("رجوع ›", color = Palette.accent) }
-                Text("سجل الأنشطة", color = Palette.text, fontSize = 22.sp)
+                TextButton(onClick = onBack) { Text(t.back, color = Palette.accent) }
+                Text(t.history, color = Palette.text, fontSize = 22.sp)
             }
 
             val list = items
@@ -66,9 +68,9 @@ fun HistoryScreen(onOpen: (Long) -> Unit, onBack: () -> Unit) {
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text("لا أنشطة بعد", color = Palette.text, fontSize = 18.sp)
+                    Text(t.noActivities, color = Palette.text, fontSize = 18.sp)
                     Text(
-                        "سجّل أول مسار ليظهر هنا",
+                        t.recordFirst,
                         color = Palette.textSecondary,
                         fontSize = 13.sp,
                     )

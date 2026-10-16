@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import dev.toufik.trailmark.app.AppGraph
+import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.formatDistance
 import dev.toufik.trailmark.app.formatDuration
@@ -42,6 +43,7 @@ private data class Detail(val row: ActivityRow, val points: List<StoredPoint>)
 @Composable
 fun DetailScreen(activityId: Long, onBack: () -> Unit) {
     val context = LocalContext.current
+    val t = LocalTexts.current
     var detail by remember { mutableStateOf<Detail?>(null) }
     var loading by remember { mutableStateOf(true) }
     val packPath = remember { dev.toufik.trailmark.app.maps.MapPacks.installedMapPack(context)?.absolutePath }
@@ -58,8 +60,8 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
     Surface(color = Palette.bg, modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onBack) { Text("رجوع ›", color = Palette.accent) }
-                Text("تفاصيل النشاط", color = Palette.text, fontSize = 22.sp)
+                TextButton(onClick = onBack) { Text(t.back, color = Palette.accent) }
+                Text(t.details, color = Palette.text, fontSize = 22.sp)
             }
 
             val d = detail
@@ -70,7 +72,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) { CircularProgressIndicator(color = Palette.accent) }
 
-                d == null -> Text("تعذّر تحميل النشاط", color = Palette.textSecondary)
+                d == null -> Text(t.loadFailed, color = Palette.textSecondary)
 
                 else -> {
                     val pace = if (d.row.distanceM < 50) null
@@ -84,13 +86,13 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text("الوقت ${formatDuration(d.row.elapsedNanos)}", color = Palette.text, fontSize = 15.sp)
+                        Text("${t.time} ${formatDuration(d.row.elapsedNanos)}", color = Palette.text, fontSize = 15.sp)
                         Text(
-                            "الإيقاع ${pace?.let { formatPace(it) } ?: "--:--"}",
+                            "${t.pace} ${pace?.let { formatPace(it) } ?: "--:--"}",
                             color = Palette.text,
                             fontSize = 15.sp,
                         )
-                        Text("النقاط ${d.row.fixCount}", color = Palette.text, fontSize = 15.sp)
+                        Text("${t.points} ${d.row.fixCount}", color = Palette.text, fontSize = 15.sp)
                     }
                     val a = remember(d) {
                         dev.toufik.trailmark.analytics.analyze(d.points, d.row.elapsedNanos)
@@ -100,12 +102,12 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text(
-                            "صعود ${a.elevationGainM.toInt()} م",
+                            "${t.elevation} ${a.elevationGainM.toInt()} م",
                             color = Palette.textSecondary,
                             fontSize = 14.sp,
                         )
                         Text(
-                            "أقصى ${"%.1f".format(a.maxSpeedMps * 3.6)} كم/س",
+                            "${t.maxSpeed} ${"%.1f".format(a.maxSpeedMps * 3.6)}",
                             color = Palette.textSecondary,
                             fontSize = 14.sp,
                         )
@@ -113,7 +115,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                         TextButton(onClick = {
                             shareGpx(context, d.points, d.row.startWallMillis, d.row.id)
-                        }) { Text("مشاركة GPX", color = Palette.accent) }
+                        }) { Text(t.share, color = Palette.accent) }
                     }
                     TrailmarkMap(
                         points = d.points,

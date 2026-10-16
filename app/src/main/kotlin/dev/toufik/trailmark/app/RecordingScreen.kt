@@ -28,6 +28,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -56,16 +58,22 @@ private fun stopService(context: Context) {
     )
 }
 
-private fun qualityLabel(q: GpsQuality): String = when (q) {
-    GpsQuality.NONE, GpsQuality.SEARCHING -> "جارٍ البحث عن الإشارة…"
-    GpsQuality.OK -> "تسجيل نشِط"
-    GpsQuality.DEGRADED -> "إشارة ضعيفة"
-    GpsQuality.LOST -> "فقدت الإشارة"
+private fun qualityLabel(t: Texts, q: GpsQuality): String = when (q) {
+    GpsQuality.NONE, GpsQuality.SEARCHING -> t.searching
+    GpsQuality.OK -> t.active
+    GpsQuality.DEGRADED -> t.weak
+    GpsQuality.LOST -> t.lost
 }
 
 @Composable
-fun RecordingScreen(onHistory: () -> Unit, onRegions: () -> Unit) {
+fun RecordingScreen(
+    onHistory: () -> Unit,
+    onRegions: () -> Unit,
+    lang: Lang,
+    onLang: (Lang) -> Unit,
+) {
     val context = LocalContext.current
+    val t = LocalTexts.current
     val state by RecordingHolder.state.collectAsState()
     var coachLine by remember { mutableStateOf<String?>(null) }
 
@@ -103,35 +111,45 @@ fun RecordingScreen(onHistory: () -> Unit, onRegions: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onHistory) {
-                    Text("سجل الأنشطة", color = Palette.accent)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row {
+                    Lang.entries.forEach { l ->
+                        TextButton(onClick = { onLang(l) }) {
+                            Text(
+                                text = l.code.uppercase(),
+                                color = if (l == lang) Palette.accent else Palette.textSecondary,
+                            )
+                        }
+                    }
                 }
-                TextButton(onClick = onRegions) {
-                    Text("الخرائط", color = Palette.accent)
+                Row {
+                    TextButton(onClick = onHistory) { Text(t.history, color = Palette.accent) }
+                    TextButton(onClick = onRegions) { Text(t.regions, color = Palette.accent) }
                 }
             }
+
             Text(
                 text = formatDistance(state.distanceM),
                 color = Palette.accent,
                 fontSize = 64.sp,
                 textAlign = TextAlign.Center,
+                modifier = Modifier.semantics { contentDescription = "${t.details} ${state.distanceM}" },
             )
             Text(text = formatDuration(state.elapsedNanos), color = Palette.text, fontSize = 22.sp)
-            Text(text = "النقاط: ${state.fixCount}", color = Palette.textSecondary, fontSize = 14.sp)
+            Text(text = "${t.points}: ${state.fixCount}", color = Palette.textSecondary, fontSize = 14.sp)
             coachLine?.let {
                 Text(text = it, color = Palette.textSecondary, fontSize = 13.sp, textAlign = TextAlign.Center)
             }
-            Text(text = qualityLabel(state.quality), color = Palette.textSecondary, fontSize = 13.sp)
+            Text(text = qualityLabel(t, state.quality), color = Palette.textSecondary, fontSize = 13.sp)
             if (state.isIdle) {
-                Text(text = "متوقف مؤقتاً (خمول)", color = Palette.accent, fontSize = 13.sp)
+                Text(text = t.paused, color = Palette.accent, fontSize = 13.sp)
             }
             state.storageError?.let {
-                Text(
-                    text = "التسجيل مستمر لكن النقاط لا تُحفظ",
-                    color = Palette.danger,
-                    fontSize = 13.sp,
-                )
+                Text(text = t.loadFailed, color = Palette.danger, fontSize = 13.sp)
             }
 
             Column(modifier = Modifier.weight(1f)) {}
@@ -144,7 +162,7 @@ fun RecordingScreen(onHistory: () -> Unit, onRegions: () -> Unit) {
                         containerColor = Palette.danger,
                         contentColor = Palette.text,
                     ),
-                ) { Text("إيقاف") }
+                ) { Text(t.stop) }
 
                 Phase.STARTING -> Button(
                     onClick = { stopService(context) },
@@ -153,7 +171,7 @@ fun RecordingScreen(onHistory: () -> Unit, onRegions: () -> Unit) {
                         containerColor = Palette.surface,
                         contentColor = Palette.text,
                     ),
-                ) { Text("إلغاء") }
+                ) { Text(t.cancel) }
 
                 Phase.STOPPED -> Button(
                     onClick = {
@@ -168,7 +186,7 @@ fun RecordingScreen(onHistory: () -> Unit, onRegions: () -> Unit) {
                         containerColor = Palette.surface,
                         contentColor = Palette.text,
                     ),
-                ) { Text("ابدأ التسجيل") }
+                ) { Text(t.start) }
             }
         }
     }
