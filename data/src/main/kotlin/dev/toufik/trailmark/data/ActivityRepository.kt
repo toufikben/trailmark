@@ -155,7 +155,7 @@ class ActivityRepository(private val db: TrailmarkDb) {
         (q.getFlag(key).executeAsOneOrNull())?.let { it != 0L } ?: default
 
     fun setFlag(key: String, value: Boolean) {
-        q.setFlag(key = key, value = if (value) 1L else 0L)
+        q.setFlag(key, if (value) 1L else 0L)
     }
 
     private fun parseType(name: String): WaypointType =
