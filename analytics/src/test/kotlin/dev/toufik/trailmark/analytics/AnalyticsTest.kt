@@ -14,8 +14,8 @@ class AnalysisTest {
     @Test
     fun computesGainLossAndMaxSpeed() {
         val pts = listOf(
-            p(0L, 36.7538, alt = 100.0),
-            p(10_000_000_000L, 36.7548, alt = 110.0),
+            p(0L, 36.7538, alt = 100.0, speed = 1.0),
+            p(10_000_000_000L, 36.7548, alt = 110.0, speed = 2.0),
             p(20_000_000_000L, 36.7558, alt = 105.0, speed = 4.0),
         )
         val a = analyze(pts, 20_000_000_000L)
