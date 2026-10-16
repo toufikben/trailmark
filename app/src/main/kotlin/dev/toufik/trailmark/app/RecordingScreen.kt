@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
@@ -56,6 +57,7 @@ import dev.toufik.trailmark.coach.Locale
 import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.core.model.WaypointType
 import dev.toufik.trailmark.engine.GpsQuality
+import dev.toufik.trailmark.engine.Sport
 import dev.toufik.trailmark.recording.Phase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -64,8 +66,10 @@ import kotlinx.coroutines.withContext
 private fun granted(context: Context, permission: String): Boolean =
     ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
 
-private fun startService(context: Context) {
-    val intent = Intent(context, RecordingService::class.java).setAction(RecordingService.ACTION_START)
+private fun startService(context: Context, sport: Sport) {
+    val intent = Intent(context, RecordingService::class.java)
+        .setAction(RecordingService.ACTION_START)
+        .putExtra(RecordingService.EXTRA_SPORT, sport.name)
     ContextCompat.startForegroundService(context, intent)
 }
 
@@ -84,11 +88,6 @@ private fun qualityLabel(t: Texts, q: GpsQuality): String = when (q) {
 
 @Composable
 private fun StatCell(label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = value, color = Palette.text, fontSize = 16.sp)
-        Text(text = label, color = Palette.textSecondary, fontSize = 11.sp)
-    }
-}
 @Composable
 fun RecordingScreen(
     onHistory: () -> Unit,
@@ -101,6 +100,7 @@ fun RecordingScreen(
     val t = LocalTexts.current
     val state by RecordingHolder.state.collectAsState()
     val packPath = remember { MapPacks.installedMapPack(context)?.absolutePath }
+    var sport by remember { mutableStateOf(Sport.RUN) }
 
     var route by remember { mutableStateOf<List<StoredPoint>>(emptyList()) }
     var coachLine by remember { mutableStateOf<String?>(null) }
@@ -154,7 +154,7 @@ fun RecordingScreen(
 
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
-    ) { result -> if (result[Manifest.permission.ACCESS_FINE_LOCATION] == true) startService(context) }
+    ) { result -> if (result[Manifest.permission.ACCESS_FINE_LOCATION] == true) startService(context, sport) }
 
     Surface(color = Palette.bg, modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -205,16 +205,26 @@ fun RecordingScreen(
                 }
                 Text(
                     text = qualityLabel(t, state.quality),
-                    color = Palette.textSecondary,
+                    color = Palette.text,
                     fontSize = 12.sp,
-                    modifier = Modifier.align(Alignment.BottomStart).padding(12.dp),
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(start = 12.dp, top = 64.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Palette.surface.copy(alpha = 0.85f))
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
                 )
                 if (state.isIdle) {
                     Text(
                         text = t.paused,
                         color = Palette.accent,
                         fontSize = 12.sp,
-                        modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp),
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(end = 12.dp, top = 64.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Palette.surface.copy(alpha = 0.85f))
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
                     )
                 }
             }
@@ -223,6 +233,19 @@ fun RecordingScreen(
                 modifier = Modifier.weight(4f).fillMaxWidth().padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                ) {
+                    Sport.entries.forEach { s ->
+                        FilterChip(
+                            selected = sport == s,
+                            enabled = state.phase == Phase.STOPPED,
+                            onClick = { if (state.phase == Phase.STOPPED) sport = s },
+                            label = { Text(sportLabelOf(t, s)) },
+                        )
+                    }
+                }
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
                         text = formatDistance(state.distanceM),
@@ -291,7 +314,7 @@ fun RecordingScreen(
                     Phase.STOPPED -> Button(
                         onClick = {
                             if (granted(context, Manifest.permission.ACCESS_FINE_LOCATION)) {
-                                startService(context)
+                                startService(context, sport)
                             } else {
                                 launcher.launch(permissions)
                             }
@@ -313,5 +336,20 @@ fun RecordingScreen(
             }
         }
     }
+}
+
+@Composable
+private fun StatCell(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(text = value, color = Palette.text, fontSize = 16.sp)
+        Text(text = label, color = Palette.textSecondary, fontSize = 11.sp)
+    }
+}
+
+private fun sportLabelOf(t: Texts, s: Sport): String = when (s) {
+    Sport.WALK -> t.walk
+    Sport.RUN -> t.run
+    Sport.BIKE -> t.bike
+    Sport.HIKE -> t.hike
 }
 

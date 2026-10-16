@@ -16,6 +16,9 @@ import androidx.core.app.ServiceCompat
 import dev.toufik.trailmark.R
 import dev.toufik.trailmark.app.MainActivity
 import dev.toufik.trailmark.app.gps.AndroidLocationFixSource
+import dev.toufik.trailmark.app.gps.SyntheticFixSource
+import dev.toufik.trailmark.engine.FixSource
+import dev.toufik.trailmark.engine.Sport
 import dev.toufik.trailmark.recording.RecordingController
 import dev.toufik.trailmark.recording.RecordingState
 import kotlinx.coroutines.CoroutineScope
@@ -39,13 +42,13 @@ class RecordingService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_START -> startRecording()
+            ACTION_START -> startRecording(intent)
             ACTION_STOP -> stopRecording()
         }
         return START_STICKY
     }
 
-    private fun startRecording() {
+    private fun startRecording(intent: Intent) {
         if (controller != null) return
         createChannel()
         ServiceCompat.startForeground(
@@ -60,10 +63,18 @@ class RecordingService : Service() {
         )
         acquireWakeLock()
 
+        val sport = intent.getStringExtra(EXTRA_SPORT)
+            ?.let { runCatching { Sport.valueOf(it) }.getOrNull() } ?: Sport.RUN
+        val source: FixSource = if (intent.getBooleanExtra(EXTRA_SYNTHETIC, false)) {
+            SyntheticFixSource()
+        } else {
+            AndroidLocationFixSource(this)
+        }
         val c = RecordingController(
             repo = dev.toufik.trailmark.app.AppGraph.repository(this),
-            source = AndroidLocationFixSource(this),
+            source = source,
             scope = scope,
+            sport = sport,
         )
         controller = c
         stateJob = scope.launch { c.state.collect { RecordingHolder.update(it) } }
@@ -135,6 +146,8 @@ class RecordingService : Service() {
     companion object {
         const val ACTION_START = "dev.toufik.trailmark.action.START"
         const val ACTION_STOP = "dev.toufik.trailmark.action.STOP"
+        const val EXTRA_SPORT = "sport"
+        const val EXTRA_SYNTHETIC = "synthetic"
         private const val CHANNEL_ID = "recording"
         private const val NOTIF_ID = 4711
     }

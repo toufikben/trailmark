@@ -2,7 +2,7 @@ package dev.toufik.trailmark.engine
 
 import kotlin.math.max
 
-enum class Sport { WALK, RUN, BIKE }
+enum class Sport { WALK, RUN, BIKE, HIKE }
 
 /**
  * Per-sport engine constants. [gateFor] is the store gate:
@@ -28,6 +28,7 @@ data class SportConfig(
             Sport.WALK -> SportConfig(Sport.WALK, maxSpeedMps = 2.5)
             Sport.RUN -> SportConfig(Sport.RUN, maxSpeedMps = 6.0)
             Sport.BIKE -> SportConfig(Sport.BIKE, maxSpeedMps = 20.0)
+            Sport.HIKE -> SportConfig(Sport.HIKE, maxSpeedMps = 2.0)
         }
     }
 }
