@@ -86,7 +86,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                         )
                         Text("النقاط ${d.row.fixCount}", color = Palette.text, fontSize = 15.sp)
                     }
-                    RouteCanvas(
+                    TrailmarkMap(
                         points = d.points,
                         modifier = Modifier.fillMaxWidth().height(360.dp).padding(top = 12.dp),
                     )

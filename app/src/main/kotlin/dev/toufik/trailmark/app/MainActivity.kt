@@ -20,6 +20,7 @@ sealed interface Screen {
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        org.maplibre.android.MapLibre.getInstance(this)
         setContent {
             TrailmarkTheme {
                 var screen by remember { mutableStateOf<Screen>(Screen.Record) }
