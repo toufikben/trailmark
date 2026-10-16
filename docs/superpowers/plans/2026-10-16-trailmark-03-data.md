@@ -1,6 +1,6 @@
 # Trailmark — خطة 03: طبقة البيانات (SQLDelight)
 
-> **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development or superpowers:executing-plans. Steps use `- [ ]`.
+> **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development or superpowers:executing-plans. Steps use `- [x]`.
 
 **Goal:** وحدة `:data` بمخطط SQLDelight + مستودع يطبّق قواعد التخزين، مُختبَرة على JVM.
 
@@ -16,15 +16,15 @@
 ---
 ## Task 1: الوحدة والمخطط
 **Files:** `data/build.gradle.kts`; `data/src/main/sqldelight/.../Activity.sq`.
-- [ ] جداول: activity, track_point, track_state, app_flag + استعلامات.
-- [ ] commit.
+- [x] جداول: activity, track_point, track_state, app_flag + استعلامات.
+- [x] commit.
 
 ## Task 2: المستودع
 **Files:** `.../data/DataModule.kt`, `.../data/ActivityRepository.kt`.
-- [ ] عمليات: insert/append/finish/pointCount/list/loadWithPoints/resume/flags.
-- [ ] commit.
+- [x] عمليات: insert/append/finish/pointCount/list/loadWithPoints/resume/flags.
+- [x] commit.
 
 ## Task 3: اختبارات JVM
 **Files:** `data/src/test/kotlin/.../ActivityRepositoryTest.kt`.
-- [ ] نقطة تُكتب وتُقرأ؛ استئناف؛ قائمة؛ علم؛ sentinel.
-- [ ] PASS ثم commit.
+- [x] نقطة تُكتب وتُقرأ؛ استئناف؛ قائمة؛ علم؛ sentinel.
+- [x] PASS ثم commit.
