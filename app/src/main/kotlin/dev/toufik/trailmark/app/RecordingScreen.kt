@@ -1,5 +1,9 @@
 package dev.toufik.trailmark.app
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,13 +14,21 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import dev.toufik.trailmark.app.gps.AndroidLocationFixSource
+import dev.toufik.trailmark.recording.Phase
+import dev.toufik.trailmark.recording.RecordingController
+import kotlinx.coroutines.launch
 
 /** Metres of accumulated distance as `km,ss`. */
 fun formatDistance(metres: Double): String {
@@ -40,9 +52,24 @@ fun formatDuration(nanos: Long): String {
 
 @Composable
 fun RecordingScreen() {
-    val controller = remember { RecordingController() }
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val s = controller.state
+    val controller = remember {
+        RecordingController(
+            repo = AppGraph.repository(context),
+            source = AndroidLocationFixSource(context),
+            scope = scope,
+        )
+    }
+    val state by controller.state.collectAsState()
+
+    fun hasPermission(): Boolean = ContextCompat.checkSelfPermission(
+        context, Manifest.permission.ACCESS_FINE_LOCATION,
+    ) == PackageManager.PERMISSION_GRANTED
+
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted -> if (granted) scope.launch { controller.start() } }
 
     Surface(color = Palette.bg, modifier = Modifier.fillMaxSize()) {
         Column(
@@ -51,18 +78,22 @@ fun RecordingScreen() {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = formatDistance(s.distanceM),
+                text = formatDistance(state.distanceM),
                 color = Palette.accent,
                 fontSize = 64.sp,
                 textAlign = TextAlign.Center,
             )
-            Text(text = formatDuration(s.elapsedNanos), color = Palette.text, fontSize = 22.sp)
-            Text(text = "النقاط: ${s.fixCount}", color = Palette.textSecondary, fontSize = 14.sp)
+            Text(text = formatDuration(state.elapsedNanos), color = Palette.text, fontSize = 22.sp)
+            Text(text = "النقاط: ${state.fixCount}", color = Palette.textSecondary, fontSize = 14.sp)
+            state.storageError?.let {
+                Text(text = "التسجيل مستمر لكن النقاط لا تُحفظ", color = Palette.danger, fontSize = 13.sp)
+            }
+
             Column(modifier = Modifier.weight(1f)) {}
 
-            if (s.running) {
+            if (state.phase == Phase.RECORDING) {
                 Button(
-                    onClick = { controller.stop() },
+                    onClick = { scope.launch { controller.stop() } },
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Palette.danger,
@@ -71,7 +102,10 @@ fun RecordingScreen() {
                 ) { Text("إيقاف") }
             } else {
                 Button(
-                    onClick = { controller.start(scope) },
+                    onClick = {
+                        if (hasPermission()) scope.launch { controller.start() }
+                        else launcher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                    },
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Palette.surface,

@@ -40,6 +40,7 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":engine"))
     implementation(project(":data"))
+    implementation(project(":recording"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)
