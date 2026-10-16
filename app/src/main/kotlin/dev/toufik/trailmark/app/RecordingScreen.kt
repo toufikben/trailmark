@@ -9,6 +9,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -16,6 +17,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -29,26 +31,6 @@ import androidx.core.content.ContextCompat
 import dev.toufik.trailmark.app.service.RecordingHolder
 import dev.toufik.trailmark.app.service.RecordingService
 import dev.toufik.trailmark.recording.Phase
-
-/** Metres of accumulated distance as `km,ss`. */
-fun formatDistance(metres: Double): String {
-    val km = metres / 1000.0
-    val whole = km.toLong()
-    val frac = Math.round((km - whole) * 100)
-    val f = if (frac == 100L) 0L else frac
-    val w = if (frac == 100L) whole + 1 else whole
-    return "$w,${f.toString().padStart(2, '0')}"
-}
-
-/** Elapsed monotonic nanos as `mm:ss` (adding `hh:` past an hour). */
-fun formatDuration(nanos: Long): String {
-    val s = nanos / 1_000_000_000L
-    val h = s / 3600
-    val m = (s % 3600) / 60
-    val sec = s % 60
-    fun p(n: Long) = n.toString().padStart(2, '0')
-    return if (h == 0L) "${p(m)}:${p(sec)}" else "${p(h)}:${p(m)}:${p(sec)}"
-}
 
 private fun granted(context: Context, permission: String): Boolean =
     ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
@@ -65,7 +47,7 @@ private fun stopService(context: Context) {
 }
 
 @Composable
-fun RecordingScreen() {
+fun RecordingScreen(onHistory: () -> Unit) {
     val context = LocalContext.current
     val state by RecordingHolder.state.collectAsState()
 
@@ -86,6 +68,11 @@ fun RecordingScreen() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onHistory) {
+                    Text("سجل الأنشطة", color = Palette.accent)
+                }
+            }
             Text(
                 text = formatDistance(state.distanceM),
                 color = Palette.accent,

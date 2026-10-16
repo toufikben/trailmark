@@ -119,8 +119,22 @@ class ActivityRepository(private val db: TrailmarkDb) {
         q.clearResume(activity_id = activityId)
     }
 
-    fun listActivities(): List<ActivityRow> {
-        val resume = q.selectResume().executeAsOneOrNull()
+    fun activityById(id: Long): ActivityRow? {
+        val r = q.selectActivity(id).executeAsOneOrNull() ?: return null
+        return ActivityRow(
+            id = r.id,
+            sport = r.sport,
+            startWallMillis = r.start_wall_millis,
+            distanceM = r.distance_m,
+            elapsedNanos = r.elapsed_nanos,
+            fixCount = r.fix_count,
+            rejectedCount = r.rejected_count,
+            mockDetected = r.mock_detected != 0L,
+            isOpen = false,
+        )
+    }
+
+    fun listActivities(): List<ActivityRow> {        val resume = q.selectResume().executeAsOneOrNull()
         return q.listActivities().executeAsList().map { r ->
             val open = resume?.activity_id == r.id
             ActivityRow(
