@@ -1,7 +1,10 @@
 package dev.toufik.trailmark.app
 
 import android.Manifest
+import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -16,8 +19,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -25,10 +26,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import dev.toufik.trailmark.app.gps.AndroidLocationFixSource
+import dev.toufik.trailmark.app.service.RecordingHolder
+import dev.toufik.trailmark.app.service.RecordingService
 import dev.toufik.trailmark.recording.Phase
-import dev.toufik.trailmark.recording.RecordingController
-import kotlinx.coroutines.launch
 
 /** Metres of accumulated distance as `km,ss`. */
 fun formatDistance(metres: Double): String {
@@ -50,26 +50,35 @@ fun formatDuration(nanos: Long): String {
     return if (h == 0L) "${p(m)}:${p(sec)}" else "${p(h)}:${p(m)}:${p(sec)}"
 }
 
+private fun granted(context: Context, permission: String): Boolean =
+    ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+
+private fun startService(context: Context) {
+    val intent = Intent(context, RecordingService::class.java).setAction(RecordingService.ACTION_START)
+    ContextCompat.startForegroundService(context, intent)
+}
+
+private fun stopService(context: Context) {
+    context.startService(
+        Intent(context, RecordingService::class.java).setAction(RecordingService.ACTION_STOP),
+    )
+}
+
 @Composable
 fun RecordingScreen() {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val controller = remember {
-        RecordingController(
-            repo = AppGraph.repository(context),
-            source = AndroidLocationFixSource(context),
-            scope = scope,
-        )
-    }
-    val state by controller.state.collectAsState()
+    val state by RecordingHolder.state.collectAsState()
 
-    fun hasPermission(): Boolean = ContextCompat.checkSelfPermission(
-        context, Manifest.permission.ACCESS_FINE_LOCATION,
-    ) == PackageManager.PERMISSION_GRANTED
+    val permissions = buildList {
+        add(Manifest.permission.ACCESS_FINE_LOCATION)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }.toTypedArray()
 
     val launcher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted -> if (granted) scope.launch { controller.start() } }
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { result -> if (result[Manifest.permission.ACCESS_FINE_LOCATION] == true) startService(context) }
 
     Surface(color = Palette.bg, modifier = Modifier.fillMaxSize()) {
         Column(
@@ -86,14 +95,18 @@ fun RecordingScreen() {
             Text(text = formatDuration(state.elapsedNanos), color = Palette.text, fontSize = 22.sp)
             Text(text = "النقاط: ${state.fixCount}", color = Palette.textSecondary, fontSize = 14.sp)
             state.storageError?.let {
-                Text(text = "التسجيل مستمر لكن النقاط لا تُحفظ", color = Palette.danger, fontSize = 13.sp)
+                Text(
+                    text = "التسجيل مستمر لكن النقاط لا تُحفظ",
+                    color = Palette.danger,
+                    fontSize = 13.sp,
+                )
             }
 
             Column(modifier = Modifier.weight(1f)) {}
 
             if (state.phase == Phase.RECORDING) {
                 Button(
-                    onClick = { scope.launch { controller.stop() } },
+                    onClick = { stopService(context) },
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Palette.danger,
@@ -103,8 +116,11 @@ fun RecordingScreen() {
             } else {
                 Button(
                     onClick = {
-                        if (hasPermission()) scope.launch { controller.start() }
-                        else launcher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                        if (granted(context, Manifest.permission.ACCESS_FINE_LOCATION)) {
+                            startService(context)
+                        } else {
+                            launcher.launch(permissions)
+                        }
                     },
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                     colors = ButtonDefaults.buttonColors(
