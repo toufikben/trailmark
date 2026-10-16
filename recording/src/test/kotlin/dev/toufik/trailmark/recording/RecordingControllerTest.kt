@@ -7,6 +7,7 @@ import dev.toufik.trailmark.core.model.WaypointType
 import dev.toufik.trailmark.data.ActivityRepository
 import dev.toufik.trailmark.data.createDatabase
 import dev.toufik.trailmark.engine.FixSource
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -21,12 +22,13 @@ private class ListSource(private val list: List<RawFix>) : FixSource {
 }
 
 private fun walkFixes(n: Int): List<RawFix> = (0 until n).map { i ->
-    RawFix(36.7538 + i * 0.0001, 3.1856, i * 1_000_000_000L, 3.0, speedMps = 1.4)
+    RawFix(36.7538 + i * (10.0 / 111111.0), 3.1856, i * 10_000_000_000L, 3.0, speedMps = 1.0)
 }
 
 private fun repo(): ActivityRepository =
     ActivityRepository(createDatabase(JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)))
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class RecordingControllerTest {
     @Test
     fun recordsEveryStoredPointAndFinalizesOnStop() = runTest {
