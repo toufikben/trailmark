@@ -87,6 +87,24 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                         )
                         Text("النقاط ${d.row.fixCount}", color = Palette.text, fontSize = 15.sp)
                     }
+                    val a = remember(d) {
+                        dev.toufik.trailmark.analytics.analyze(d.points, d.row.elapsedNanos)
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            "صعود ${a.elevationGainM.toInt()} م",
+                            color = Palette.textSecondary,
+                            fontSize = 14.sp,
+                        )
+                        Text(
+                            "أقصى ${"%.1f".format(a.maxSpeedMps * 3.6)} كم/س",
+                            color = Palette.textSecondary,
+                            fontSize = 14.sp,
+                        )
+                    }
                     TrailmarkMap(
                         points = d.points,
                         modifier = Modifier.fillMaxWidth().height(360.dp).padding(top = 12.dp),

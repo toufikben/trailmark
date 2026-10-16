@@ -43,6 +43,7 @@ dependencies {
     implementation(project(":data"))
     implementation(project(":recording"))
     implementation(project(":regions"))
+    implementation(project(":analytics"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)
