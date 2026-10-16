@@ -29,6 +29,10 @@ data class RecordingState(
     val fixCount: Int = 0,
     val quality: GpsQuality = GpsQuality.NONE,
     val isIdle: Boolean = false,
+    val currentLat: Double? = null,
+    val currentLon: Double? = null,
+    val currentBearing: Double? = null,
+    val activityId: Long? = null,
     val storageError: String? = null,
     val lastActivityId: Long? = null,
 )
@@ -109,6 +113,10 @@ class RecordingController(
             elapsedNanos = e.elapsedNanos,
             fixCount = e.stats.fixCount,
             isIdle = e.isIdle,
+            currentLat = fix.lat,
+            currentLon = fix.lon,
+            currentBearing = fix.bearingDeg,
+            activityId = activityId,
         )
         persist(e)
     }
@@ -126,7 +134,7 @@ class RecordingController(
             val slice = e.storedPoints.subList(written, e.storedCount)
             try {
                 val id = activityId ?: repo.insertActivity(newUuid(), sport.name, wallMillis())
-                    .also { activityId = it }
+                    .also { activityId = it; _state.value = _state.value.copy(activityId = it) }
                 repo.appendPoints(id, slice)
                 pointsWritten = written + slice.size
                 repo.saveResume(id, slice.last(), e.distanceMeters, resumeElapsedNanos + e.elapsedNanos)

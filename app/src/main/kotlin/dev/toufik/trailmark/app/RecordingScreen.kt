@@ -8,6 +8,7 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,20 +31,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import dev.toufik.trailmark.app.service.RecordingHolder
-import dev.toufik.trailmark.app.service.RecordingService
 import dev.toufik.trailmark.analytics.Ghost
 import dev.toufik.trailmark.analytics.ghostDeltaM
+import dev.toufik.trailmark.app.maps.MapPacks
+import dev.toufik.trailmark.app.service.RecordingHolder
+import dev.toufik.trailmark.app.service.RecordingService
+import dev.toufik.trailmark.app.ui.TrailmarkMap
 import dev.toufik.trailmark.coach.Coach
 import dev.toufik.trailmark.coach.CoachEvent
 import dev.toufik.trailmark.coach.Locale
+import dev.toufik.trailmark.core.model.StoredPoint
+import dev.toufik.trailmark.core.model.WaypointType
 import dev.toufik.trailmark.engine.GpsQuality
 import dev.toufik.trailmark.recording.Phase
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 private fun granted(context: Context, permission: String): Boolean =
@@ -66,7 +71,6 @@ private fun qualityLabel(t: Texts, q: GpsQuality): String = when (q) {
     GpsQuality.DEGRADED -> t.weak
     GpsQuality.LOST -> t.lost
 }
-
 @Composable
 fun RecordingScreen(
     onHistory: () -> Unit,
@@ -77,8 +81,23 @@ fun RecordingScreen(
     val context = LocalContext.current
     val t = LocalTexts.current
     val state by RecordingHolder.state.collectAsState()
+    val packPath = remember { MapPacks.installedMapPack(context)?.absolutePath }
+
+    var route by remember { mutableStateOf<List<StoredPoint>>(emptyList()) }
     var coachLine by remember { mutableStateOf<String?>(null) }
     var ghost by remember { mutableStateOf<Ghost?>(null) }
+
+    LaunchedEffect(state.activityId) {
+        val id = state.activityId
+        if (id == null) {
+            route = emptyList()
+            return@LaunchedEffect
+        }
+        while (true) {
+            route = withContext(Dispatchers.IO) { AppGraph.repository(context).loadPoints(id) }
+            delay(1500)
+        }
+    }
 
     LaunchedEffect(Unit) {
         val loaded = withContext(Dispatchers.IO) {
@@ -101,6 +120,12 @@ fun RecordingScreen(
         }
     }
 
+    val current: StoredPoint? = state.currentLat?.let { la ->
+        state.currentLon?.let { lo ->
+            StoredPoint(la, lo, state.elapsedNanos, 5.0, WaypointType.NORMAL, bearingDeg = state.currentBearing)
+        }
+    }
+
     val permissions = buildList {
         add(Manifest.permission.ACCESS_FINE_LOCATION)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -113,100 +138,126 @@ fun RecordingScreen(
     ) { result -> if (result[Manifest.permission.ACCESS_FINE_LOCATION] == true) startService(context) }
 
     Surface(color = Palette.bg, modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Row {
-                    Lang.entries.forEach { l ->
-                        TextButton(onClick = { onLang(l) }) {
-                            Text(
-                                text = l.code.uppercase(),
-                                color = if (l == lang) Palette.accent else Palette.textSecondary,
-                            )
+        Column(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.weight(6f).fillMaxWidth()) {
+                TrailmarkMap(
+                    points = route,
+                    packPath = packPath,
+                    current = current,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row {
+                        Lang.entries.forEach { l ->
+                            TextButton(onClick = { onLang(l) }) {
+                                Text(
+                                    l.code.uppercase(),
+                                    color = if (l == lang) Palette.accent else Palette.textSecondary,
+                                )
+                            }
                         }
                     }
+                    Row {
+                        TextButton(onClick = onHistory) { Text(t.history, color = Palette.accent) }
+                        TextButton(onClick = onRegions) { Text(t.regions, color = Palette.accent) }
+                    }
                 }
-                Row {
-                    TextButton(onClick = onHistory) { Text(t.history, color = Palette.accent) }
-                    TextButton(onClick = onRegions) { Text(t.regions, color = Palette.accent) }
-                }
-            }
-
-            Text(
-                text = formatDistance(state.distanceM),
-                color = Palette.accent,
-                fontSize = 64.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.semantics {
-                    contentDescription = "${formatDistance(state.distanceM)} ${t.km}"
-                },
-            )
-            Text(text = t.km, color = Palette.textSecondary, fontSize = 12.sp)
-            Text(text = formatDuration(state.elapsedNanos), color = Palette.text, fontSize = 22.sp)
-            Text(text = "${t.points}: ${state.fixCount}", color = Palette.textSecondary, fontSize = 14.sp)
-            coachLine?.let {
-                Text(text = it, color = Palette.textSecondary, fontSize = 13.sp, textAlign = TextAlign.Center)
-            }
-            val g = ghost
-            if (g != null && state.phase == Phase.RECORDING) {
-                val d = ghostDeltaM(g, state.distanceM, state.elapsedNanos).toInt()
                 Text(
-                    text = "${t.ghost}: ${if (d >= 0) "+" else ""}$d ${t.metre}",
-                    color = Palette.accent,
-                    fontSize = 13.sp,
+                    text = qualityLabel(t, state.quality),
+                    color = Palette.textSecondary,
+                    fontSize = 12.sp,
+                    modifier = Modifier.align(Alignment.BottomStart).padding(12.dp),
                 )
+                if (state.isIdle) {
+                    Text(
+                        text = t.paused,
+                        color = Palette.accent,
+                        fontSize = 12.sp,
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp),
+                    )
+                }
             }
-            Text(text = qualityLabel(t, state.quality), color = Palette.textSecondary, fontSize = 13.sp)
-            if (state.isIdle) {
-                Text(text = t.paused, color = Palette.accent, fontSize = 13.sp)
-            }
-            state.storageError?.let {
-                Text(text = t.loadFailed, color = Palette.danger, fontSize = 13.sp)
-            }
 
-            Column(modifier = Modifier.weight(1f)) {}
+            Column(
+                modifier = Modifier.weight(4f).fillMaxWidth().padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        text = formatDistance(state.distanceM),
+                        color = Palette.accent,
+                        fontSize = 52.sp,
+                        modifier = Modifier.semantics {
+                            contentDescription = "${formatDistance(state.distanceM)} ${t.km}"
+                        },
+                    )
+                    Text(
+                        text = " ${t.km}",
+                        color = Palette.textSecondary,
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                }
+                Text(text = formatDuration(state.elapsedNanos), color = Palette.text, fontSize = 20.sp)
+                Text(text = "${t.points}: ${state.fixCount}", color = Palette.textSecondary, fontSize = 13.sp)
+                coachLine?.let {
+                    Text(text = it, color = Palette.textSecondary, fontSize = 12.sp)
+                }
+                val g = ghost
+                if (g != null && state.phase == Phase.RECORDING) {
+                    val d = ghostDeltaM(g, state.distanceM, state.elapsedNanos).toInt()
+                    Text(
+                        text = "${t.ghost}: ${if (d >= 0) "+" else ""}$d ${t.metre}",
+                        color = Palette.accent,
+                        fontSize = 12.sp,
+                    )
+                }
+                state.storageError?.let {
+                    Text(text = t.loadFailed, color = Palette.danger, fontSize = 12.sp)
+                }
 
-            when (state.phase) {
-                Phase.RECORDING -> Button(
-                    onClick = { stopService(context) },
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Palette.danger,
-                        contentColor = Palette.text,
-                    ),
-                ) { Text(t.stop) }
+                Column(modifier = Modifier.weight(1f)) {}
 
-                Phase.STARTING -> Button(
-                    onClick = { stopService(context) },
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Palette.surface,
-                        contentColor = Palette.text,
-                    ),
-                ) { Text(t.cancel) }
+                when (state.phase) {
+                    Phase.RECORDING -> Button(
+                        onClick = { stopService(context) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Palette.danger,
+                            contentColor = Palette.text,
+                        ),
+                    ) { Text(t.stop) }
 
-                Phase.STOPPED -> Button(
-                    onClick = {
-                        if (granted(context, Manifest.permission.ACCESS_FINE_LOCATION)) {
-                            startService(context)
-                        } else {
-                            launcher.launch(permissions)
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Palette.surface,
-                        contentColor = Palette.text,
-                    ),
-                ) { Text(t.start) }
+                    Phase.STARTING -> Button(
+                        onClick = { stopService(context) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Palette.surface,
+                            contentColor = Palette.text,
+                        ),
+                    ) { Text(t.cancel) }
+
+                    Phase.STOPPED -> Button(
+                        onClick = {
+                            if (granted(context, Manifest.permission.ACCESS_FINE_LOCATION)) {
+                                startService(context)
+                            } else {
+                                launcher.launch(permissions)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Palette.surface,
+                            contentColor = Palette.text,
+                        ),
+                    ) { Text(t.start) }
+                }
             }
         }
     }
 }
+
