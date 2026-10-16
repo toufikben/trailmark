@@ -16,4 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "trailmark"
 
-include(":core:model", ":core:geo", ":core:time")
+include(":core:model", ":core:geo", ":core:time", ":engine")
