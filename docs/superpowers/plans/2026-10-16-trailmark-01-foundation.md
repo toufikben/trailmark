@@ -1,6 +1,6 @@
 # Trailmark — خطة 01: الأساس والوحدات البدئية
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use `- [ ]` checkboxes.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use `- [x]` checkboxes.
 
 **Goal:** مشروع Gradle متعدّد الوحدات لأندرويد + CI يبني ويختبر + نقل الوحدات النقية `core:time`, `core:geo`, `core:model`.
 
@@ -38,7 +38,7 @@ core/time/build.gradle.kts  + .../core/time/MonotonicTicker.kt (+ test)
 
 **Interfaces:** Produces: `class MonotonicTicker { val lastNanos: Long; fun accept(nanos: Long): Boolean; fun secondsSince(fromNanos: Long): Double }`
 
-- [ ] **Step 1: اختبار فاشل**
+- [x] **Step 1: اختبار فاشل**
 ```kotlin
 package dev.toufik.trailmark.core.time
 import org.junit.jupiter.api.Assertions.*
@@ -55,8 +55,8 @@ class MonotonicTickerTest {
   }
 }
 ```
-- [ ] **Step 2: شغّل وافشل** — `./gradlew :core:time:test` ⇒ FAIL (غير موجود).
-- [ ] **Step 3: التنفيذ**
+- [x] **Step 2: شغّل وافشل** — `./gradlew :core:time:test` ⇒ FAIL (غير موجود).
+- [x] **Step 3: التنفيذ**
 ```kotlin
 package dev.toufik.trailmark.core.time
 class MonotonicTicker {
@@ -65,15 +65,15 @@ class MonotonicTicker {
   fun secondsSince(fromNanos: Long): Double = (lastNanos - fromNanos) / 1e9
 }
 ```
-- [ ] **Step 4: شغّل ونجح** — `./gradlew :core:time:test` ⇒ PASS.
-- [ ] **Step 5: commit** — `feat: core:time MonotonicTicker`.
+- [x] **Step 4: شغّل ونجح** — `./gradlew :core:time:test` ⇒ PASS.
+- [x] **Step 5: commit** — `feat: core:time MonotonicTicker`.
 ---
 ## Task 2: `core:geo`
 
 **Files:** Create: `core/geo/build.gradle.kts`, `core/geo/src/main/kotlin/dev/toufik/trailmark/core/geo/Geo.kt`, test.
 **Interfaces:** Produces: `haversineMeters(Double,Double,Double,Double): Double`, `bearingDeg(...): Double`.
 
-- [ ] **Step 1: اختبار فاشل**
+- [x] **Step 1: اختبار فاشل**
 ```kotlin
 package dev.toufik.trailmark.core.geo
 import org.junit.jupiter.api.Assertions.*
@@ -84,8 +84,8 @@ class GeoTest {
   @Test fun bearingEast() = assertEquals(90.0, bearingDeg(36.75,3.18,36.75,3.19), 0.5)
 }
 ```
-- [ ] **Step 2: شغّل وافشل** — `./gradlew :core:geo:test`.
-- [ ] **Step 3: التنفيذ**
+- [x] **Step 2: شغّل وافشل** — `./gradlew :core:geo:test`.
+- [x] **Step 3: التنفيذ**
 ```kotlin
 package dev.toufik.trailmark.core.geo
 import kotlin.math.*
@@ -102,15 +102,15 @@ fun bearingDeg(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
   return (atan2(y,x)*180/PI + 360) % 360
 }
 ```
-- [ ] **Step 4: PASS** — `./gradlew :core:geo:test`.
-- [ ] **Step 5: commit** — `feat: core:geo haversine/bearing`.
+- [x] **Step 4: PASS** — `./gradlew :core:geo:test`.
+- [x] **Step 5: commit** — `feat: core:geo haversine/bearing`.
 ---
 ## Task 3: `core:model`
 
 **Files:** Create: `core/model/build.gradle.kts`, `core/model/src/main/kotlin/dev/toufik/trailmark/core/model/Model.kt`, test.
 **Interfaces:** Produces: `enum WaypointType { NORMAL, IDLE, REJECTED, SKIPPED }`; `data class RawFix(...)`; `data class StoredPoint(...)`; `fun displayablePoints(List<StoredPoint>): List<StoredPoint>`.
 
-- [ ] **Step 1: اختبار فاشل**
+- [x] **Step 1: اختبار فاشل**
 ```kotlin
 package dev.toufik.trailmark.core.model
 import org.junit.jupiter.api.Assertions.*
@@ -124,8 +124,8 @@ class ModelTest {
   @Test fun emptyStaysEmpty() = assertTrue(displayablePoints(emptyList()).isEmpty())
 }
 ```
-- [ ] **Step 2: شغّل وافشل** — `./gradlew :core:model:test`.
-- [ ] **Step 3: التنفيذ**
+- [x] **Step 2: شغّل وافشل** — `./gradlew :core:model:test`.
+- [x] **Step 3: التنفيذ**
 ```kotlin
 package dev.toufik.trailmark.core.model
 enum class WaypointType { NORMAL, IDLE, REJECTED, SKIPPED }
@@ -137,14 +137,14 @@ data class StoredPoint(val lat: Double, val lon: Double, val timeNanos: Long,
   val speedMps: Double? = null, val bearingDeg: Double? = null)
 fun displayablePoints(points: List<StoredPoint>) = points.filter { it.type != WaypointType.REJECTED }
 ```
-- [ ] **Step 4: PASS** — `./gradlew :core:model:test`.
-- [ ] **Step 5: commit** — `feat: core:model domain types + displayablePoints`.
+- [x] **Step 4: PASS** — `./gradlew :core:model:test`.
+- [x] **Step 5: commit** — `feat: core:model domain types + displayablePoints`.
 ---
 ## Task 4: هيكل Gradle والكتالوج والـ CI
 
 **Files:** Create: `settings.gradle.kts`, `build.gradle.kts`, `gradle.properties`, `gradle/libs.versions.toml`, `gradle/wrapper/gradle-wrapper.properties`, `.github/workflows/ci.yml`.
 
-- [ ] **Step 1: كتالوج الإصدارات** — `gradle/libs.versions.toml`
+- [x] **Step 1: كتالوج الإصدارات** — `gradle/libs.versions.toml`
 ```toml
 [versions]
 kotlin = "2.0.21"
@@ -157,8 +157,8 @@ android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 ```
-- [ ] **Step 2: `settings.gradle.kts`** — `pluginManagement`/`dependencyResolutionManagement` (google, mavenCentral)، `include(":core:model", ":core:geo", ":core:time")`.
-- [ ] **Step 3: وحدة JVM نموذجية** — مثال `core/time/build.gradle.kts`
+- [x] **Step 2: `settings.gradle.kts`** — `pluginManagement`/`dependencyResolutionManagement` (google, mavenCentral)، `include(":core:model", ":core:geo", ":core:time")`.
+- [x] **Step 3: وحدة JVM نموذجية** — مثال `core/time/build.gradle.kts`
 ```kotlin
 plugins { `kotlin-jvm` }
 kotlin { jvmToolchain(17) }
@@ -166,10 +166,10 @@ dependencies { testImplementation(libs.junit.jupiter) }
 tasks.test { useJUnitPlatform() }
 ```
 (نفس النمط لـ `core/geo`, `core/model`.)
-- [ ] **Step 4: wrapper** — `gradle wrapper --gradle-version 8.9`.
-- [ ] **Step 5: CI** — `.github/workflows/ci.yml`: JDK 17، `./gradlew test --no-daemon`.
-- [ ] **Step 6: تحقّق** — `./gradlew test` ⇒ BUILD SUCCESSFUL (اختبارات الوحدات الثلاث تمرّ).
-- [ ] **Step 7: commit** — `build: gradle multi-module skeleton + CI`.
+- [x] **Step 4: wrapper** — `gradle wrapper --gradle-version 8.9`.
+- [x] **Step 5: CI** — `.github/workflows/ci.yml`: JDK 17، `./gradlew test --no-daemon`.
+- [x] **Step 6: تحقّق** — `./gradlew test` ⇒ BUILD SUCCESSFUL (اختبارات الوحدات الثلاث تمرّ).
+- [x] **Step 7: commit** — `build: gradle multi-module skeleton + CI`.
 
 ## Self-Review
 - تغطية المواصفة: §4 (الوحدات)، §5.1 جزئياً (geo/time/model)، §10 (اختبار JVM)، §11 P0.
