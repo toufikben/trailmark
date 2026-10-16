@@ -1,5 +1,7 @@
 package dev.toufik.trailmark.app.ui
 
+import android.content.Context
+import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import dev.toufik.trailmark.app.AppGraph
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.formatDistance
@@ -29,6 +32,8 @@ import dev.toufik.trailmark.app.formatDuration
 import dev.toufik.trailmark.app.formatPace
 import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.data.ActivityRow
+import dev.toufik.trailmark.portable.Gpx
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -105,6 +110,11 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                             fontSize = 14.sp,
                         )
                     }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = {
+                            shareGpx(context, d.points, d.row.startWallMillis, d.row.id)
+                        }) { Text("مشاركة GPX", color = Palette.accent) }
+                    }
                     TrailmarkMap(
                         points = d.points,
                         modifier = Modifier.fillMaxWidth().height(360.dp).padding(top = 12.dp),
@@ -114,4 +124,17 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
             }
         }
     }
+}
+
+private fun shareGpx(context: Context, points: List<StoredPoint>, startWallMillis: Long, id: Long) {
+    val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+    val file = File(dir, "trailmark-$id.gpx")
+    file.writeText(Gpx.write(points, startWallMillis))
+    val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
+    val send = Intent(Intent.ACTION_SEND).apply {
+        type = "application/gpx+xml"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(send, "مشاركة GPX"))
 }
