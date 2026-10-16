@@ -71,4 +71,20 @@ class RecordingControllerTest {
         assertEquals(id, rows[0].id)
         assertTrue(rows[0].elapsedNanos > 50_000_000_000L, "persisted elapsed accumulates")
     }
+
+    @Test
+    fun aBadSignalKeepsSearchingAndRecordsNothing() = runTest {
+        val r = repo()
+        val bad = (0 until 5).map {
+            RawFix(36.7538 + it * (10.0 / 111111.0), 3.1856, it * 10_000_000_000L, 90.0, speedMps = 1.0)
+        }
+        val c = RecordingController(r, ListSource(bad), this, nowNanos = { 0L })
+        c.start()
+        advanceUntilIdle()
+
+        assertEquals(Phase.STARTING, c.state.value.phase)
+        assertEquals(dev.toufik.trailmark.engine.GpsQuality.SEARCHING, c.state.value.quality)
+        c.stop()
+        assertTrue(r.listActivities().isEmpty(), "no row for a session ر7 never opened")
+    }
 }

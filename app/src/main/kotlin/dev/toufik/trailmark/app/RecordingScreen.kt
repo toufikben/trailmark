@@ -37,6 +37,7 @@ import dev.toufik.trailmark.app.service.RecordingService
 import dev.toufik.trailmark.coach.Coach
 import dev.toufik.trailmark.coach.CoachEvent
 import dev.toufik.trailmark.coach.Locale
+import dev.toufik.trailmark.engine.GpsQuality
 import dev.toufik.trailmark.recording.Phase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -53,6 +54,13 @@ private fun stopService(context: Context) {
     context.startService(
         Intent(context, RecordingService::class.java).setAction(RecordingService.ACTION_STOP),
     )
+}
+
+private fun qualityLabel(q: GpsQuality): String = when (q) {
+    GpsQuality.NONE, GpsQuality.SEARCHING -> "جارٍ البحث عن الإشارة…"
+    GpsQuality.OK -> "تسجيل نشِط"
+    GpsQuality.DEGRADED -> "إشارة ضعيفة"
+    GpsQuality.LOST -> "فقدت الإشارة"
 }
 
 @Composable
@@ -114,6 +122,10 @@ fun RecordingScreen(onHistory: () -> Unit, onRegions: () -> Unit) {
             coachLine?.let {
                 Text(text = it, color = Palette.textSecondary, fontSize = 13.sp, textAlign = TextAlign.Center)
             }
+            Text(text = qualityLabel(state.quality), color = Palette.textSecondary, fontSize = 13.sp)
+            if (state.isIdle) {
+                Text(text = "متوقف مؤقتاً (خمول)", color = Palette.accent, fontSize = 13.sp)
+            }
             state.storageError?.let {
                 Text(
                     text = "التسجيل مستمر لكن النقاط لا تُحفظ",
@@ -124,8 +136,8 @@ fun RecordingScreen(onHistory: () -> Unit, onRegions: () -> Unit) {
 
             Column(modifier = Modifier.weight(1f)) {}
 
-            if (state.phase == Phase.RECORDING) {
-                Button(
+            when (state.phase) {
+                Phase.RECORDING -> Button(
                     onClick = { stopService(context) },
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                     colors = ButtonDefaults.buttonColors(
@@ -133,8 +145,17 @@ fun RecordingScreen(onHistory: () -> Unit, onRegions: () -> Unit) {
                         contentColor = Palette.text,
                     ),
                 ) { Text("إيقاف") }
-            } else {
-                Button(
+
+                Phase.STARTING -> Button(
+                    onClick = { stopService(context) },
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Palette.surface,
+                        contentColor = Palette.text,
+                    ),
+                ) { Text("إلغاء") }
+
+                Phase.STOPPED -> Button(
                     onClick = {
                         if (granted(context, Manifest.permission.ACCESS_FINE_LOCATION)) {
                             startService(context)
