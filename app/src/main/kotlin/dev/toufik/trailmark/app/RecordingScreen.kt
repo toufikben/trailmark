@@ -175,6 +175,10 @@ fun RecordingScreen(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { result -> if (result[Manifest.permission.ACCESS_FINE_LOCATION] == true) startService(context, sport) }
 
+    val locateLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { }
+
     Surface(color = Palette.bg, modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
             Box(
@@ -191,6 +195,9 @@ fun RecordingScreen(
                     sport = sport,
                     ghostRoute = ghostRoute,
                     ghostCurrent = ghostNow,
+                    onNeedPermission = {
+                        locateLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION))
+                    },
                     modifier = Modifier.fillMaxSize(),
                 )
                 Row(

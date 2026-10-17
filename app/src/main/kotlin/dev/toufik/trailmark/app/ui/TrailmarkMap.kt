@@ -5,8 +5,14 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
+import android.Manifest
+import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.os.Looper
 import android.view.Gravity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,6 +41,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.maps.GlyphStore
@@ -49,12 +56,15 @@ import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.layers.CircleLayer
+import org.maplibre.android.style.layers.FillLayer
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.layers.PropertyFactory.circleColor
 import org.maplibre.android.style.layers.PropertyFactory.circleRadius
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeColor
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth
+import org.maplibre.android.style.layers.PropertyFactory.fillColor
+import org.maplibre.android.style.layers.PropertyFactory.fillOpacity
 import org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap
 import org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement
 import org.maplibre.android.style.layers.PropertyFactory.iconImage
@@ -69,6 +79,9 @@ import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
+import org.maplibre.geojson.Polygon
+import kotlin.math.cos
+import kotlin.math.sin
 
 private fun isOnline(context: Context): Boolean {
     val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
@@ -128,6 +141,25 @@ private fun vectorStyle(packPath: String, glyphsBase: String): String = """
 
 private val EMPTY: FeatureCollection = FeatureCollection.fromFeatures(emptyArray())
 
+private fun Location.toStoredPoint(): StoredPoint = StoredPoint(
+    lat = latitude,
+    lon = longitude,
+    timeNanos = elapsedRealtimeNanos,
+    accuracyM = if (hasAccuracy()) accuracy.toDouble() else 5.0,
+    type = WaypointType.NORMAL,
+    bearingDeg = if (hasBearing()) bearing.toDouble() else null,
+)
+
+private fun accuracyPolygon(lat: Double, lon: Double, meters: Double): Feature {
+    val pts = (0 until 32).map { i ->
+        val a = Math.toRadians(i * 360.0 / 32.0)
+        val dLat = meters * cos(a) / 111320.0
+        val dLon = meters * sin(a) / (111320.0 * maxOf(0.2, cos(Math.toRadians(lat))))
+        Point.fromLngLat(lon + dLon, lat + dLat)
+    }
+    return Feature.fromGeometry(Polygon.fromLngLats(listOf(pts + pts.first())))
+}
+
 /** Position marker: a heading arrow, or a bicycle for rides. Accent on a dark disc. */
 private fun markerBitmap(context: Context, bike: Boolean): Bitmap {
     val s = (44 * context.resources.displayMetrics.density).toInt().coerceAtLeast(96).toFloat()
@@ -174,6 +206,7 @@ fun TrailmarkMap(
     sport: Sport = Sport.RUN,
     ghostRoute: List<StoredPoint> = emptyList(),
     ghostCurrent: StoredPoint? = null,
+    onNeedPermission: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val t = LocalTexts.current
@@ -186,6 +219,13 @@ fun TrailmarkMap(
     var worldShown by remember { mutableStateOf(false) }
     var following by remember { mutableStateOf(true) }
     var lastBearing by remember { mutableStateOf(0f) }
+    var userFix by remember { mutableStateOf<StoredPoint?>(null) }
+    var pendingLocate by remember { mutableStateOf(false) }
+    val lm = remember { context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager }
+    fun locationGranted(): Boolean = ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.ACCESS_FINE_LOCATION,
+    ) == PackageManager.PERMISSION_GRANTED
 
     val mapView = remember {
         MapView(context).apply {
@@ -229,6 +269,47 @@ fun TrailmarkMap(
         }
     }
 
+    DisposableEffect(Unit) {
+        var listener: LocationListener? = null
+        if (lm != null && locationGranted()) {
+            val last = listOf(
+                LocationManager.GPS_PROVIDER,
+                LocationManager.NETWORK_PROVIDER,
+                LocationManager.PASSIVE_PROVIDER,
+            ).mapNotNull { p -> runCatching { lm.getLastKnownLocation(p) }.getOrNull() }
+                .maxByOrNull { it.time }
+            if (last != null) userFix = last.toStoredPoint()
+            val l = object : LocationListener {
+                override fun onLocationChanged(location: Location) {
+                    userFix = location.toStoredPoint()
+                }
+            }
+            listener = l
+            runCatching { lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 3000L, 5f, l) }
+            runCatching { lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 3000L, 5f, l) }
+        }
+        onDispose {
+            val l = listener
+            if (l != null && lm != null) runCatching { lm.removeUpdates(l) }
+        }
+    }
+
+    LaunchedEffect(userFix, pendingLocate) {
+        val fix = userFix
+        if (pendingLocate && fix != null) {
+            pendingLocate = false
+            mapView.getMapAsync { map ->
+                map.cameraPosition = CameraPosition.Builder()
+                    .target(LatLng(fix.lat, fix.lon))
+                    .zoom(16.0)
+                    .bearing(fix.bearingDeg ?: 0.0)
+                    .tilt(45.0)
+                    .build()
+                fitted = true
+            }
+        }
+    }
+
     LaunchedEffect(packPath) {
         mapView.getMapAsync { map ->
             val builder = when {
@@ -255,6 +336,22 @@ fun TrailmarkMap(
                         iconRotationAlignment("map"),
                         iconAllowOverlap(true),
                         iconIgnorePlacement(true),
+                    ),
+                )
+                s.addSource(GeoJsonSource("user-accuracy-source", EMPTY))
+                s.addLayer(
+                    FillLayer("user-accuracy-layer", "user-accuracy-source").withProperties(
+                        fillColor("#C6FF3D"),
+                        fillOpacity(0.12f),
+                    ),
+                )
+                s.addSource(GeoJsonSource("user-source", EMPTY))
+                s.addLayer(
+                    CircleLayer("user-layer", "user-source").withProperties(
+                        circleColor("#C6FF3D"),
+                        circleRadius(8f),
+                        circleStrokeColor("#FFFFFF"),
+                        circleStrokeWidth(3f),
                     ),
                 )
                 s.addSource(GeoJsonSource("ghost-source", EMPTY))
@@ -285,7 +382,7 @@ fun TrailmarkMap(
         )
     }
 
-    LaunchedEffect(route, current, style, ghost, ghostCurrent) {
+    LaunchedEffect(route, current, style, ghost, ghostCurrent, userFix) {
         val s = style ?: return@LaunchedEffect
         val routeFc = if (route.size >= 2) {
             FeatureCollection.fromFeatures(
@@ -325,16 +422,35 @@ fun TrailmarkMap(
             )
         } ?: EMPTY
         s.getSourceAs<GeoJsonSource>("ghost-current-source")?.setGeoJson(ghostCurFc)
+        val fix = userFix
+        val userFc = if (current == null && fix != null) {
+            FeatureCollection.fromFeatures(
+                arrayOf(Feature.fromGeometry(Point.fromLngLat(fix.lon, fix.lat))),
+            )
+        } else {
+            EMPTY
+        }
+        s.getSourceAs<GeoJsonSource>("user-source")?.setGeoJson(userFc)
+        val accFc = if (current == null && fix != null) {
+            FeatureCollection.fromFeatures(
+                arrayOf(accuracyPolygon(fix.lat, fix.lon, fix.accuracyM.coerceIn(5.0, 400.0))),
+            )
+        } else {
+            EMPTY
+        }
+        s.getSourceAs<GeoJsonSource>("user-accuracy-source")?.setGeoJson(accFc)
     }
 
-    LaunchedEffect(route.size, current, following) {
+    LaunchedEffect(route.size, current, following, userFix) {
         mapView.getMapAsync { map ->
             val c = current ?: run {
                 if (!worldShown) {
-                    map.cameraPosition = CameraPosition.Builder()
-                        .target(LatLng(20.0, 10.0))
-                        .zoom(1.6)
-                        .build()
+                    val fix = userFix
+                    map.cameraPosition = if (fix != null) {
+                        CameraPosition.Builder().target(LatLng(fix.lat, fix.lon)).zoom(13.5).build()
+                    } else {
+                        CameraPosition.Builder().target(LatLng(20.0, 10.0)).zoom(1.6).build()
+                    }
                     worldShown = true
                 }
                 return@getMapAsync
@@ -373,16 +489,28 @@ fun TrailmarkMap(
                 onClick = {
                     following = true
                     val c = current
-                    mapView.getMapAsync { map ->
-                        if (c != null) {
+                    val fix = userFix
+                    when {
+                        c != null -> mapView.getMapAsync { map ->
                             map.cameraPosition = CameraPosition.Builder()
                                 .target(LatLng(c.lat, c.lon))
                                 .zoom(16.0)
-                                .bearing(c.bearingDeg?.toDouble() ?: 0.0)
+                                .bearing(c.bearingDeg ?: 0.0)
                                 .tilt(45.0)
                                 .build()
                             fitted = true
                         }
+                        !locationGranted() -> onNeedPermission()
+                        fix != null -> mapView.getMapAsync { map ->
+                            map.cameraPosition = CameraPosition.Builder()
+                                .target(LatLng(fix.lat, fix.lon))
+                                .zoom(16.0)
+                                .bearing(fix.bearingDeg ?: 0.0)
+                                .tilt(45.0)
+                                .build()
+                            fitted = true
+                        }
+                        else -> pendingLocate = true
                     }
                 },
                 color = Palette.surface.copy(alpha = 0.92f),
