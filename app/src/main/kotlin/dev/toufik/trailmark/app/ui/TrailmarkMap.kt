@@ -37,6 +37,9 @@ private const val FLAT_STYLE =
     """{"version":8,"name":"trailmark-dark","sources":{},"layers":[
        {"id":"background","type":"background","paint":{"background-color":"#0E1113"}}]}"""
 
+/** Global, free, no-key vector basemap with labels (OpenFreeMap). */
+private const val ONLINE_STYLE = "https://tiles.openfreemap.org/styles/dark"
+
 /** A richer OpenMapTiles style with SDF labels (Arabic first, then French/English). */
 private fun vectorStyle(packPath: String, glyphsBase: String): String = """
     {"version":8,"name":"trailmark-omt",
@@ -118,9 +121,10 @@ fun TrailmarkMap(
 
     LaunchedEffect(packPath) {
         mapView.getMapAsync { map ->
-            val builder =
-                if (packPath != null) Style.Builder().fromJson(vectorStyle(packPath, glyphsBase))
-                else Style.Builder().fromJson(FLAT_STYLE)
+            val builder = when {
+                packPath != null -> Style.Builder().fromJson(vectorStyle(packPath, glyphsBase))
+                else -> Style.Builder().fromUri(ONLINE_STYLE)
+            }
             map.setStyle(builder) { s ->
                 s.addSource(GeoJsonSource("route-source", EMPTY))
                 s.addLayer(
