@@ -12,6 +12,9 @@ import java.net.URL
 const val MANIFEST_URL =
     "https://github.com/toufikben/trailmark-maps/releases/download/maps-latest/manifest.json"
 
+/** The global online basemap. Also the style offline areas are downloaded for. */
+const val ONLINE_STYLE_URL = "https://tiles.openfreemap.org/styles/dark"
+
 /** A File-backed [RegionFiles] rooted in the app's private storage. */
 class FileRegionFiles(private val dir: File) : RegionFiles {
     private fun f(name: String) = File(dir, name)

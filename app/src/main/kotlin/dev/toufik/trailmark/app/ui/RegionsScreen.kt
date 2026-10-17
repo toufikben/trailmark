@@ -31,6 +31,8 @@ import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.maps.HttpBytesFetcher
 import dev.toufik.trailmark.app.maps.MANIFEST_URL
 import dev.toufik.trailmark.app.maps.MapPacks
+import dev.toufik.trailmark.app.maps.OfflineRegions
+import dev.toufik.trailmark.app.maps.SavedRegion
 import dev.toufik.trailmark.regions.RegionManifest
 import dev.toufik.trailmark.regions.RegionPack
 import dev.toufik.trailmark.regions.parseManifest
@@ -47,13 +49,16 @@ fun RegionsScreen(onBack: () -> Unit) {
     var error by remember { mutableStateOf<String?>(null) }
     var installing by remember { mutableStateOf<String?>(null) }
     var installed by remember { mutableStateOf(setOf<String>()) }
+    var savedAreas by remember { mutableStateOf(listOf<SavedRegion>()) }
     val manager = remember { MapPacks.manager(context) }
+    val regions = remember { OfflineRegions(context) }
 
     fun refreshInstalled(packs: List<RegionPack>) {
         installed = packs.filter { manager.isInstalled(it) }.map { it.id }.toSet()
     }
 
     LaunchedEffect(Unit) {
+        savedAreas = regions.list()
         try {
             val text = withContext(Dispatchers.IO) {
                 HttpBytesFetcher.fetch(MANIFEST_URL).decodeToString()
@@ -62,7 +67,7 @@ fun RegionsScreen(onBack: () -> Unit) {
             manifest = m
             refreshInstalled(m.packs)
         } catch (t: Throwable) {
-            error = t.message ?: "تعذّر جلب قائمة المناطق"
+            error = t.message ?: t.loadFailed
         }
     }
 
@@ -73,13 +78,64 @@ fun RegionsScreen(onBack: () -> Unit) {
                 Text(t.mapRegions, color = Palette.text, fontSize = 22.sp)
             }
 
-            val m = manifest
-            when {
-                error != null -> Text(error!!, color = Palette.textSecondary, fontSize = 14.sp)
-                m == null -> Text(t.searching, color = Palette.textSecondary, fontSize = 14.sp)
-                m.packs.isEmpty() -> Text(t.noActivities, color = Palette.textSecondary)
-                else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(m.packs, key = { it.id }) { pack ->
+            LazyColumn(modifier = Modifier.fillMaxSize()) {
+                item(key = "offline-card") {
+                    OfflineAreaCard(onCompleted = {
+                        scope.launch { savedAreas = regions.list() }
+                    })
+                }
+                item(key = "saved-title") {
+                    Text(
+                        t.downloadedAreas,
+                        color = Palette.text,
+                        fontSize = 18.sp,
+                        modifier = Modifier.padding(top = 14.dp, bottom = 4.dp),
+                    )
+                }
+                if (savedAreas.isEmpty()) {
+                    item(key = "no-areas") {
+                        Text(t.noAreas, color = Palette.textSecondary, fontSize = 13.sp)
+                    }
+                } else {
+                    items(savedAreas, key = { it.id }) { r ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(r.name, color = Palette.text, fontSize = 15.sp)
+                                Text(
+                                    "${"%.1f".format(r.bytes / 1_048_576.0)} MB · ${r.tiles} ${t.tiles}",
+                                    color = Palette.textSecondary,
+                                    fontSize = 12.sp,
+                                )
+                            }
+                            TextButton(onClick = {
+                                scope.launch {
+                                    runCatching { regions.delete(r.id) }
+                                    savedAreas = regions.list()
+                                }
+                            }) { Text(t.delete, color = Palette.textSecondary) }
+                        }
+                    }
+                }
+                item(key = "packs-title") {
+                    Text(
+                        t.prebuiltPacks,
+                        color = Palette.text,
+                        fontSize = 18.sp,
+                        modifier = Modifier.padding(top = 14.dp, bottom = 4.dp),
+                    )
+                }
+                val m = manifest
+                when {
+                    error != null -> item(key = "pack-error") {
+                        Text(error!!, color = Palette.textSecondary, fontSize = 14.sp)
+                    }
+                    m == null -> item(key = "pack-loading") {
+                        Text(t.searching, color = Palette.textSecondary, fontSize = 14.sp)
+                    }
+                    else -> items(m.packs, key = { it.id }) { pack ->
                         Column(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
                             Text(pack.name, color = Palette.text, fontSize = 16.sp)
                             Text(

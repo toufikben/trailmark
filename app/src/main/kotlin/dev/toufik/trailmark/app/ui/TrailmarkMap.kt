@@ -14,6 +14,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import dev.toufik.trailmark.app.maps.GlyphStore
+import dev.toufik.trailmark.app.maps.ONLINE_STYLE_URL
 import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.core.model.WaypointType
 import org.maplibre.android.camera.CameraPosition
@@ -35,13 +36,6 @@ import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
-
-private const val FLAT_STYLE =
-    """{"version":8,"name":"trailmark-dark","sources":{},"layers":[
-       {"id":"background","type":"background","paint":{"background-color":"#0E1113"}}]}"""
-
-/** Global, free, no-key vector basemap with labels (OpenFreeMap). */
-private const val ONLINE_STYLE = "https://tiles.openfreemap.org/styles/dark"
 
 private fun isOnline(context: Context): Boolean {
     val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
@@ -136,7 +130,7 @@ fun TrailmarkMap(
             val builder = when {
                 packPath != null && !online ->
                     Style.Builder().fromJson(vectorStyle(packPath, glyphsBase))
-                else -> Style.Builder().fromUri(ONLINE_STYLE)
+                else -> Style.Builder().fromUri(ONLINE_STYLE_URL)
             }
             map.setStyle(builder) { s ->
                 s.addSource(GeoJsonSource("route-source", EMPTY))
