@@ -10,6 +10,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import dev.toufik.trailmark.app.maps.GlyphStore
 import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.core.model.WaypointType
@@ -39,6 +42,13 @@ private const val FLAT_STYLE =
 
 /** Global, free, no-key vector basemap with labels (OpenFreeMap). */
 private const val ONLINE_STYLE = "https://tiles.openfreemap.org/styles/dark"
+
+private fun isOnline(context: Context): Boolean {
+    val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
+    val net = cm.activeNetwork ?: return false
+    val caps = cm.getNetworkCapabilities(net) ?: return false
+    return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+}
 
 /** A richer OpenMapTiles style with SDF labels (Arabic first, then French/English). */
 private fun vectorStyle(packPath: String, glyphsBase: String): String = """
@@ -100,6 +110,7 @@ fun TrailmarkMap(
     val context = LocalContext.current
     val route = remember(points) { points.filter { it.type != WaypointType.REJECTED } }
     val glyphsBase = remember { GlyphStore.ensure(context).absolutePath }
+    val online = remember { isOnline(context) }
     var style by remember { mutableStateOf<Style?>(null) }
     var fitted by remember { mutableStateOf(false) }
     var worldShown by remember { mutableStateOf(false) }
@@ -123,7 +134,8 @@ fun TrailmarkMap(
     LaunchedEffect(packPath) {
         mapView.getMapAsync { map ->
             val builder = when {
-                packPath != null -> Style.Builder().fromJson(vectorStyle(packPath, glyphsBase))
+                packPath != null && !online ->
+                    Style.Builder().fromJson(vectorStyle(packPath, glyphsBase))
                 else -> Style.Builder().fromUri(ONLINE_STYLE)
             }
             map.setStyle(builder) { s ->
