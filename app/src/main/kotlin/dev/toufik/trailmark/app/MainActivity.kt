@@ -1,9 +1,11 @@
 package dev.toufik.trailmark.app
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.core.content.ContextCompat
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,6 +28,13 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         org.maplibre.android.MapLibre.getInstance(this)
+        if (intent?.getBooleanExtra("synthetic", false) == true) {
+            val svc = Intent(this, dev.toufik.trailmark.app.service.RecordingService::class.java)
+                .setAction(dev.toufik.trailmark.app.service.RecordingService.ACTION_START)
+                .putExtra(dev.toufik.trailmark.app.service.RecordingService.EXTRA_SPORT, "RUN")
+                .putExtra(dev.toufik.trailmark.app.service.RecordingService.EXTRA_SYNTHETIC, true)
+            ContextCompat.startForegroundService(this, svc)
+        }
         setContent {
             var lang by remember { mutableStateOf(Lang.AR) }
             val texts = textsFor(lang)
