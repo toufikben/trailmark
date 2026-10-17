@@ -290,7 +290,7 @@ fun RecordingScreen(
                             },
                             modifier = Modifier.size(48.dp),
                         ) {
-                            Canvas(Modifier.size(22.dp)) {
+                            Canvas(Modifier.size(22.dp).semantics { contentDescription = t.mapTheme }) {
                                 val tint = Palette.text
                                 val cx = size.width / 2f
                                 val cy = size.height / 2f
