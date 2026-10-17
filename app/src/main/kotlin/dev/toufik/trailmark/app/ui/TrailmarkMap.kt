@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import dev.toufik.trailmark.app.maps.GlyphStore
 import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.core.model.WaypointType
 import org.maplibre.android.camera.CameraPosition
@@ -36,10 +37,10 @@ private const val FLAT_STYLE =
     """{"version":8,"name":"trailmark-dark","sources":{},"layers":[
        {"id":"background","type":"background","paint":{"background-color":"#0E1113"}}]}"""
 
-/** A richer OpenMapTiles style (no glyphs, so labels are omitted for now). */
-private fun vectorStyle(packPath: String): String = """
+/** A richer OpenMapTiles style with SDF labels (Arabic first, then French/English). */
+private fun vectorStyle(packPath: String, glyphsBase: String): String = """
     {"version":8,"name":"trailmark-omt",
-     "glyphs":"asset://glyphs/{fontstack}/{range}.pbf",
+     "glyphs":"file://$glyphsBase/{fontstack}/{range}.pbf",
      "sources":{"openmaptiles":{"type":"vector","url":"pmtiles://file://$packPath"}},
      "layers":[
        {"id":"background","type":"background","paint":{"background-color":"#0E1113"}},
@@ -95,6 +96,7 @@ fun TrailmarkMap(
 ) {
     val context = LocalContext.current
     val route = remember(points) { points.filter { it.type != WaypointType.REJECTED } }
+    val glyphsBase = remember { GlyphStore.ensure(context).absolutePath }
     var style by remember { mutableStateOf<Style?>(null) }
     var fitted by remember { mutableStateOf(false) }
 
@@ -117,7 +119,7 @@ fun TrailmarkMap(
     LaunchedEffect(packPath) {
         mapView.getMapAsync { map ->
             val builder =
-                if (packPath != null) Style.Builder().fromJson(vectorStyle(packPath))
+                if (packPath != null) Style.Builder().fromJson(vectorStyle(packPath, glyphsBase))
                 else Style.Builder().fromJson(FLAT_STYLE)
             map.setStyle(builder) { s ->
                 s.addSource(GeoJsonSource("route-source", EMPTY))
