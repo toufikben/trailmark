@@ -162,11 +162,10 @@ fun RecordingScreen(
     ) { result -> if (result[Manifest.permission.ACCESS_FINE_LOCATION] == true) startService(context, sport) }
 
     Surface(color = Palette.bg, modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
+        Box(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
             Box(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
+                    .fillMaxSize()
                     .padding(start = 12.dp, top = 12.dp, end = 12.dp)
                     .clip(RoundedCornerShape(20.dp)),
             ) {
@@ -238,50 +237,34 @@ fun RecordingScreen(
                             .padding(horizontal = 10.dp, vertical = 6.dp),
                     )
                 }
-
-                RoundRecordButton(
-                    phase = state.phase,
-                    description = if (state.phase == Phase.STOPPED) t.start else t.stop,
-                    onClick = {
-                        when (state.phase) {
-                            Phase.RECORDING, Phase.STARTING -> stopService(context)
-                            Phase.STOPPED -> {
-                                if (granted(context, Manifest.permission.ACCESS_FINE_LOCATION)) {
-                                    startService(context, sport)
-                                } else {
-                                    launcher.launch(permissions)
-                                }
-                            }
-                        }
-                    },
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(16.dp),
-                )
             }
 
             Surface(
-                color = Palette.surface,
-                shape = RoundedCornerShape(20.dp),
+                color = Palette.surface.copy(alpha = 0.94f),
+                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 12.dp),
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth(),
             ) {
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 14.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                ) {
-                    Sport.entries.forEach { s ->
-                        FilterChip(
-                            selected = sport == s,
-                            enabled = state.phase == Phase.STOPPED,
-                            onClick = { if (state.phase == Phase.STOPPED) sport = s },
-                            label = { Text(sportLabelOf(t, s)) },
-                        )
+                if (state.phase == Phase.STOPPED) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                    ) {
+                        Sport.entries.forEach { s ->
+                            FilterChip(
+                                selected = sport == s,
+                                enabled = state.phase == Phase.STOPPED,
+                                onClick = { if (state.phase == Phase.STOPPED) sport = s },
+                                label = { Text(sportLabelOf(t, s)) },
+                            )
+                        }
                     }
                 }
                 val paceText = if (state.distanceM < 50) "--:--"
@@ -306,6 +289,22 @@ fun RecordingScreen(
                     StatCell(formatDuration(state.elapsedNanos), t.time)
                     StatCell(paceText, t.pace)
                     StatCell(speedText, t.speed)
+                    RoundRecordButton(
+                        phase = state.phase,
+                        description = if (state.phase == Phase.STOPPED) t.start else t.stop,
+                        onClick = {
+                            when (state.phase) {
+                                Phase.RECORDING, Phase.STARTING -> stopService(context)
+                                Phase.STOPPED -> {
+                                    if (granted(context, Manifest.permission.ACCESS_FINE_LOCATION)) {
+                                        startService(context, sport)
+                                    } else {
+                                        launcher.launch(permissions)
+                                    }
+                                }
+                            }
+                        },
+                    )
                 }
                 coachLine?.let {
                     Text(text = it, color = Palette.textSecondary, fontSize = 12.sp)
