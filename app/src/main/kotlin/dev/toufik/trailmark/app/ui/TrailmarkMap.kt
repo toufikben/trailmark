@@ -54,7 +54,9 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
+import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.CircleLayer
+import org.maplibre.android.style.layers.FillExtrusionLayer
 import org.maplibre.android.style.layers.FillLayer
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.SymbolLayer
@@ -63,6 +65,10 @@ import org.maplibre.android.style.layers.PropertyFactory.circleRadius
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeColor
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth
 import org.maplibre.android.style.layers.PropertyFactory.fillColor
+import org.maplibre.android.style.layers.PropertyFactory.fillExtrusionBase
+import org.maplibre.android.style.layers.PropertyFactory.fillExtrusionColor
+import org.maplibre.android.style.layers.PropertyFactory.fillExtrusionHeight
+import org.maplibre.android.style.layers.PropertyFactory.fillExtrusionOpacity
 import org.maplibre.android.style.layers.PropertyFactory.fillOpacity
 import org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap
 import org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement
@@ -107,8 +113,11 @@ private fun vectorStyle(packPath: String, glyphsBase: String): String = """
         "paint":{"fill-color":"#12232E"}},
        {"id":"waterway","type":"line","source":"openmaptiles","source-layer":"waterway",
         "paint":{"line-color":"#12232E","line-width":1.0}},
-       {"id":"building","type":"fill","source":"openmaptiles","source-layer":"building","minzoom":13,
-        "paint":{"fill-color":"#1E2429"}},
+       {"id":"building","type":"fill-extrusion","source":"openmaptiles","source-layer":"building","minzoom":14,
+        "paint":{"fill-extrusion-color":"#1E2429",
+         "fill-extrusion-height":["coalesce",["get","render_height"],8],
+         "fill-extrusion-base":["coalesce",["get","render_min_height"],0],
+         "fill-extrusion-opacity":0.85}},
        {"id":"road-minor","type":"line","source":"openmaptiles","source-layer":"transportation",
         "filter":["in","class","tertiary","minor","service","residential"],
         "paint":{"line-color":"#333E48","line-width":["interpolate",["linear"],["zoom"],12,0.6,14,2.4]}},
@@ -350,6 +359,22 @@ fun TrailmarkMap(
                 else -> Style.Builder().fromUri(ONLINE_STYLE_URL)
             }
             map.setStyle(builder) { s ->
+                if (online && s.getLayer("3d-buildings") == null) {
+                    val b3d = FillExtrusionLayer("3d-buildings", "openmaptiles")
+                        .withProperties(
+                            fillExtrusionColor("#1E2429"),
+                            fillExtrusionHeight(
+                                Expression.coalesce(Expression.get("render_height"), Expression.literal(8f)),
+                            ),
+                            fillExtrusionBase(
+                                Expression.coalesce(Expression.get("render_min_height"), Expression.literal(0f)),
+                            ),
+                            fillExtrusionOpacity(0.85f),
+                        )
+                        .apply { minZoom = 14f }
+                    val below = s.layers.firstOrNull { it is SymbolLayer }?.id
+                    if (below != null) s.addLayerBelow(b3d, below) else s.addLayer(b3d)
+                }
                 s.addSource(GeoJsonSource("route-source", EMPTY))
                 s.addLayer(
                     LineLayer("route-layer", "route-source").withProperties(
