@@ -157,7 +157,13 @@ fun RecordingScreen(
 
     Surface(color = Palette.bg, modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
-            Box(modifier = Modifier.weight(5f).fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .weight(5f)
+                    .fillMaxWidth()
+                    .padding(start = 12.dp, top = 12.dp, end = 12.dp)
+                    .clip(RoundedCornerShape(20.dp)),
+            ) {
                 TrailmarkMap(
                     points = route,
                     packPath = packPath,
@@ -228,10 +234,15 @@ fun RecordingScreen(
                 }
             }
 
-            Column(
-                modifier = Modifier.weight(5f).fillMaxWidth().padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+            Surface(
+                color = Palette.surface,
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.weight(5f).fillMaxWidth().padding(12.dp),
             ) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
@@ -331,6 +342,7 @@ fun RecordingScreen(
                     TextButton(onClick = { onOpenDetail(lastId) }) {
                         Text(t.details, color = Palette.accent)
                     }
+                }
                 }
             }
         }
