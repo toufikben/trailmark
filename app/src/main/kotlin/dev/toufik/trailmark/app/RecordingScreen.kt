@@ -61,6 +61,8 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
@@ -381,79 +383,27 @@ fun RecordingScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 14.dp),
+                        .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 10.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                var sportMenu by remember { mutableStateOf(false) }
-                val canPickSport = state.phase == Phase.STOPPED
-                Box {
-                    Surface(
-                        onClick = { sportMenu = true },
-                        enabled = canPickSport,
-                        shape = RoundedCornerShape(24.dp),
-                        color = Color.Transparent,
-                        border = BorderStroke(1.dp, Palette.textSecondary.copy(alpha = 0.4f)),
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(start = 14.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
-                        ) {
-                            Text(
-                                text = sportLabelOf(t, sport),
-                                color = if (canPickSport) Palette.text else Palette.textSecondary,
-                                fontSize = 13.sp,
-                            )
-                            Icon(
-                                Icons.Filled.ArrowDropDown,
-                                contentDescription = null,
-                                tint = Palette.textSecondary,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        }
-                    }
-                    DropdownMenu(expanded = sportMenu, onDismissRequest = { sportMenu = false }) {
-                        Sport.entries.forEach { s ->
-                            DropdownMenuItem(
-                                text = { Text(sportLabelOf(t, s)) },
-                                onClick = {
-                                    sport = s
-                                    sportMenu = false
-                                },
-                                trailingIcon = if (s == sport) {
-                                    { Icon(Icons.Filled.Check, contentDescription = null) }
-                                } else {
-                                    null
-                                },
-                            )
-                        }
-                    }
-                }
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(top = 6.dp),
-                ) {
-                    Text(
-                        text = formatDistance(state.distanceM),
-                        color = Palette.accent,
-                        fontSize = 40.sp,
-                        modifier = Modifier.semantics {
-                            contentDescription = "${formatDistance(state.distanceM)} ${t.km}"
-                        },
-                    )
-                    Text(text = t.km, color = Palette.textSecondary, fontSize = 11.sp)
-                }
                 val paceText = if (state.distanceM < 50) "--:--"
                 else formatPace((state.elapsedNanos / 1e9) / (state.distanceM / 1000))
                 val speedText = state.currentSpeedMps?.let { "%.1f".format(it * 3.6) } ?: "--"
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column(
+                    Row(
                         modifier = Modifier.weight(1f),
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                        horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally),
                     ) {
                         StatCell(formatDuration(state.elapsedNanos), t.time)
+                        StatCell(
+                            formatDistance(state.distanceM),
+                            t.km,
+                            accent = true,
+                            desc = "${formatDistance(state.distanceM)} ${t.km}",
+                        )
                     }
                     val startAction = {
                         if (granted(context, Manifest.permission.ACCESS_FINE_LOCATION)) {
@@ -482,9 +432,9 @@ fun RecordingScreen(
                             if (state.phase == Phase.STOPPED) startAction() else stopService(context)
                         },
                     )
-                    Column(
+                    Row(
                         modifier = Modifier.weight(1f),
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                        horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally),
                     ) {
                         StatCell(speedText, t.speed)
                         StatCell(paceText, t.pace)
@@ -522,15 +472,90 @@ fun RecordingScreen(
                 }
                 }
             }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = with(LocalDensity.current) { barHeightPx.toDp() } + 12.dp),
+            ) {
+                SportPicker(
+                    t = t,
+                    sport = sport,
+                    enabled = state.phase == Phase.STOPPED,
+                    onPick = { sport = it },
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun StatCell(label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = value, color = Palette.text, fontSize = 16.sp)
+private fun StatCell(value: String, label: String, accent: Boolean = false, desc: String? = null) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = if (desc != null) {
+            Modifier.clearAndSetSemantics { contentDescription = desc }
+        } else {
+            Modifier
+        },
+    ) {
+        Text(
+            text = value,
+            color = if (accent) Palette.accent else Palette.text,
+            fontSize = 16.sp,
+        )
         Text(text = label, color = Palette.textSecondary, fontSize = 11.sp)
+    }
+}
+
+@Composable
+private fun SportPicker(
+    t: Texts,
+    sport: Sport,
+    enabled: Boolean,
+    onPick: (Sport) -> Unit,
+) {
+    var menu by remember { mutableStateOf(false) }
+    Box {
+        Surface(
+            onClick = { menu = true },
+            enabled = enabled,
+            shape = RoundedCornerShape(24.dp),
+            color = Palette.surface.copy(alpha = 0.9f),
+            border = BorderStroke(1.dp, Palette.textSecondary.copy(alpha = 0.3f)),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(start = 14.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+            ) {
+                Text(
+                    text = sportLabelOf(t, sport),
+                    color = if (enabled) Palette.text else Palette.textSecondary,
+                    fontSize = 13.sp,
+                )
+                Icon(
+                    Icons.Filled.ArrowDropDown,
+                    contentDescription = null,
+                    tint = Palette.textSecondary,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            Sport.entries.forEach { s ->
+                DropdownMenuItem(
+                    text = { Text(sportLabelOf(t, s)) },
+                    onClick = {
+                        onPick(s)
+                        menu = false
+                    },
+                    trailingIcon = if (s == sport) {
+                        { Icon(Icons.Filled.Check, contentDescription = null) }
+                    } else {
+                        null
+                    },
+                )
+            }
+        }
     }
 }
 
