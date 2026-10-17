@@ -8,6 +8,10 @@ sealed interface CoachEvent {
     data class PreviousBest(val distanceM: Double, val seconds: Long, val targetM: Double?) : CoachEvent
     data class Ahead(val seconds: Long) : CoachEvent
     data class Behind(val seconds: Long) : CoachEvent
+    data class GhostAhead(val metres: Int) : CoachEvent
+    data class GhostBehind(val metres: Int) : CoachEvent
+    data class Overtook(val metres: Int) : CoachEvent
+    data class GotOvertaken(val metres: Int) : CoachEvent
     data class Milestone(val km: Int) : CoachEvent
     data class Finish(val distanceM: Double, val seconds: Long, val isRecord: Boolean) : CoachEvent
 }
@@ -46,6 +50,10 @@ object Coach {
             )
             is CoachEvent.Ahead -> fill(pick, "s" to event.seconds.toString())
             is CoachEvent.Behind -> fill(pick, "s" to event.seconds.toString())
+            is CoachEvent.GhostAhead -> fill(pick, "m" to event.metres.toString())
+            is CoachEvent.GhostBehind -> fill(pick, "m" to event.metres.toString())
+            is CoachEvent.Overtook -> fill(pick, "m" to event.metres.toString())
+            is CoachEvent.GotOvertaken -> fill(pick, "m" to event.metres.toString())
             is CoachEvent.Milestone -> fill(pick, "km" to event.km.toString())
             is CoachEvent.Finish -> fill(
                 pick,
@@ -79,6 +87,26 @@ object Coach {
             Locale.AR -> listOf("متأخّر بـ {s} ثانية — اشتدّ قليلاً!", "خلف شبحك بـ {s} ث. أعطِ أكثر قليلاً.")
             Locale.FR -> listOf("Retard de {s} s — accélère un peu !", "{s} s de retard. Donne un peu plus.")
             Locale.EN -> listOf("{s}s behind — push a little!", "{s}s down. Give a bit more.")
+        }
+        is CoachEvent.GhostAhead -> when (locale) {
+            Locale.AR -> listOf("شبحك متقدم بـ {m} م — أدركه!", "خلف شبحك بـ {m} م. زد السرعة قليلاً.", "الشبح أمامك بـ {m} م — لا تستسلم.")
+            Locale.FR -> listOf("Ton fantôme mène de {m} m — rattrape-le !", "{m} m de retard sur ton fantôme. Accélère.", "Le fantôme est devant de {m} m — lâche rien.")
+            Locale.EN -> listOf("Your ghost leads by {m}m — reel it in!", "{m}m behind your ghost — pick it up.", "Ghost is {m}m ahead — don't fold.")
+        }
+        is CoachEvent.GhostBehind -> when (locale) {
+            Locale.AR -> listOf("أنت متقدم على شبحك بـ {m} م — واصل!", "تقدمك {m} م عن شبحك. لا تفرّط بها.", "الشبح خلفك بـ {m} م — حافظ على الإيقاع.")
+            Locale.FR -> listOf("Tu mènes de {m} m sur ton fantôme — tiens bon !", "{m} m d'avance. Ne lâche pas.", "Fantôme derrière de {m} m — garde le rythme.")
+            Locale.EN -> listOf("You're {m}m ahead of your ghost — hold it!", "{m}m up. Don't give it back.", "Ghost is {m}m back — keep the pace.")
+        }
+        is CoachEvent.Overtook -> when (locale) {
+            Locale.AR -> listOf("تجاوزت شبحك! 🔥", "سبقته — أنت متقدم بـ {m} م الآن.", "التجاوز تم! {m} م لصالحك.")
+            Locale.FR -> listOf("Tu as dépassé ton fantôme ! 🔥", "Dépassement — {m} m d'avance.", "Tu l'as eu ! {m} m devant.")
+            Locale.EN -> listOf("You overtook your ghost! 🔥", "Passed it — {m}m ahead now.", "Got him! {m}m in front.")
+        }
+        is CoachEvent.GotOvertaken -> when (locale) {
+            Locale.AR -> listOf("سبقك شبحك — ردّ الهجوم!", "الشبح تقدم — فارق {m} م. استعد.", "تجاوَزك شبحك بـ {m} م — اشتعل!")
+            Locale.FR -> listOf("Ton fantôme t'a dépassé — réagis !", "Le fantôme passe devant — {m} m.", "Dépassé de {m} m — réveille-toi !")
+            Locale.EN -> listOf("Your ghost overtook you — fight back!", "Ghost took the lead — {m}m gap.", "Overtaken by {m}m — light it up!")
         }
         is CoachEvent.Milestone -> when (locale) {
             Locale.AR -> listOf("{km} كم! استمر", "تجاوزت {km} كم — أحسنت.")

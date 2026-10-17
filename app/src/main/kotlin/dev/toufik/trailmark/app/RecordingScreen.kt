@@ -37,6 +37,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -161,7 +162,46 @@ fun RecordingScreen(
     val ghostNow: StoredPoint? = if (ghostRoute.size < 2) {
         null
     } else {
-        ghostRoute.lastOrNull { it.timeNanos - ghostStartNanos <= state.elapsedNanos }
+        val idx = ghostRoute.indexOfLast { it.timeNanos - ghostStartNanos <= state.elapsedNanos }
+        if (idx < 0) {
+            null
+        } else {
+            val p = ghostRoute[idx]
+            val prev = ghostRoute.getOrNull(idx - 1)
+            val b = if (prev != null) bearingDeg(prev.lat, prev.lon, p.lat, p.lon) else p.bearingDeg
+            p.copy(bearingDeg = b ?: p.bearingDeg)
+        }
+    }
+
+    val gLive = ghost
+    val liveDelta: Int? = if (gLive != null && state.phase == Phase.RECORDING) {
+        ghostDeltaM(gLive, state.distanceM, state.elapsedNanos).toInt()
+    } else {
+        null
+    }
+    var lastAhead by remember { mutableStateOf<Boolean?>(null) }
+    var overtakeFlash by remember { mutableStateOf<String?>(null) }
+    val liveDeltaRef = rememberUpdatedState(liveDelta)
+    LaunchedEffect(liveDelta?.let { it >= 0 }, state.phase) {
+        val d = liveDeltaRef.value
+        if (d == null) {
+            lastAhead = null
+            overtakeFlash = null
+            return@LaunchedEffect
+        }
+        val ahead = d >= 0
+        val prev = lastAhead
+        lastAhead = ahead
+        if (prev != null && prev != ahead) {
+            val seed = (state.elapsedNanos / 60_000_000_000L).toInt()
+            overtakeFlash = if (ahead) {
+                Coach.message(CoachEvent.Overtook(Math.abs(d)), Locale.AR, seed)
+            } else {
+                Coach.message(CoachEvent.GotOvertaken(Math.abs(d)), Locale.AR, seed)
+            }
+            delay(5000)
+            overtakeFlash = null
+        }
     }
 
     val permissions = buildList {
@@ -335,14 +375,14 @@ fun RecordingScreen(
                 coachLine?.let {
                     Text(text = it, color = Palette.textSecondary, fontSize = 12.sp)
                 }
-                val g = ghost
-                if (g != null && state.phase == Phase.RECORDING) {
-                    val d = ghostDeltaM(g, state.distanceM, state.elapsedNanos).toInt()
-                    Text(
-                        text = "${t.ghost}: ${if (d >= 0) "+" else ""}$d ${t.metre}",
-                        color = Palette.accent,
-                        fontSize = 12.sp,
-                    )
+                if (ghost != null && state.phase == Phase.RECORDING && liveDelta != null) {
+                    val seed = (state.elapsedNanos / 20_000_000_000L).toInt()
+                    val line = overtakeFlash ?: if (liveDelta >= 0) {
+                        Coach.message(CoachEvent.GhostBehind(Math.abs(liveDelta)), Locale.AR, seed)
+                    } else {
+                        Coach.message(CoachEvent.GhostAhead(Math.abs(liveDelta)), Locale.AR, seed)
+                    }
+                    Text(text = line, color = Palette.accent, fontSize = 12.sp)
                 }
                 state.storageError?.let {
                     Text(text = t.loadFailed, color = Palette.danger, fontSize = 12.sp)
@@ -415,5 +455,14 @@ private fun sportLabelOf(t: Texts, s: Sport): String = when (s) {
     Sport.RUN -> t.run
     Sport.BIKE -> t.bike
     Sport.HIKE -> t.hike
+}
+
+private fun bearingDeg(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+    val p1 = Math.toRadians(lat1)
+    val p2 = Math.toRadians(lat2)
+    val dl = Math.toRadians(lon2 - lon1)
+    val y = Math.sin(dl) * Math.cos(p2)
+    val x = Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl)
+    return (Math.toDegrees(Math.atan2(y, x)) + 360.0) % 360.0
 }
 

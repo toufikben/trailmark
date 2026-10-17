@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.graphics.Path
 import android.Manifest
 import android.content.pm.PackageManager
 import android.location.Location
@@ -68,6 +67,7 @@ import org.maplibre.android.style.layers.PropertyFactory.fillOpacity
 import org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap
 import org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement
 import org.maplibre.android.style.layers.PropertyFactory.iconImage
+import org.maplibre.android.style.layers.PropertyFactory.iconOpacity
 import org.maplibre.android.style.layers.PropertyFactory.iconRotate
 import org.maplibre.android.style.layers.PropertyFactory.iconRotationAlignment
 import org.maplibre.android.style.layers.PropertyFactory.iconSize
@@ -160,38 +160,70 @@ private fun accuracyPolygon(lat: Double, lon: Double, meters: Double): Feature {
     return Feature.fromGeometry(Polygon.fromLngLats(listOf(pts + pts.first())))
 }
 
-/** Position marker: a heading arrow, or a bicycle for rides. Accent on a dark disc. */
-private fun markerBitmap(context: Context, bike: Boolean): Bitmap {
-    val s = (44 * context.resources.displayMetrics.density).toInt().coerceAtLeast(96).toFloat()
+/** Position marker per sport — a small figure on a dark disc. */
+private fun markerBitmap(context: Context, sport: Sport): Bitmap {
+    val s = (36 * context.resources.displayMetrics.density).toInt().coerceAtLeast(80).toFloat()
     val bmp = Bitmap.createBitmap(s.toInt(), s.toInt(), Bitmap.Config.ARGB_8888)
     val c = Canvas(bmp)
     val p = Paint(Paint.ANTI_ALIAS_FLAG)
     p.color = 0xD90E1113.toInt()
     c.drawCircle(s / 2f, s / 2f, s / 2f - 2f, p)
     p.color = 0xFFC6FF3D.toInt()
-    p.strokeWidth = s * 0.055f
+    p.strokeWidth = s * 0.05f
     p.strokeCap = Paint.Cap.ROUND
     p.strokeJoin = Paint.Join.ROUND
-    if (bike) {
-        p.style = Paint.Style.STROKE
-        val r = s * 0.155f
-        val cy = s * 0.62f
-        c.drawCircle(s * 0.30f, cy, r, p)
-        c.drawCircle(s * 0.70f, cy, r, p)
-        c.drawLine(s * 0.30f, cy, s * 0.46f, cy - s * 0.24f, p)
-        c.drawLine(s * 0.46f, cy - s * 0.24f, s * 0.64f, cy - s * 0.02f, p)
-        c.drawLine(s * 0.64f, cy - s * 0.02f, s * 0.30f, cy, p)
-        c.drawLine(s * 0.46f, cy - s * 0.24f, s * 0.42f, cy - s * 0.38f, p)
-        c.drawLine(s * 0.36f, cy - s * 0.38f, s * 0.52f, cy - s * 0.38f, p)
-    } else {
-        p.style = Paint.Style.FILL
-        val arrow = Path()
-        arrow.moveTo(s * 0.50f, s * 0.16f)
-        arrow.lineTo(s * 0.78f, s * 0.82f)
-        arrow.lineTo(s * 0.50f, s * 0.66f)
-        arrow.lineTo(s * 0.22f, s * 0.82f)
-        arrow.close()
-        c.drawPath(arrow, p)
+    p.style = Paint.Style.STROKE
+    when (sport) {
+        Sport.BIKE -> {
+            val r = s * 0.115f
+            val cy = s * 0.66f
+            c.drawCircle(s * 0.28f, cy, r, p)
+            c.drawCircle(s * 0.72f, cy, r, p)
+            c.drawLine(s * 0.28f, cy, s * 0.50f, s * 0.44f, p)
+            c.drawLine(s * 0.50f, s * 0.44f, s * 0.72f, cy, p)
+            c.drawLine(s * 0.50f, s * 0.44f, s * 0.44f, s * 0.32f, p)
+            c.drawLine(s * 0.40f, s * 0.32f, s * 0.48f, s * 0.30f, p)
+            c.drawLine(s * 0.44f, s * 0.32f, s * 0.56f, s * 0.26f, p)
+            c.drawLine(s * 0.56f, s * 0.26f, s * 0.68f, s * 0.40f, p)
+            c.drawLine(s * 0.44f, s * 0.32f, s * 0.50f, s * 0.50f, p)
+            c.drawLine(s * 0.50f, s * 0.50f, s * 0.44f, s * 0.62f, p)
+            p.style = Paint.Style.FILL
+            c.drawCircle(s * 0.60f, s * 0.21f, s * 0.055f, p)
+        }
+        Sport.RUN -> {
+            c.drawLine(s * 0.54f, s * 0.28f, s * 0.46f, s * 0.48f, p)
+            c.drawLine(s * 0.46f, s * 0.48f, s * 0.60f, s * 0.58f, p)
+            c.drawLine(s * 0.60f, s * 0.58f, s * 0.66f, s * 0.72f, p)
+            c.drawLine(s * 0.46f, s * 0.48f, s * 0.34f, s * 0.56f, p)
+            c.drawLine(s * 0.34f, s * 0.56f, s * 0.30f, s * 0.72f, p)
+            c.drawLine(s * 0.50f, s * 0.34f, s * 0.66f, s * 0.40f, p)
+            c.drawLine(s * 0.50f, s * 0.34f, s * 0.36f, s * 0.28f, p)
+            p.style = Paint.Style.FILL
+            c.drawCircle(s * 0.56f, s * 0.20f, s * 0.055f, p)
+        }
+        Sport.WALK -> {
+            c.drawLine(s * 0.50f, s * 0.26f, s * 0.50f, s * 0.50f, p)
+            c.drawLine(s * 0.50f, s * 0.50f, s * 0.42f, s * 0.62f, p)
+            c.drawLine(s * 0.42f, s * 0.62f, s * 0.40f, s * 0.74f, p)
+            c.drawLine(s * 0.50f, s * 0.50f, s * 0.58f, s * 0.62f, p)
+            c.drawLine(s * 0.58f, s * 0.62f, s * 0.60f, s * 0.74f, p)
+            c.drawLine(s * 0.50f, s * 0.32f, s * 0.42f, s * 0.44f, p)
+            c.drawLine(s * 0.50f, s * 0.32f, s * 0.58f, s * 0.44f, p)
+            p.style = Paint.Style.FILL
+            c.drawCircle(s * 0.50f, s * 0.18f, s * 0.055f, p)
+        }
+        Sport.HIKE -> {
+            c.drawLine(s * 0.50f, s * 0.26f, s * 0.50f, s * 0.50f, p)
+            c.drawLine(s * 0.50f, s * 0.50f, s * 0.42f, s * 0.62f, p)
+            c.drawLine(s * 0.42f, s * 0.62f, s * 0.40f, s * 0.74f, p)
+            c.drawLine(s * 0.50f, s * 0.50f, s * 0.58f, s * 0.62f, p)
+            c.drawLine(s * 0.58f, s * 0.62f, s * 0.60f, s * 0.74f, p)
+            c.drawLine(s * 0.50f, s * 0.34f, s * 0.60f, s * 0.44f, p)
+            c.drawLine(s * 0.60f, s * 0.44f, s * 0.68f, s * 0.74f, p)
+            p.style = Paint.Style.FILL
+            c.drawCircle(s * 0.50f, s * 0.18f, s * 0.055f, p)
+            c.drawRoundRect(s * 0.38f, s * 0.28f, s * 0.455f, s * 0.42f, s * 0.03f, s * 0.03f, p)
+        }
     }
     return bmp
 }
@@ -326,11 +358,10 @@ fun TrailmarkMap(
                     ),
                 )
                 s.addSource(GeoJsonSource("current-source", EMPTY))
-                s.addImage("me-arrow", markerBitmap(context, false))
-                s.addImage("me-bike", markerBitmap(context, true))
+                Sport.entries.forEach { sp -> s.addImage("me-" + sp.name, markerBitmap(context, sp)) }
                 s.addLayer(
                     SymbolLayer("current-layer", "current-source").withProperties(
-                        iconImage(if (sport == Sport.BIKE) "me-bike" else "me-arrow"),
+                        iconImage("me-" + sport.name),
                         iconSize(1f),
                         iconRotate(lastBearing),
                         iconRotationAlignment("map"),
@@ -364,11 +395,14 @@ fun TrailmarkMap(
                 )
                 s.addSource(GeoJsonSource("ghost-current-source", EMPTY))
                 s.addLayer(
-                    CircleLayer("ghost-current-layer", "ghost-current-source").withProperties(
-                        circleColor("#AAB4C8"),
-                        circleRadius(7f),
-                        circleStrokeColor("#0E1113"),
-                        circleStrokeWidth(3f),
+                    SymbolLayer("ghost-current-layer", "ghost-current-source").withProperties(
+                        iconImage("me-" + sport.name),
+                        iconSize(0.9f),
+                        iconOpacity(0.45f),
+                        iconRotate(0f),
+                        iconRotationAlignment("map"),
+                        iconAllowOverlap(true),
+                        iconIgnorePlacement(true),
                     ),
                 )
                 style = s
@@ -377,9 +411,9 @@ fun TrailmarkMap(
     }
 
     LaunchedEffect(sport) {
-        style?.getLayerAs<SymbolLayer>("current-layer")?.setProperties(
-            iconImage(if (sport == Sport.BIKE) "me-bike" else "me-arrow"),
-        )
+        val img = "me-" + sport.name
+        style?.getLayerAs<SymbolLayer>("current-layer")?.setProperties(iconImage(img))
+        style?.getLayerAs<SymbolLayer>("ghost-current-layer")?.setProperties(iconImage(img))
     }
 
     LaunchedEffect(route, current, style, ghost, ghostCurrent, userFix) {
@@ -422,6 +456,9 @@ fun TrailmarkMap(
             )
         } ?: EMPTY
         s.getSourceAs<GeoJsonSource>("ghost-current-source")?.setGeoJson(ghostCurFc)
+        s.getLayerAs<SymbolLayer>("ghost-current-layer")?.setProperties(
+            iconRotate(ghostCurrent?.bearingDeg?.toFloat() ?: 0f),
+        )
         val fix = userFix
         val userFc = if (current == null && fix != null) {
             FeatureCollection.fromFeatures(
