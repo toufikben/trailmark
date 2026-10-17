@@ -48,6 +48,7 @@ import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.maps.GlyphStore
 import dev.toufik.trailmark.app.maps.ONLINE_STYLE_URL
 import dev.toufik.trailmark.app.maps.ONLINE_STYLE_URL_LIGHT
+import dev.toufik.trailmark.core.geo.haversineMeters
 import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.core.model.WaypointType
 import dev.toufik.trailmark.engine.Sport
@@ -289,6 +290,8 @@ fun TrailmarkMap(
     var worldShown by remember { mutableStateOf(false) }
     var following by remember { mutableStateOf(true) }
     var lastBearing by remember { mutableStateOf(0f) }
+    var smoothBearing by remember { mutableStateOf(0f) }
+    var tiltDeg by remember { mutableStateOf(45.0) }
     var userFix by remember { mutableStateOf<StoredPoint?>(null) }
     var pendingLocate by remember { mutableStateOf(false) }
     val lm = remember { context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager }
@@ -369,11 +372,12 @@ fun TrailmarkMap(
         if (pendingLocate && fix != null) {
             pendingLocate = false
             mapView.getMapAsync { map ->
+                smoothBearing = (fix.bearingDeg ?: 0.0).toFloat()
                 map.cameraPosition = CameraPosition.Builder()
                     .target(LatLng(fix.lat, fix.lon))
                     .zoom(16.0)
-                    .bearing(fix.bearingDeg ?: 0.0)
-                    .tilt(45.0)
+                    .bearing(smoothBearing.toDouble())
+                    .tilt(tiltDeg)
                     .build()
                 fitted = true
             }
@@ -533,7 +537,7 @@ fun TrailmarkMap(
         s.getSourceAs<GeoJsonSource>("user-accuracy-source")?.setGeoJson(accFc)
     }
 
-    LaunchedEffect(route.size, current, following, userFix) {
+    LaunchedEffect(route.size, current, following, userFix, tiltDeg) {
         mapView.getMapAsync { map ->
             val c = current ?: run {
                 if (!worldShown) {
@@ -548,21 +552,33 @@ fun TrailmarkMap(
                 return@getMapAsync
             }
             if (!fitted && route.size >= 2) {
-                val bounds = LatLngBounds.Builder()
-                    .include(LatLng(route.first().lat, route.first().lon))
-                    .include(LatLng(route.last().lat, route.last().lon))
-                    .build()
-                map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 120))
+                val first = route.first()
+                val last = route.last()
+                if (haversineMeters(first.lat, first.lon, last.lat, last.lon) < 150.0) {
+                    map.cameraPosition = CameraPosition.Builder()
+                        .target(LatLng(first.lat, first.lon))
+                        .zoom(16.0)
+                        .tilt(tiltDeg)
+                        .build()
+                } else {
+                    val bounds = LatLngBounds.Builder()
+                        .include(LatLng(first.lat, first.lon))
+                        .include(LatLng(last.lat, last.lon))
+                        .build()
+                    map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 120))
+                }
                 fitted = true
                 return@getMapAsync
             }
             if (following) {
-                val b = c.bearingDeg?.toDouble() ?: map.cameraPosition.bearing
+                val target = c.bearingDeg?.toFloat() ?: smoothBearing
+                val delta = ((target - smoothBearing + 540f) % 360f) - 180f
+                smoothBearing = (smoothBearing + delta * 0.3f + 360f) % 360f
                 map.cameraPosition = CameraPosition.Builder()
                     .target(LatLng(c.lat, c.lon))
                     .zoom(if (fitted) map.cameraPosition.zoom else 16.0)
-                    .bearing(b)
-                    .tilt(45.0)
+                    .bearing(smoothBearing.toDouble())
+                    .tilt(tiltDeg)
                     .build()
             }
         }
@@ -584,21 +600,23 @@ fun TrailmarkMap(
                     val fix = userFix
                     when {
                         c != null -> mapView.getMapAsync { map ->
+                            smoothBearing = (c.bearingDeg ?: 0.0).toFloat()
                             map.cameraPosition = CameraPosition.Builder()
                                 .target(LatLng(c.lat, c.lon))
                                 .zoom(16.0)
-                                .bearing(c.bearingDeg ?: 0.0)
-                                .tilt(45.0)
+                                .bearing(smoothBearing.toDouble())
+                                .tilt(tiltDeg)
                                 .build()
                             fitted = true
                         }
                         !locationGranted() -> onNeedPermission()
                         fix != null -> mapView.getMapAsync { map ->
+                            smoothBearing = (fix.bearingDeg ?: 0.0).toFloat()
                             map.cameraPosition = CameraPosition.Builder()
                                 .target(LatLng(fix.lat, fix.lon))
                                 .zoom(16.0)
-                                .bearing(fix.bearingDeg ?: 0.0)
-                                .tilt(45.0)
+                                .bearing(smoothBearing.toDouble())
+                                .tilt(tiltDeg)
                                 .build()
                             fitted = true
                         }
@@ -635,6 +653,20 @@ fun TrailmarkMap(
             ) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("-", color = Palette.text, fontSize = 24.sp)
+                }
+            }
+            Surface(
+                onClick = { tiltDeg = if (tiltDeg > 1.0) 0.0 else 45.0 },
+                color = Palette.surface.copy(alpha = 0.92f),
+                shape = CircleShape,
+                modifier = Modifier.size(44.dp),
+            ) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        if (tiltDeg > 1.0) "2D" else "3D",
+                        color = if (tiltDeg > 1.0) Palette.text else Palette.accent,
+                        fontSize = 13.sp,
+                    )
                 }
             }
         }

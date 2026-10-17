@@ -70,6 +70,9 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
     var detail by remember { mutableStateOf<Detail?>(null) }
     var loading by remember { mutableStateOf(true) }
     val packPath = remember { dev.toufik.trailmark.app.maps.MapPacks.installedMapPack(context)?.absolutePath }
+    val darkMap = remember {
+        context.getSharedPreferences("trailmark", Context.MODE_PRIVATE).getBoolean("map_dark", true)
+    }
 
     LaunchedEffect(activityId) {
         detail = withContext(Dispatchers.IO) {
@@ -173,6 +176,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                         packPath = packPath,
                         current = cursor,
                         sport = sportOf(d.row.sport),
+                        dark = darkMap,
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
