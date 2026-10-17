@@ -60,6 +60,7 @@ data class Texts(
     val downloadedAreas: String,
     val noAreas: String,
     val prebuiltPacks: String,
+    val mapRecenter: String,
 )
 
 /** Arabic (RTL) — the app's first language. */
@@ -118,6 +119,7 @@ val AR_TEXTS = Texts(
     downloadedAreas = "مناطق محفوظة",
     noAreas = "لا مناطق محفوظة",
     prebuiltPacks = "حزم جاهزة (اختياري)",
+    mapRecenter = "العودة إليّ",
 )
 val FR_TEXTS = Texts(
     appName = "Trailmark",
@@ -174,6 +176,7 @@ val FR_TEXTS = Texts(
     downloadedAreas = "Zones enregistrées",
     noAreas = "Aucune zone enregistrée",
     prebuiltPacks = "Packs pré-faits (optionnel)",
+    mapRecenter = "Recentrer sur moi",
 )
 
 val EN_TEXTS = Texts(
@@ -231,6 +234,7 @@ val EN_TEXTS = Texts(
     downloadedAreas = "Saved areas",
     noAreas = "No saved areas",
     prebuiltPacks = "Prebuilt packs (optional)",
+    mapRecenter = "Re-center on me",
 )
 
 fun textsFor(lang: Lang): Texts = when (lang) {

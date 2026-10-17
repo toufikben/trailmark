@@ -111,6 +111,8 @@ fun RecordingScreen(
     var route by remember { mutableStateOf<List<StoredPoint>>(emptyList()) }
     var coachLine by remember { mutableStateOf<String?>(null) }
     var ghost by remember { mutableStateOf<Ghost?>(null) }
+    var ghostRoute by remember { mutableStateOf<List<StoredPoint>>(emptyList()) }
+    var ghostStartNanos by remember { mutableStateOf(0L) }
     var barHeightPx by remember { mutableStateOf(0) }
 
     LaunchedEffect(state.activityId) {
@@ -142,7 +144,11 @@ fun RecordingScreen(
                 ),
                 Locale.AR,
             )
-            if (points.size >= 2) ghost = Ghost(points, points.first().timeNanos)
+            if (points.size >= 2) {
+                ghost = Ghost(points, points.first().timeNanos)
+                ghostRoute = points
+                ghostStartNanos = points.first().timeNanos
+            }
         }
     }
 
@@ -150,6 +156,12 @@ fun RecordingScreen(
         state.currentLon?.let { lo ->
             StoredPoint(la, lo, state.elapsedNanos, 5.0, WaypointType.NORMAL, bearingDeg = state.currentBearing)
         }
+    }
+
+    val ghostNow: StoredPoint? = if (ghostRoute.size < 2) {
+        null
+    } else {
+        ghostRoute.lastOrNull { it.timeNanos - ghostStartNanos <= state.elapsedNanos }
     }
 
     val permissions = buildList {
@@ -176,6 +188,9 @@ fun RecordingScreen(
                     packPath = packPath,
                     current = current,
                     attributionBottom = barHeightPx,
+                    sport = sport,
+                    ghostRoute = ghostRoute,
+                    ghostCurrent = ghostNow,
                     modifier = Modifier.fillMaxSize(),
                 )
                 Row(

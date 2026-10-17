@@ -1,5 +1,22 @@
 package dev.toufik.trailmark.app.ui
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Path
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.view.Gravity
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -7,29 +24,42 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import android.content.Context
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
+import dev.toufik.trailmark.app.LocalTexts
+import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.maps.GlyphStore
 import dev.toufik.trailmark.app.maps.ONLINE_STYLE_URL
 import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.core.model.WaypointType
+import dev.toufik.trailmark.engine.Sport
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
+import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.layers.PropertyFactory.circleColor
 import org.maplibre.android.style.layers.PropertyFactory.circleRadius
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeColor
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth
+import org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap
+import org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement
+import org.maplibre.android.style.layers.PropertyFactory.iconImage
+import org.maplibre.android.style.layers.PropertyFactory.iconRotate
+import org.maplibre.android.style.layers.PropertyFactory.iconRotationAlignment
+import org.maplibre.android.style.layers.PropertyFactory.iconSize
 import org.maplibre.android.style.layers.PropertyFactory.lineColor
+import org.maplibre.android.style.layers.PropertyFactory.lineDasharray
+import org.maplibre.android.style.layers.PropertyFactory.lineOpacity
 import org.maplibre.android.style.layers.PropertyFactory.lineWidth
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
@@ -94,6 +124,43 @@ private fun vectorStyle(packPath: String, glyphsBase: String): String = """
 """.trimIndent()
 
 private val EMPTY: FeatureCollection = FeatureCollection.fromFeatures(emptyArray())
+
+/** Position marker: a heading arrow, or a bicycle for rides. Accent on a dark disc. */
+private fun markerBitmap(context: Context, bike: Boolean): Bitmap {
+    val s = (44 * context.resources.displayMetrics.density).toInt().coerceAtLeast(96).toFloat()
+    val bmp = Bitmap.createBitmap(s.toInt(), s.toInt(), Bitmap.Config.ARGB_8888)
+    val c = Canvas(bmp)
+    val p = Paint(Paint.ANTI_ALIAS_FLAG)
+    p.color = 0xD90E1113.toInt()
+    c.drawCircle(s / 2f, s / 2f, s / 2f - 2f, p)
+    p.color = 0xFFC6FF3D.toInt()
+    p.strokeWidth = s * 0.055f
+    p.strokeCap = Paint.Cap.ROUND
+    p.strokeJoin = Paint.Join.ROUND
+    if (bike) {
+        p.style = Paint.Style.STROKE
+        val r = s * 0.155f
+        val cy = s * 0.62f
+        c.drawCircle(s * 0.30f, cy, r, p)
+        c.drawCircle(s * 0.70f, cy, r, p)
+        c.drawLine(s * 0.30f, cy, s * 0.46f, cy - s * 0.24f, p)
+        c.drawLine(s * 0.46f, cy - s * 0.24f, s * 0.64f, cy - s * 0.02f, p)
+        c.drawLine(s * 0.64f, cy - s * 0.02f, s * 0.30f, cy, p)
+        c.drawLine(s * 0.46f, cy - s * 0.24f, s * 0.42f, cy - s * 0.38f, p)
+        c.drawLine(s * 0.36f, cy - s * 0.38f, s * 0.52f, cy - s * 0.38f, p)
+    } else {
+        p.style = Paint.Style.FILL
+        val arrow = Path()
+        arrow.moveTo(s * 0.50f, s * 0.16f)
+        arrow.lineTo(s * 0.78f, s * 0.82f)
+        arrow.lineTo(s * 0.50f, s * 0.66f)
+        arrow.lineTo(s * 0.22f, s * 0.82f)
+        arrow.close()
+        c.drawPath(arrow, p)
+    }
+    return bmp
+}
+
 @Composable
 fun TrailmarkMap(
     points: List<StoredPoint>,
@@ -101,14 +168,21 @@ fun TrailmarkMap(
     packPath: String? = null,
     current: StoredPoint? = null,
     attributionBottom: Int = 0,
+    sport: Sport = Sport.RUN,
+    ghostRoute: List<StoredPoint> = emptyList(),
+    ghostCurrent: StoredPoint? = null,
 ) {
     val context = LocalContext.current
+    val t = LocalTexts.current
     val route = remember(points) { points.filter { it.type != WaypointType.REJECTED } }
+    val ghost = remember(ghostRoute) { ghostRoute.filter { it.type != WaypointType.REJECTED } }
     val glyphsBase = remember { GlyphStore.ensure(context).absolutePath }
     val online = remember { isOnline(context) }
     var style by remember { mutableStateOf<Style?>(null) }
     var fitted by remember { mutableStateOf(false) }
     var worldShown by remember { mutableStateOf(false) }
+    var following by remember { mutableStateOf(true) }
+    var lastBearing by remember { mutableStateOf(0f) }
 
     val mapView = remember {
         MapView(context).apply {
@@ -129,12 +203,33 @@ fun TrailmarkMap(
     LaunchedEffect(attributionBottom) {
         mapView.getMapAsync { map ->
             val d = context.resources.displayMetrics.density
-            map.uiSettings.setAttributionMargins(
+            val ui = map.uiSettings
+            ui.setAttributionMargins(
                 (92 * d).toInt(),
                 (4 * d).toInt(),
                 (92 * d).toInt(),
                 attributionBottom + (8 * d).toInt(),
             )
+            ui.isZoomControlsEnabled = true
+            ui.setZoomControlsMargins(
+                (12 * d).toInt(),
+                0,
+                (12 * d).toInt(),
+                attributionBottom + (12 * d).toInt(),
+            )
+            ui.isCompassEnabled = true
+            ui.setCompassGravity(Gravity.TOP or Gravity.END)
+            ui.setCompassMargins(0, (128 * d).toInt(), (12 * d).toInt(), 0)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        mapView.getMapAsync { map ->
+            map.addOnCameraMoveStartedListener { reason ->
+                if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_GESTURE) {
+                    following = false
+                }
+            }
         }
     }
 
@@ -154,9 +249,31 @@ fun TrailmarkMap(
                     ),
                 )
                 s.addSource(GeoJsonSource("current-source", EMPTY))
+                s.addImage("me-arrow", markerBitmap(context, false))
+                s.addImage("me-bike", markerBitmap(context, true))
                 s.addLayer(
-                    CircleLayer("current-layer", "current-source").withProperties(
-                        circleColor("#C6FF3D"),
+                    SymbolLayer("current-layer", "current-source").withProperties(
+                        iconImage(if (sport == Sport.RIDE) "me-bike" else "me-arrow"),
+                        iconSize(1f),
+                        iconRotate(lastBearing),
+                        iconRotationAlignment("map"),
+                        iconAllowOverlap(true),
+                        iconIgnorePlacement(true),
+                    ),
+                )
+                s.addSource(GeoJsonSource("ghost-source", EMPTY))
+                s.addLayer(
+                    LineLayer("ghost-line", "ghost-source").withProperties(
+                        lineColor("#8A93A6"),
+                        lineWidth(4f),
+                        lineOpacity(0.55f),
+                        lineDasharray(1.2f, 1.8f),
+                    ),
+                )
+                s.addSource(GeoJsonSource("ghost-current-source", EMPTY))
+                s.addLayer(
+                    CircleLayer("ghost-current-layer", "ghost-current-source").withProperties(
+                        circleColor("#AAB4C8"),
                         circleRadius(7f),
                         circleStrokeColor("#0E1113"),
                         circleStrokeWidth(3f),
@@ -167,7 +284,13 @@ fun TrailmarkMap(
         }
     }
 
-    LaunchedEffect(route, current, style) {
+    LaunchedEffect(sport) {
+        style?.getLayerAs<SymbolLayer>("current-layer")?.setProperties(
+            iconImage(if (sport == Sport.RIDE) "me-bike" else "me-arrow"),
+        )
+    }
+
+    LaunchedEffect(route, current, style, ghost, ghostCurrent) {
         val s = style ?: return@LaunchedEffect
         val routeFc = if (route.size >= 2) {
             FeatureCollection.fromFeatures(
@@ -187,12 +310,31 @@ fun TrailmarkMap(
             )
         } ?: EMPTY
         s.getSourceAs<GeoJsonSource>("current-source")?.setGeoJson(curFc)
+        current?.bearingDeg?.let { lastBearing = it.toFloat() }
+        s.getLayerAs<SymbolLayer>("current-layer")?.setProperties(iconRotate(lastBearing))
+        val ghostFc = if (ghost.size >= 2) {
+            FeatureCollection.fromFeatures(
+                arrayOf(
+                    Feature.fromGeometry(
+                        LineString.fromLngLats(ghost.map { Point.fromLngLat(it.lon, it.lat) }),
+                    ),
+                ),
+            )
+        } else {
+            EMPTY
+        }
+        s.getSourceAs<GeoJsonSource>("ghost-source")?.setGeoJson(ghostFc)
+        val ghostCurFc = ghostCurrent?.let {
+            FeatureCollection.fromFeatures(
+                arrayOf(Feature.fromGeometry(Point.fromLngLat(it.lon, it.lat))),
+            )
+        } ?: EMPTY
+        s.getSourceAs<GeoJsonSource>("ghost-current-source")?.setGeoJson(ghostCurFc)
     }
 
-    LaunchedEffect(route.size, current) {
+    LaunchedEffect(route.size, current, following) {
         mapView.getMapAsync { map ->
-            val c = current
-            if (c == null) {
+            val c = current ?: run {
                 if (!worldShown) {
                     map.cameraPosition = CameraPosition.Builder()
                         .target(LatLng(20.0, 10.0))
@@ -209,14 +351,54 @@ fun TrailmarkMap(
                     .build()
                 map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 120))
                 fitted = true
+                return@getMapAsync
             }
-            map.cameraPosition = CameraPosition.Builder()
-                .target(LatLng(c.lat, c.lon))
-                .zoom(if (fitted) map.cameraPosition.zoom else 16.0)
-                .build()
+            if (following) {
+                val b = c.bearingDeg?.toFloat() ?: map.cameraPosition.bearing
+                map.cameraPosition = CameraPosition.Builder()
+                    .target(LatLng(c.lat, c.lon))
+                    .zoom(if (fitted) map.cameraPosition.zoom else 16.0)
+                    .bearing(b)
+                    .pitch(45.0)
+                    .build()
+            }
         }
     }
 
-    AndroidView(modifier = modifier, factory = { mapView })
+    val bottomPad = with(LocalDensity.current) { attributionBottom.toDp() } + 100.dp
+    Box(modifier = modifier) {
+        AndroidView(modifier = Modifier.fillMaxSize(), factory = { mapView })
+        Surface(
+            onClick = {
+                following = true
+                val c = current
+                mapView.getMapAsync { map ->
+                    if (c != null) {
+                        map.cameraPosition = CameraPosition.Builder()
+                            .target(LatLng(c.lat, c.lon))
+                            .zoom(16.0)
+                            .bearing(c.bearingDeg?.toFloat() ?: 0f)
+                            .pitch(45.0)
+                            .build()
+                        fitted = true
+                    }
+                }
+            },
+            color = Palette.surface.copy(alpha = 0.92f),
+            shape = CircleShape,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 12.dp, bottom = bottomPad)
+                .size(44.dp),
+        ) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Filled.LocationOn,
+                    contentDescription = t.mapRecenter,
+                    tint = if (following) Palette.accent else Palette.textSecondary,
+                )
+            }
+        }
+    }
 }
 
