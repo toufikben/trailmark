@@ -64,6 +64,7 @@ data class Texts(
     val mapTheme: String,
     val pause: String,
     val resume: String,
+    val holdToFinish: String,
 )
 
 /** Arabic (RTL) — the app's first language. */
@@ -126,6 +127,7 @@ val AR_TEXTS = Texts(
     mapTheme = "مظهر الخريطة",
     pause = "إيقاف مؤقت",
     resume = "استئناف",
+    holdToFinish = "اضغط مطولاً للإنهاء",
 )
 val FR_TEXTS = Texts(
     appName = "Trailmark",
@@ -186,6 +188,7 @@ val FR_TEXTS = Texts(
     mapTheme = "Thème de la carte",
     pause = "Pause",
     resume = "Reprendre",
+    holdToFinish = "Appui long : terminer",
 )
 
 val EN_TEXTS = Texts(
@@ -247,6 +250,7 @@ val EN_TEXTS = Texts(
     mapTheme = "Map theme",
     pause = "Pause",
     resume = "Resume",
+    holdToFinish = "Hold to finish",
 )
 
 fun textsFor(lang: Lang): Texts = when (lang) {

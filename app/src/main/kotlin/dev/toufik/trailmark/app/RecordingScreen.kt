@@ -9,7 +9,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,12 +50,14 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -74,7 +77,9 @@ import dev.toufik.trailmark.engine.GpsQuality
 import dev.toufik.trailmark.engine.Sport
 import dev.toufik.trailmark.recording.Phase
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private fun granted(context: Context, permission: String): Boolean =
@@ -411,56 +416,40 @@ fun RecordingScreen(
                     StatCell(formatDuration(state.elapsedNanos), t.time)
                     StatCell(paceText, t.pace)
                     StatCell(speedText, t.speed)
-                    if (state.phase == Phase.RECORDING || state.phase == Phase.PAUSED) {
-                        RoundIconButton(
-                            description = if (state.phase == Phase.PAUSED) t.resume else t.pause,
-                            onClick = {
-                                if (state.phase == Phase.PAUSED) resumeService(context)
-                                else pauseService(context)
-                            },
-                        ) {
-                            if (state.phase == Phase.PAUSED) {
-                                drawCircle(color = Palette.accent, radius = size.minDimension / 2f * 0.98f)
-                                val path = Path().apply {
-                                    moveTo(size.width * 0.40f, size.height * 0.30f)
-                                    lineTo(size.width * 0.72f, size.height * 0.50f)
-                                    lineTo(size.width * 0.40f, size.height * 0.70f)
-                                    close()
-                                }
-                                drawPath(path, Color(0xFF0E1113))
-                            } else {
-                                val w = size.width * 0.14f
-                                val h = size.height * 0.52f
-                                drawRoundRect(
-                                    color = Palette.text,
-                                    topLeft = Offset(size.width * 0.31f - w / 2f, (size.height - h) / 2f),
-                                    size = Size(w, h),
-                                    cornerRadius = CornerRadius(w * 0.4f),
-                                )
-                                drawRoundRect(
-                                    color = Palette.text,
-                                    topLeft = Offset(size.width * 0.69f - w / 2f, (size.height - h) / 2f),
-                                    size = Size(w, h),
-                                    cornerRadius = CornerRadius(w * 0.4f),
-                                )
-                            }
+                    val startAction = {
+                        if (granted(context, Manifest.permission.ACCESS_FINE_LOCATION)) {
+                            startService(context, sport)
+                        } else {
+                            launcher.launch(permissions)
                         }
                     }
                     RoundRecordButton(
                         phase = state.phase,
-                        description = if (state.phase == Phase.STOPPED) t.start else t.stop,
+                        description = when (state.phase) {
+                            Phase.STOPPED -> t.start
+                            Phase.RECORDING -> "${t.pause} \u00b7 ${t.holdToFinish}"
+                            Phase.PAUSED -> "${t.resume} \u00b7 ${t.holdToFinish}"
+                            Phase.STARTING -> t.stop
+                        },
                         onClick = {
                             when (state.phase) {
-                                Phase.RECORDING, Phase.STARTING, Phase.PAUSED -> stopService(context)
-                                Phase.STOPPED -> {
-                                    if (granted(context, Manifest.permission.ACCESS_FINE_LOCATION)) {
-                                        startService(context, sport)
-                                    } else {
-                                        launcher.launch(permissions)
-                                    }
-                                }
+                                Phase.STOPPED -> startAction()
+                                Phase.RECORDING -> pauseService(context)
+                                Phase.PAUSED -> resumeService(context)
+                                Phase.STARTING -> stopService(context)
                             }
                         },
+                        onLongClick = {
+                            if (state.phase == Phase.STOPPED) startAction() else stopService(context)
+                        },
+                    )
+                }
+                if (state.phase == Phase.RECORDING || state.phase == Phase.PAUSED) {
+                    Text(
+                        t.holdToFinish,
+                        color = Palette.textSecondary,
+                        fontSize = 10.sp,
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
                     )
                 }
                 coachLine?.let {
@@ -499,12 +488,15 @@ private fun StatCell(label: String, value: String) {
     }
 }
 
-/** Small icon-only record/stop button: accent dot to start, red square to stop. */
+private const val HOLD_TO_FINISH_NANOS = 2_000_000_000L
+
+/** Tap starts/pauses/resumes; a 2-second hold finishes (the ring shows the countdown). */
 @Composable
 private fun RoundRecordButton(
     phase: Phase,
     description: String,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val background = when (phase) {
@@ -514,51 +506,106 @@ private fun RoundRecordButton(
         Phase.STOPPED -> Palette.accent
     }
     val iconTint = if (phase == Phase.STARTING) Palette.text else Color.White
+    var holdFrac by remember { mutableStateOf(0f) }
     Box(
         modifier = modifier
             .size(56.dp)
             .clip(CircleShape)
             .background(background)
-            .clickable(role = Role.Button, onClickLabel = description, onClick = onClick)
-            .semantics { contentDescription = description },
+            .pointerInput(phase) {
+                awaitEachGesture {
+                    awaitFirstDown()
+                    var fired = false
+                    val t0 = System.nanoTime()
+                    coroutineScope {
+                        val holdJob = launch {
+                            while (true) {
+                                val f = (System.nanoTime() - t0).toDouble() / HOLD_TO_FINISH_NANOS
+                                holdFrac = f.toFloat().coerceIn(0f, 1f)
+                                if (f >= 1.0) {
+                                    fired = true
+                                    onLongClick()
+                                    break
+                                }
+                                delay(16L)
+                            }
+                        }
+                        val up = waitForUpOrCancellation()
+                        holdJob.cancel()
+                        if (up != null && !fired) onClick()
+                    }
+                    holdFrac = 0f
+                }
+            }
+            .semantics {
+                contentDescription = description
+                this.onClick(label = description) {
+                    onClick()
+                    true
+                }
+                this.onLongClick(label = description) {
+                    onLongClick()
+                    true
+                }
+            },
     ) {
+        if (holdFrac > 0f && (phase == Phase.RECORDING || phase == Phase.PAUSED)) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val stroke = size.minDimension * 0.07f
+                drawArc(
+                    color = Color.White,
+                    startAngle = -90f,
+                    sweepAngle = 360f * holdFrac,
+                    useCenter = false,
+                    topLeft = Offset(stroke / 2f, stroke / 2f),
+                    size = Size(size.width - stroke, size.height - stroke),
+                    style = Stroke(width = stroke, cap = StrokeCap.Round),
+                )
+            }
+        }
         Canvas(
             modifier = Modifier
                 .align(Alignment.Center)
                 .size(22.dp),
         ) {
-            if (phase == Phase.STOPPED) {
-                drawCircle(color = iconTint, radius = size.minDimension / 2f)
-            } else {
-                val side = size.minDimension * 0.82f
-                drawRoundRect(
-                    color = iconTint,
-                    topLeft = Offset((size.width - side) / 2f, (size.height - side) / 2f),
-                    size = Size(side, side),
-                    cornerRadius = CornerRadius(side * 0.22f),
-                )
+            when (phase) {
+                Phase.STOPPED -> drawCircle(color = iconTint, radius = size.minDimension / 2f)
+                Phase.RECORDING -> {
+                    val w = size.width * 0.14f
+                    val h = size.height * 0.52f
+                    drawRoundRect(
+                        color = iconTint,
+                        topLeft = Offset(size.width * 0.31f - w / 2f, (size.height - h) / 2f),
+                        size = Size(w, h),
+                        cornerRadius = CornerRadius(w * 0.4f),
+                    )
+                    drawRoundRect(
+                        color = iconTint,
+                        topLeft = Offset(size.width * 0.69f - w / 2f, (size.height - h) / 2f),
+                        size = Size(w, h),
+                        cornerRadius = CornerRadius(w * 0.4f),
+                    )
+                }
+                Phase.PAUSED -> {
+                    val path = Path().apply {
+                        moveTo(size.width * 0.40f, size.height * 0.30f)
+                        lineTo(size.width * 0.72f, size.height * 0.50f)
+                        lineTo(size.width * 0.40f, size.height * 0.70f)
+                        close()
+                    }
+                    drawPath(path, iconTint)
+                }
+                Phase.STARTING -> {
+                    val side = size.minDimension * 0.82f
+                    drawRoundRect(
+                        color = iconTint,
+                        topLeft = Offset((size.width - side) / 2f, (size.height - side) / 2f),
+                        size = Size(side, side),
+                        cornerRadius = CornerRadius(side * 0.22f),
+                    )
+                }
             }
         }
-    }
-}
-
-/** Small secondary round button (44dp) for pause/resume. */
-@Composable
-private fun RoundIconButton(
-    description: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    content: DrawScope.() -> Unit,
-) {
-    Box(
-        modifier = modifier
-            .size(44.dp)
-            .clip(CircleShape)
-            .background(Palette.surface.copy(alpha = 0.9f))
-            .clickable(role = Role.Button, onClickLabel = description, onClick = onClick)
-            .semantics { contentDescription = description },
-    ) {
-        Canvas(modifier = Modifier.align(Alignment.Center).size(22.dp), onDraw = content)
     }
 }
 
