@@ -102,6 +102,7 @@ fun TrailmarkMap(
     val glyphsBase = remember { GlyphStore.ensure(context).absolutePath }
     var style by remember { mutableStateOf<Style?>(null) }
     var fitted by remember { mutableStateOf(false) }
+    var worldShown by remember { mutableStateOf(false) }
 
     val mapView = remember {
         MapView(context).apply {
@@ -170,8 +171,18 @@ fun TrailmarkMap(
     }
 
     LaunchedEffect(route.size, current) {
-        val c = current ?: return@LaunchedEffect
         mapView.getMapAsync { map ->
+            val c = current
+            if (c == null) {
+                if (!worldShown) {
+                    map.cameraPosition = CameraPosition.Builder()
+                        .target(LatLng(20.0, 10.0))
+                        .zoom(1.6)
+                        .build()
+                    worldShown = true
+                }
+                return@getMapAsync
+            }
             if (!fitted && route.size >= 2) {
                 val bounds = LatLngBounds.Builder()
                     .include(LatLng(route.first().lat, route.first().lon))
