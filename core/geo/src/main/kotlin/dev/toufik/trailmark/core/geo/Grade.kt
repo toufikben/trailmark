@@ -53,10 +53,9 @@ fun ascentDescent(points: List<ElevPoint>, hysteresisM: Double = 1.0): Pair<Doub
             }
         }
     }
-    if (goingUp) {
-        ascent += max(0.0, extreme - ref)
-    } else {
-        descent += max(0.0, ref - extreme)
+    val trailing = if (goingUp) max(0.0, extreme - ref) else max(0.0, ref - extreme)
+    if (trailing >= hysteresisM) {
+        if (goingUp) ascent += trailing else descent += trailing
     }
     return ascent to descent
 }
