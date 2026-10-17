@@ -39,6 +39,7 @@ private const val FLAT_STYLE =
 /** A richer OpenMapTiles style (no glyphs, so labels are omitted for now). */
 private fun vectorStyle(packPath: String): String = """
     {"version":8,"name":"trailmark-omt",
+     "glyphs":"asset://glyphs/{fontstack}/{range}.pbf",
      "sources":{"openmaptiles":{"type":"vector","url":"pmtiles://file://$packPath"}},
      "layers":[
        {"id":"background","type":"background","paint":{"background-color":"#0E1113"}},
@@ -64,7 +65,23 @@ private fun vectorStyle(packPath: String): String = """
         "filter":["==","class","rail"],
         "paint":{"line-color":"#2A3138","line-width":1.0}},
        {"id":"boundary","type":"line","source":"openmaptiles","source-layer":"boundary",
-        "paint":{"line-color":"#3A444E","line-width":1.0}}
+        "paint":{"line-color":"#3A444E","line-width":1.0}},
+       {"id":"water-name","type":"symbol","source":"openmaptiles","source-layer":"water_name",
+        "layout":{"text-field":["coalesce",["get","name:ar"],["get","name"]],
+          "text-font":["TrailmarkSans"],"text-size":12,"text-max-width":8},
+        "paint":{"text-color":"#8FA3B0","text-halo-color":"#0E1113","text-halo-width":1.0}},
+       {"id":"place-name","type":"symbol","source":"openmaptiles","source-layer":"place",
+        "filter":["in","class","city","town"],
+        "layout":{"text-field":["coalesce",["get","name:ar"],["get","name:fr"],["get","name"]],
+          "text-font":["TrailmarkSans"],
+          "text-size":["interpolate",["linear"],["zoom"],6,11,12,15],"text-max-width":8},
+        "paint":{"text-color":"#E8EEEA","text-halo-color":"#0E1113","text-halo-width":1.4}},
+       {"id":"road-name","type":"symbol","source":"openmaptiles","source-layer":"transportation_name",
+        "minzoom":13,
+        "layout":{"text-field":["coalesce",["get","name:ar"],["get","name"]],
+          "text-font":["TrailmarkSans"],"text-size":10,
+          "symbol-placement":"line","text-rotation-alignment":"map"},
+        "paint":{"text-color":"#9DA4A1","text-halo-color":"#0E1113","text-halo-width":1.0}}
      ]}
 """.trimIndent()
 
