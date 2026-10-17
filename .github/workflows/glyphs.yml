@@ -1,0 +1,61 @@
+name: glyphs
+
+# Generates MapLibre SDF glyph PBFs (Latin + Arabic) from open Noto fonts and
+# uploads them as an artifact. Run by hand; the result is committed into the
+# app's assets so labels render fully offline.
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install fontnik
+        run: |
+          npm init -y >/dev/null
+          npm install @mapbox/node-fontnik
+      - name: Fetch Noto fonts
+        run: |
+          curl -sSfL -o NotoSans-Regular.ttf \
+            https://raw.githubusercontent.com/openmaptiles/fonts/master/noto-sans/NotoSans-Regular.ttf
+          curl -sSfL -o NotoNaskhArabic-Regular.ttf \
+            https://raw.githubusercontent.com/openmaptiles/fonts/master/noto-sans/NotoNaskhArabic-Regular.ttf
+          ls -l *.ttf
+      - name: Generate glyph ranges
+        run: |
+          cat > gen.js <<'JS'
+          const fs = require('fs');
+          const fontnik = require('@mapbox/node-fontnik');
+          const latin = fs.readFileSync('NotoSans-Regular.ttf');
+          const arabic = fs.readFileSync('NotoNaskhArabic-Regular.ttf');
+          const starts = [0, 256, 512, 768, 1024, 1280, 1536, 1792, 2048];
+          const out = 'glyphs/TrailmarkSans';
+          fs.mkdirSync(out, { recursive: true });
+          (async () => {
+            for (const start of starts) {
+              const end = start + 255;
+              const font = start >= 1536 ? arabic : latin;
+              await new Promise((resolve, reject) => {
+                fontnik.range({ font, start, end }, (err, pbf) => {
+                  if (err) return reject(err);
+                  fs.writeFileSync(`${out}/${start}-${end}.pbf`, pbf);
+                  resolve();
+                });
+              });
+              console.log(`wrote ${start}-${end}.pbf`);
+            }
+          })().catch((e) => { console.error(e); process.exit(1); });
+          JS
+          node gen.js
+          du -sh glyphs
+          find glyphs -type f | sort
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trailmark-glyphs
+          path: glyphs
+          if-no-files-found: error
