@@ -8,13 +8,17 @@ import android.graphics.Path
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.view.Gravity
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -41,7 +45,6 @@ import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
-import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.layers.CircleLayer
@@ -58,7 +61,6 @@ import org.maplibre.android.style.layers.PropertyFactory.iconRotate
 import org.maplibre.android.style.layers.PropertyFactory.iconRotationAlignment
 import org.maplibre.android.style.layers.PropertyFactory.iconSize
 import org.maplibre.android.style.layers.PropertyFactory.lineColor
-import org.maplibre.android.style.layers.PropertyFactory.lineDasharray
 import org.maplibre.android.style.layers.PropertyFactory.lineOpacity
 import org.maplibre.android.style.layers.PropertyFactory.lineWidth
 import org.maplibre.android.style.sources.GeoJsonSource
@@ -210,13 +212,6 @@ fun TrailmarkMap(
                 (92 * d).toInt(),
                 attributionBottom + (8 * d).toInt(),
             )
-            ui.isZoomControlsEnabled = true
-            ui.setZoomControlsMargins(
-                (12 * d).toInt(),
-                0,
-                (12 * d).toInt(),
-                attributionBottom + (12 * d).toInt(),
-            )
             ui.isCompassEnabled = true
             ui.setCompassGravity(Gravity.TOP or Gravity.END)
             ui.setCompassMargins(0, (128 * d).toInt(), (12 * d).toInt(), 0)
@@ -226,7 +221,7 @@ fun TrailmarkMap(
     LaunchedEffect(Unit) {
         mapView.getMapAsync { map ->
             map.addOnCameraMoveStartedListener { reason ->
-                if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_GESTURE) {
+                if (reason == 1) {
                     following = false
                 }
             }
@@ -253,7 +248,7 @@ fun TrailmarkMap(
                 s.addImage("me-bike", markerBitmap(context, true))
                 s.addLayer(
                     SymbolLayer("current-layer", "current-source").withProperties(
-                        iconImage(if (sport == Sport.RIDE) "me-bike" else "me-arrow"),
+                        iconImage(if (sport == Sport.BIKE) "me-bike" else "me-arrow"),
                         iconSize(1f),
                         iconRotate(lastBearing),
                         iconRotationAlignment("map"),
@@ -267,7 +262,6 @@ fun TrailmarkMap(
                         lineColor("#8A93A6"),
                         lineWidth(4f),
                         lineOpacity(0.55f),
-                        lineDasharray(1.2f, 1.8f),
                     ),
                 )
                 s.addSource(GeoJsonSource("ghost-current-source", EMPTY))
@@ -286,7 +280,7 @@ fun TrailmarkMap(
 
     LaunchedEffect(sport) {
         style?.getLayerAs<SymbolLayer>("current-layer")?.setProperties(
-            iconImage(if (sport == Sport.RIDE) "me-bike" else "me-arrow"),
+            iconImage(if (sport == Sport.BIKE) "me-bike" else "me-arrow"),
         )
     }
 
@@ -354,49 +348,73 @@ fun TrailmarkMap(
                 return@getMapAsync
             }
             if (following) {
-                val b = c.bearingDeg?.toFloat() ?: map.cameraPosition.bearing
+                val b = c.bearingDeg?.toDouble() ?: map.cameraPosition.bearing
                 map.cameraPosition = CameraPosition.Builder()
                     .target(LatLng(c.lat, c.lon))
                     .zoom(if (fitted) map.cameraPosition.zoom else 16.0)
                     .bearing(b)
-                    .pitch(45.0)
+                    .tilt(45.0)
                     .build()
             }
         }
     }
 
-    val bottomPad = with(LocalDensity.current) { attributionBottom.toDp() } + 100.dp
+    val bottomPad = with(LocalDensity.current) { attributionBottom.toDp() } + 12.dp
     Box(modifier = modifier) {
         AndroidView(modifier = Modifier.fillMaxSize(), factory = { mapView })
-        Surface(
-            onClick = {
-                following = true
-                val c = current
-                mapView.getMapAsync { map ->
-                    if (c != null) {
-                        map.cameraPosition = CameraPosition.Builder()
-                            .target(LatLng(c.lat, c.lon))
-                            .zoom(16.0)
-                            .bearing(c.bearingDeg?.toFloat() ?: 0f)
-                            .pitch(45.0)
-                            .build()
-                        fitted = true
-                    }
-                }
-            },
-            color = Palette.surface.copy(alpha = 0.92f),
-            shape = CircleShape,
+        Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 12.dp, bottom = bottomPad)
-                .size(44.dp),
+                .padding(end = 12.dp, bottom = bottomPad),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Icon(
-                    Icons.Filled.LocationOn,
-                    contentDescription = t.mapRecenter,
-                    tint = if (following) Palette.accent else Palette.textSecondary,
-                )
+            Surface(
+                onClick = {
+                    following = true
+                    val c = current
+                    mapView.getMapAsync { map ->
+                        if (c != null) {
+                            map.cameraPosition = CameraPosition.Builder()
+                                .target(LatLng(c.lat, c.lon))
+                                .zoom(16.0)
+                                .bearing(c.bearingDeg?.toDouble() ?: 0.0)
+                                .tilt(45.0)
+                                .build()
+                            fitted = true
+                        }
+                    }
+                },
+                color = Palette.surface.copy(alpha = 0.92f),
+                shape = CircleShape,
+                modifier = Modifier.size(44.dp),
+            ) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Filled.LocationOn,
+                        contentDescription = t.mapRecenter,
+                        tint = if (following) Palette.accent else Palette.textSecondary,
+                    )
+                }
+            }
+            Surface(
+                onClick = { mapView.getMapAsync { map -> map.animateCamera(CameraUpdateFactory.zoomIn()) } },
+                color = Palette.surface.copy(alpha = 0.92f),
+                shape = CircleShape,
+                modifier = Modifier.size(44.dp),
+            ) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Filled.Add, contentDescription = "+", tint = Palette.text)
+                }
+            }
+            Surface(
+                onClick = { mapView.getMapAsync { map -> map.animateCamera(CameraUpdateFactory.zoomOut()) } },
+                color = Palette.surface.copy(alpha = 0.92f),
+                shape = CircleShape,
+                modifier = Modifier.size(44.dp),
+            ) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Filled.Remove, contentDescription = "-", tint = Palette.text)
+                }
             }
         }
     }
