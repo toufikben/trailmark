@@ -156,7 +156,7 @@ fun RecordingScreen(
 
     Surface(color = Palette.bg, modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            Box(modifier = Modifier.weight(6f).fillMaxWidth()) {
+            Box(modifier = Modifier.weight(5f).fillMaxWidth()) {
                 TrailmarkMap(
                     points = route,
                     packPath = packPath,
@@ -228,7 +228,7 @@ fun RecordingScreen(
             }
 
             Column(
-                modifier = Modifier.weight(4f).fillMaxWidth().padding(16.dp),
+                modifier = Modifier.weight(5f).fillMaxWidth().padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Row(
