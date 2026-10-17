@@ -100,6 +100,7 @@ fun TrailmarkMap(
     modifier: Modifier = Modifier,
     packPath: String? = null,
     current: StoredPoint? = null,
+    attributionBottom: Int = 0,
 ) {
     val context = LocalContext.current
     val route = remember(points) { points.filter { it.type != WaypointType.REJECTED } }
@@ -122,6 +123,18 @@ fun TrailmarkMap(
             mapView.onPause()
             mapView.onStop()
             mapView.onDestroy()
+        }
+    }
+
+    LaunchedEffect(attributionBottom) {
+        mapView.getMapAsync { map ->
+            val d = context.resources.displayMetrics.density
+            map.uiSettings.setAttributionMargins(
+                (92 * d).toInt(),
+                (4 * d).toInt(),
+                (92 * d).toInt(),
+                attributionBottom + (8 * d).toInt(),
+            )
         }
     }
 

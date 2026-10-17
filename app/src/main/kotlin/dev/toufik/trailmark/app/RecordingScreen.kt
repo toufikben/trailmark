@@ -45,6 +45,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -110,6 +111,7 @@ fun RecordingScreen(
     var route by remember { mutableStateOf<List<StoredPoint>>(emptyList()) }
     var coachLine by remember { mutableStateOf<String?>(null) }
     var ghost by remember { mutableStateOf<Ghost?>(null) }
+    var barHeightPx by remember { mutableStateOf(0) }
 
     LaunchedEffect(state.activityId) {
         val id = state.activityId
@@ -173,6 +175,7 @@ fun RecordingScreen(
                     points = route,
                     packPath = packPath,
                     current = current,
+                    attributionBottom = barHeightPx,
                     modifier = Modifier.fillMaxSize(),
                 )
                 Row(
@@ -244,7 +247,8 @@ fun RecordingScreen(
                 shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .onSizeChanged { barHeightPx = it.height },
             ) {
                 Column(
                     modifier = Modifier
