@@ -26,7 +26,7 @@
         <service
             android:name=".app.service.RecordingService"
             android:exported="false"
-            android:foregroundServiceType="location" />
+            android:foregroundServiceType="location|dataSync" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

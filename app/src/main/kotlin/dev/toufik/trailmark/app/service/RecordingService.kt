@@ -51,14 +51,15 @@ class RecordingService : Service() {
     private fun startRecording(intent: Intent) {
         if (controller != null) return
         createChannel()
+        val synthetic = intent.getBooleanExtra(EXTRA_SYNTHETIC, false)
         ServiceCompat.startForeground(
             this,
             NOTIF_ID,
             buildNotification(),
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-            } else {
-                0
+            when {
+                Build.VERSION.SDK_INT < Build.VERSION_CODES.Q -> 0
+                synthetic -> ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                else -> ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
             },
         )
         acquireWakeLock()
