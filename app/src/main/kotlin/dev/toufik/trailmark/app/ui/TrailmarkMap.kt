@@ -1,10 +1,6 @@
 package dev.toufik.trailmark.app.ui
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.Path
 import android.Manifest
 import android.content.pm.PackageManager
 import android.location.Location
@@ -33,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,12 +39,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import androidx.core.graphics.PathParser
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.maps.GlyphStore
 import dev.toufik.trailmark.app.maps.ONLINE_STYLE_URL
 import dev.toufik.trailmark.app.maps.ONLINE_STYLE_URL_LIGHT
+import dev.toufik.trailmark.core.geo.RouteChunk
 import dev.toufik.trailmark.core.geo.haversineMeters
 import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.core.model.WaypointType
@@ -98,6 +95,7 @@ import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
 import org.maplibre.geojson.Polygon
+import kotlinx.coroutines.delay
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -197,82 +195,13 @@ private fun accuracyPolygon(lat: Double, lon: Double, meters: Double): Feature {
     return Feature.fromGeometry(Polygon.fromLngLats(listOf(pts + pts.first())))
 }
 
-private const val ICON_BIKE =
-    "M15.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM5 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 " +
-        "5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 " +
-        "3.5-3.5 3.5zm5.8-10l2.4-2.4.8.8c1.3 1.3 3 2.1 5.1 2.1V9c-1.5 0-2.7-.6-3.6-1.5l-1.9-1.9" +
-        "c-.5-.4-1-.6-1.6-.6s-1.1.2-1.4.6L7.8 8.4c-.4.4-.6.9-.6 1.4 0 .6.2 1.1.6 1.4L11 14v5h2" +
-        "v-6.2l-2.2-2.3zM19 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3" +
-        ".5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5z"
-
-private const val ICON_RUN =
-    "M13.49 5.48c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm-3.6 13.9l1-4.4 2.1 2v6h2v-7.5" +
-        "l-2.1-2 .6-3c1.3 1.5 3.3 2.5 5.5 2.5v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1" +
-        "-.3 0-.5.1-.8.1l-5.2 2.2v4.7h2v-3.4l1.8-.7-1.6 8.1-4.9-1-.4 2 7 1.4z"
-
-private const val ICON_WALK =
-    "M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2" +
-        "v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1." +
-        "7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"
-
-private const val ICON_HIKE =
-    "M13.5,5.5c1.1,0,2-0.9,2-2s-0.9-2-2-2s-2,0.9-2,2S12.4,5.5,13.5,5.5z M17.5,10.78c-1.23-0.37" +
-        "-2.22-1.17-2.8-2.18l-1-1.6 c-0.41-0.65-1.11-1-1.84-1c-0.78,0-1.59,0.5-1.78,1.44S7,23," +
-        "7,23h2.1l1.8-8l2.1,2v6h2v-7.5l-2.1-2l0.6-3c1,1.15,2.41,2.01,4,2.34V23 H19V9h-1.5L17.5," +
-        "10.78z M7.43,13.13l-2.12-0.41c-0.54-0.11-0.9-0.63-0.79-1.17l0.76-3.93c0.21-1.08,1.26-" +
-        "1.79,2.34-1.58l1.16,0.23 L7.43,13.13z"
-
-private fun glyphPath(sport: Sport): Path = PathParser.createPathFromPathData(
-    when (sport) {
-        Sport.BIKE -> ICON_BIKE
-        Sport.RUN -> ICON_RUN
-        Sport.WALK -> ICON_WALK
-        Sport.HIKE -> ICON_HIKE
-    },
-)
-
-private fun drawSportGlyph(c: Canvas, sport: Sport, s: Float, fill: Int, halo: Int?) {
-    val path = glyphPath(sport)
-    val scale = (s * 0.60f) / 24f
-    c.save()
-    c.translate(s / 2f - 12f * scale, s / 2f - 12f * scale)
-    c.scale(scale, scale)
-    val p = Paint(Paint.ANTI_ALIAS_FLAG)
-    if (halo != null) {
-        p.style = Paint.Style.STROKE
-        p.strokeWidth = 1.7f
-        p.strokeJoin = Paint.Join.ROUND
-        p.color = halo
-        c.drawPath(path, p)
-    }
-    p.style = Paint.Style.FILL
-    p.color = fill
-    c.drawPath(path, p)
-    c.restore()
-}
-
-/** Position marker per sport — Material silhouette on a dark disc with an accent ring. */
-private fun markerBitmap(context: Context, sport: Sport): Bitmap {
-    val s = (36 * context.resources.displayMetrics.density).toInt().coerceAtLeast(80).toFloat()
-    val bmp = Bitmap.createBitmap(s.toInt(), s.toInt(), Bitmap.Config.ARGB_8888)
-    val c = Canvas(bmp)
-    val p = Paint(Paint.ANTI_ALIAS_FLAG)
-    p.color = 0xE60E1113.toInt()
-    c.drawCircle(s / 2f, s / 2f, s / 2f - 2f, p)
-    p.style = Paint.Style.STROKE
-    p.strokeWidth = s * 0.04f
-    p.color = 0xFFC6FF3D.toInt()
-    c.drawCircle(s / 2f, s / 2f, s / 2f - 2f - p.strokeWidth / 2f, p)
-    drawSportGlyph(c, sport, s, 0xFFC6FF3D.toInt(), null)
-    return bmp
-}
-
-/** Ghost: the same silhouette, soft and translucent, with a dark halo so it reads on any map. */
-private fun ghostBitmap(context: Context, sport: Sport): Bitmap {
-    val s = (30 * context.resources.displayMetrics.density).toInt().coerceAtLeast(72).toFloat()
-    val bmp = Bitmap.createBitmap(s.toInt(), s.toInt(), Bitmap.Config.ARGB_8888)
-    drawSportGlyph(Canvas(bmp), sport, s, 0xBFE8EEEA.toInt(), 0x730E1113.toInt())
-    return bmp
+/** `["step",["get","frame"],"me-RUN-0",1,"me-RUN-1",…]` — picks the cycle frame image. */
+private fun frameIconExpr(sport: Sport): Expression {
+    val sb = StringBuilder()
+    sb.append("""["step",["get","frame"],"${spriteImageId(sport, 0)}"""")
+    for (f in 1 until SPRITE_FRAMES) sb.append(""",$f,"${spriteImageId(sport, f)}"""")
+    sb.append("]")
+    return Expression.raw(sb.toString())
 }
 
 @Composable
@@ -285,6 +214,11 @@ fun TrailmarkMap(
     sport: Sport = Sport.RUN,
     ghostRoute: List<StoredPoint> = emptyList(),
     ghostCurrent: StoredPoint? = null,
+    speedMps: Double? = null,
+    planChunks: List<RouteChunk> = emptyList(),
+    planDest: Pair<Double, Double>? = null,
+    onMapClick: ((Double, Double) -> Unit)? = null,
+    onUserFix: ((StoredPoint) -> Unit)? = null,
     onNeedPermission: () -> Unit = {},
     dark: Boolean = true,
 ) {
@@ -305,6 +239,9 @@ fun TrailmarkMap(
     var tiltDeg by remember { mutableStateOf(0.0) }
     var userFix by remember { mutableStateOf<StoredPoint?>(null) }
     var pendingLocate by remember { mutableStateOf(false) }
+    var frameIndex by remember { mutableStateOf(0) }
+    val onMapClickRef = rememberUpdatedState(onMapClick)
+    val onUserFixRef = rememberUpdatedState(onUserFix)
     val lm = remember { context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager }
     fun locationGranted(): Boolean = ContextCompat.checkSelfPermission(
         context,
@@ -350,6 +287,28 @@ fun TrailmarkMap(
                     following = false
                 }
             }
+            map.addOnMapClickListener { latLng ->
+                val cb = onMapClickRef.value
+                if (cb != null) {
+                    cb(latLng.latitude, latLng.longitude)
+                    true
+                } else {
+                    false
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(current != null, speedMps) {
+        if (current == null) {
+            frameIndex = 0
+            return@LaunchedEffect
+        }
+        while (true) {
+            val kmh = (speedMps ?: 0.0) * 3.6
+            val ms = if (kmh < 1.0) 400L else (1100.0 / kmh).toLong().coerceIn(80L, 170L)
+            delay(ms)
+            if (kmh >= 1.0) frameIndex = (frameIndex + 1) % SPRITE_FRAMES
         }
     }
 
@@ -362,10 +321,16 @@ fun TrailmarkMap(
                 LocationManager.PASSIVE_PROVIDER,
             ).mapNotNull { p -> runCatching { lm.getLastKnownLocation(p) }.getOrNull() }
                 .maxByOrNull { it.time }
-            if (last != null) userFix = last.toStoredPoint()
+            if (last != null) {
+                val sp = last.toStoredPoint()
+                userFix = sp
+                onUserFixRef.value?.invoke(sp)
+            }
             val l = object : LocationListener {
                 override fun onLocationChanged(location: Location) {
-                    userFix = location.toStoredPoint()
+                    val sp = location.toStoredPoint()
+                    userFix = sp
+                    onUserFixRef.value?.invoke(sp)
                 }
             }
             listener = l
@@ -450,6 +415,29 @@ fun TrailmarkMap(
                 poiLabel.setFilter(poiFilter)
                 poiLabel.minZoom = 15.5f
                 s.addLayer(poiLabel)
+                s.addSource(GeoJsonSource("plan-source", EMPTY))
+                s.addLayer(
+                    LineLayer("plan-casing", "plan-source").withProperties(
+                        lineColor(if (dark) "#0E1113" else "#FFFFFF"),
+                        lineWidth(8f),
+                        lineOpacity(0.45f),
+                    ),
+                )
+                s.addLayer(
+                    LineLayer("plan-line", "plan-source").withProperties(
+                        lineColor(Expression.get("color")),
+                        lineWidth(5f),
+                    ),
+                )
+                s.addSource(GeoJsonSource("plan-dest-source", EMPTY))
+                s.addLayer(
+                    CircleLayer("plan-dest", "plan-dest-source").withProperties(
+                        circleColor("#C6FF3D"),
+                        circleRadius(7f),
+                        circleStrokeColor("#FFFFFF"),
+                        circleStrokeWidth(2.5f),
+                    ),
+                )
                 s.addSource(GeoJsonSource("route-source", EMPTY))
                 s.addLayer(
                     LineLayer("route-layer", "route-source").withProperties(
@@ -458,12 +446,16 @@ fun TrailmarkMap(
                     ),
                 )
                 s.addSource(GeoJsonSource("current-source", EMPTY))
-                Sport.entries.forEach { sp -> s.addImage("me-" + sp.name, markerBitmap(context, sp)) }
-                Sport.entries.forEach { sp -> s.addImage("me-ghost-" + sp.name, ghostBitmap(context, sp)) }
+                Sport.entries.forEach { sp ->
+                    for (f in 0 until SPRITE_FRAMES) {
+                        s.addImage(spriteImageId(sp, f), spriteBitmap(context, sp, f))
+                    }
+                    s.addImage("me-ghost-" + sp.name, ghostSpriteBitmapFor(context, sp))
+                }
                 s.addLayer(
                     SymbolLayer("current-layer", "current-source").withProperties(
-                        iconImage("me-" + sport.name),
-                        iconSize(1f),
+                        iconImage(frameIconExpr(sport)),
+                        iconSize(0.92f),
                         iconRotate(lastBearing),
                         iconRotationAlignment("map"),
                         iconAllowOverlap(true),
@@ -518,13 +510,39 @@ fun TrailmarkMap(
     }
 
     LaunchedEffect(sport) {
-        val img = "me-" + sport.name
         val ghostImg = "me-ghost-" + sport.name
-        style?.getLayerAs<SymbolLayer>("current-layer")?.setProperties(iconImage(img))
+        style?.getLayerAs<SymbolLayer>("current-layer")?.setProperties(iconImage(frameIconExpr(sport)))
         style?.getLayerAs<SymbolLayer>("ghost-current-layer")?.setProperties(iconImage(ghostImg))
     }
 
-    LaunchedEffect(route, current, style, ghost, ghostCurrent, userFix) {
+    LaunchedEffect(planChunks, style) {
+        val s = style ?: return@LaunchedEffect
+        val features = planChunks.map { chunk ->
+            val f = Feature.fromGeometry(
+                LineString.fromLngLats(chunk.points.map { Point.fromLngLat(it.lon, it.lat) }),
+            )
+            f.addStringProperty("color", gradeColorHex(chunk.gradePercent))
+            f
+        }
+        s.getSourceAs<GeoJsonSource>("plan-source")?.setGeoJson(
+            if (features.isEmpty()) EMPTY else FeatureCollection.fromFeatures(features.toTypedArray()),
+        )
+    }
+
+    LaunchedEffect(planDest, style) {
+        val s = style ?: return@LaunchedEffect
+        val d = planDest
+        val fc = if (d != null) {
+            FeatureCollection.fromFeatures(
+                arrayOf(Feature.fromGeometry(Point.fromLngLat(d.second, d.first))),
+            )
+        } else {
+            EMPTY
+        }
+        s.getSourceAs<GeoJsonSource>("plan-dest-source")?.setGeoJson(fc)
+    }
+
+    LaunchedEffect(route, current, style, ghost, ghostCurrent, userFix, frameIndex) {
         val s = style ?: return@LaunchedEffect
         val routeFc = if (route.size >= 2) {
             FeatureCollection.fromFeatures(
@@ -539,9 +557,9 @@ fun TrailmarkMap(
         }
         s.getSourceAs<GeoJsonSource>("route-source")?.setGeoJson(routeFc)
         val curFc = current?.let {
-            FeatureCollection.fromFeatures(
-                arrayOf(Feature.fromGeometry(Point.fromLngLat(it.lon, it.lat))),
-            )
+            val f = Feature.fromGeometry(Point.fromLngLat(it.lon, it.lat))
+            f.addNumberProperty("frame", (frameIndex % SPRITE_FRAMES).toDouble())
+            FeatureCollection.fromFeatures(arrayOf(f))
         } ?: EMPTY
         s.getSourceAs<GeoJsonSource>("current-source")?.setGeoJson(curFc)
         current?.bearingDeg?.let { lastBearing = it.toFloat() }

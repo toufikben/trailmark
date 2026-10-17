@@ -15,12 +15,14 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.platform.LocalLayoutDirection
 import dev.toufik.trailmark.app.ui.DetailScreen
 import dev.toufik.trailmark.app.ui.HistoryScreen
+import dev.toufik.trailmark.app.ui.PlanScreen
 import dev.toufik.trailmark.app.ui.RegionsScreen
 
 sealed interface Screen {
     data object Record : Screen
     data object History : Screen
     data object Regions : Screen
+    data object Plan : Screen
     data class Detail(val id: Long) : Screen
 }
 
@@ -61,10 +63,12 @@ class MainActivity : ComponentActivity() {
                             Screen.Record -> RecordingScreen(
                                 onHistory = { screen = Screen.History },
                                 onRegions = { screen = Screen.Regions },
+                                onPlan = { screen = Screen.Plan },
                                 onOpenDetail = { id -> screen = Screen.Detail(id) },
                                 lang = lang,
                                 onLang = { lang = it },
                             )
+                            Screen.Plan -> PlanScreen(onBack = { screen = Screen.Record })
                             Screen.History -> HistoryScreen(
                                 onOpen = { screen = Screen.Detail(it) },
                                 onBack = { screen = Screen.Record },

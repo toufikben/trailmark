@@ -65,6 +65,16 @@ data class Texts(
     val pause: String,
     val resume: String,
     val holdToFinish: String,
+    val plan: String,
+    val pickDestination: String,
+    val calculating: String,
+    val estimatedTime: String,
+    val estimatedArrival: String,
+    val descent: String,
+    val maxGrade: String,
+    val clear: String,
+    val directEstimate: String,
+    val elevationProfile: String,
 )
 
 /** Arabic (RTL) — the app's first language. */
@@ -128,6 +138,16 @@ val AR_TEXTS = Texts(
     pause = "إيقاف مؤقت",
     resume = "استئناف",
     holdToFinish = "اضغط مطولاً للإنهاء",
+    plan = "تخطيط مسار",
+    pickDestination = "اضغط على الخريطة لاختيار وجهتك",
+    calculating = "…جارٍ حساب المسار",
+    estimatedTime = "الوقت المقدر",
+    estimatedArrival = "الوصول",
+    descent = "نزول",
+    maxGrade = "أقصى انحدار",
+    clear = "مسح",
+    directEstimate = "تقدير مباشر — لا تتوفر بيانات الطرق والارتفاع",
+    elevationProfile = "مقطع الارتفاع",
 )
 val FR_TEXTS = Texts(
     appName = "Trailmark",
@@ -189,6 +209,16 @@ val FR_TEXTS = Texts(
     pause = "Pause",
     resume = "Reprendre",
     holdToFinish = "Appui long : terminer",
+    plan = "Itinéraire",
+    pickDestination = "Touchez la carte pour choisir la destination",
+    calculating = "Calcul de l'itinéraire…",
+    estimatedTime = "Durée estimée",
+    estimatedArrival = "Arrivée",
+    descent = "Descente",
+    maxGrade = "Pente max",
+    clear = "Effacer",
+    directEstimate = "Estimation directe — pas de données routières ni d'altitude",
+    elevationProfile = "Profil d'altitude",
 )
 
 val EN_TEXTS = Texts(
@@ -251,6 +281,16 @@ val EN_TEXTS = Texts(
     pause = "Pause",
     resume = "Resume",
     holdToFinish = "Hold to finish",
+    plan = "Route planner",
+    pickDestination = "Tap the map to pick a destination",
+    calculating = "Routing…",
+    estimatedTime = "Est. time",
+    estimatedArrival = "Arrival",
+    descent = "Descent",
+    maxGrade = "Max grade",
+    clear = "Clear",
+    directEstimate = "Straight-line estimate — no road or elevation data",
+    elevationProfile = "Elevation profile",
 )
 
 fun textsFor(lang: Lang): Texts = when (lang) {

@@ -7,7 +7,6 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -26,12 +25,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Place
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
@@ -128,6 +123,7 @@ private fun qualityLabel(t: Texts, q: GpsQuality): String = when (q) {
 fun RecordingScreen(
     onHistory: () -> Unit,
     onRegions: () -> Unit,
+    onPlan: () -> Unit,
     onOpenDetail: (Long) -> Unit,
     lang: Lang,
     onLang: (Lang) -> Unit,
@@ -264,6 +260,7 @@ fun RecordingScreen(
                     current = current,
                     attributionBottom = barHeightPx,
                     sport = sport,
+                    speedMps = state.currentSpeedMps,
                     ghostRoute = ghostRoute,
                     ghostCurrent = ghostNow,
                     onNeedPermission = {
@@ -302,6 +299,25 @@ fun RecordingScreen(
                             .clip(RoundedCornerShape(24.dp))
                             .background(Palette.surface.copy(alpha = 0.85f)),
                     ) {
+                        IconButton(onClick = onPlan, modifier = Modifier.size(48.dp)) {
+                            Canvas(Modifier.size(22.dp).semantics { contentDescription = t.plan }) {
+                                val tint = Palette.text
+                                val w = size.width
+                                val h = size.height
+                                val path = Path().apply {
+                                    moveTo(w * 0.08f, h * 0.86f)
+                                    cubicTo(w * 0.35f, h * 0.86f, w * 0.30f, h * 0.40f, w * 0.55f, h * 0.40f)
+                                    cubicTo(w * 0.80f, h * 0.40f, w * 0.70f, h * 0.14f, w * 0.92f, h * 0.14f)
+                                }
+                                drawPath(
+                                    path,
+                                    tint,
+                                    style = Stroke(width = w * 0.10f, cap = StrokeCap.Round),
+                                )
+                                drawCircle(tint, radius = w * 0.11f, center = Offset(w * 0.08f, h * 0.86f))
+                                drawCircle(Palette.accent, radius = w * 0.13f, center = Offset(w * 0.92f, h * 0.14f))
+                            }
+                        }
                         IconButton(onClick = onHistory, modifier = Modifier.size(48.dp)) {
                             Icon(Icons.Filled.List, contentDescription = t.history, tint = Palette.text)
                         }
@@ -489,8 +505,7 @@ fun RecordingScreen(
 }
 
 @Composable
-private fun StatCell(value: String, label: String, accent: Boolean = false, desc: String? = null) {
-    Column(
+private fun StatCell(value: String, label: String, accent: Boolean = false, desc: String? = null) {    Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = if (desc != null) {
             Modifier.clearAndSetSemantics { contentDescription = desc }
@@ -504,58 +519,6 @@ private fun StatCell(value: String, label: String, accent: Boolean = false, desc
             fontSize = 16.sp,
         )
         Text(text = label, color = Palette.textSecondary, fontSize = 11.sp)
-    }
-}
-
-@Composable
-private fun SportPicker(
-    t: Texts,
-    sport: Sport,
-    enabled: Boolean,
-    onPick: (Sport) -> Unit,
-) {
-    var menu by remember { mutableStateOf(false) }
-    Box {
-        Surface(
-            onClick = { menu = true },
-            enabled = enabled,
-            shape = RoundedCornerShape(24.dp),
-            color = Palette.surface.copy(alpha = 0.9f),
-            border = BorderStroke(1.dp, Palette.textSecondary.copy(alpha = 0.3f)),
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(start = 14.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
-            ) {
-                Text(
-                    text = sportLabelOf(t, sport),
-                    color = if (enabled) Palette.text else Palette.textSecondary,
-                    fontSize = 13.sp,
-                )
-                Icon(
-                    Icons.Filled.ArrowDropDown,
-                    contentDescription = null,
-                    tint = Palette.textSecondary,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-        }
-        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-            Sport.entries.forEach { s ->
-                DropdownMenuItem(
-                    text = { Text(sportLabelOf(t, s)) },
-                    onClick = {
-                        onPick(s)
-                        menu = false
-                    },
-                    trailingIcon = if (s == sport) {
-                        { Icon(Icons.Filled.Check, contentDescription = null) }
-                    } else {
-                        null
-                    },
-                )
-            }
-        }
     }
 }
 
@@ -677,13 +640,6 @@ private fun RoundRecordButton(
             }
         }
     }
-}
-
-private fun sportLabelOf(t: Texts, s: Sport): String = when (s) {
-    Sport.WALK -> t.walk
-    Sport.RUN -> t.run
-    Sport.BIKE -> t.bike
-    Sport.HIKE -> t.hike
 }
 
 private fun bearingDeg(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
