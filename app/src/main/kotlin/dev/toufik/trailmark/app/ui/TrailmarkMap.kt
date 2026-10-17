@@ -291,7 +291,7 @@ fun TrailmarkMap(
     var following by remember { mutableStateOf(true) }
     var lastBearing by remember { mutableStateOf(0f) }
     var smoothBearing by remember { mutableStateOf(0f) }
-    var tiltDeg by remember { mutableStateOf(45.0) }
+    var tiltDeg by remember { mutableStateOf(0.0) }
     var userFix by remember { mutableStateOf<StoredPoint?>(null) }
     var pendingLocate by remember { mutableStateOf(false) }
     val lm = remember { context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager }
@@ -543,7 +543,7 @@ fun TrailmarkMap(
                 if (!worldShown) {
                     val fix = userFix
                     map.cameraPosition = if (fix != null) {
-                        CameraPosition.Builder().target(LatLng(fix.lat, fix.lon)).zoom(13.5).build()
+                        CameraPosition.Builder().target(LatLng(fix.lat, fix.lon)).zoom(13.5).tilt(tiltDeg).build()
                     } else {
                         CameraPosition.Builder().target(LatLng(20.0, 10.0)).zoom(1.6).build()
                     }
@@ -656,7 +656,13 @@ fun TrailmarkMap(
                 }
             }
             Surface(
-                onClick = { tiltDeg = if (tiltDeg > 1.0) 0.0 else 45.0 },
+                onClick = {
+                    val next = if (tiltDeg > 1.0) 0.0 else 45.0
+                    tiltDeg = next
+                    mapView.getMapAsync { map ->
+                        map.animateCamera(CameraUpdateFactory.tiltTo(next))
+                    }
+                },
                 color = Palette.surface.copy(alpha = 0.92f),
                 shape = CircleShape,
                 modifier = Modifier.size(44.dp),
