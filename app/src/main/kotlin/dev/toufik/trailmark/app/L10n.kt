@@ -62,6 +62,8 @@ data class Texts(
     val prebuiltPacks: String,
     val mapRecenter: String,
     val mapTheme: String,
+    val pause: String,
+    val resume: String,
 )
 
 /** Arabic (RTL) — the app's first language. */
@@ -122,6 +124,8 @@ val AR_TEXTS = Texts(
     prebuiltPacks = "حزم جاهزة (اختياري)",
     mapRecenter = "العودة إليّ",
     mapTheme = "مظهر الخريطة",
+    pause = "إيقاف مؤقت",
+    resume = "استئناف",
 )
 val FR_TEXTS = Texts(
     appName = "Trailmark",
@@ -180,6 +184,8 @@ val FR_TEXTS = Texts(
     prebuiltPacks = "Packs pré-faits (optionnel)",
     mapRecenter = "Recentrer sur moi",
     mapTheme = "Thème de la carte",
+    pause = "Pause",
+    resume = "Reprendre",
 )
 
 val EN_TEXTS = Texts(
@@ -239,6 +245,8 @@ val EN_TEXTS = Texts(
     prebuiltPacks = "Prebuilt packs (optional)",
     mapRecenter = "Re-center on me",
     mapTheme = "Map theme",
+    pause = "Pause",
+    resume = "Resume",
 )
 
 fun textsFor(lang: Lang): Texts = when (lang) {

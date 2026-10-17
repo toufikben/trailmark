@@ -44,6 +44,8 @@ class RecordingService : Service() {
         when (intent?.action) {
             ACTION_START -> startRecording(intent)
             ACTION_STOP -> stopRecording()
+            ACTION_PAUSE -> scope.launch { controller?.pause() }
+            ACTION_RESUME -> scope.launch { controller?.resume() }
         }
         return START_STICKY
     }
@@ -147,6 +149,8 @@ class RecordingService : Service() {
     companion object {
         const val ACTION_START = "dev.toufik.trailmark.action.START"
         const val ACTION_STOP = "dev.toufik.trailmark.action.STOP"
+        const val ACTION_PAUSE = "dev.toufik.trailmark.action.PAUSE"
+        const val ACTION_RESUME = "dev.toufik.trailmark.action.RESUME"
         const val EXTRA_SPORT = "sport"
         const val EXTRA_SYNTHETIC = "synthetic"
         private const val CHANNEL_ID = "recording"

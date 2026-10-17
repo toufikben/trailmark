@@ -49,6 +49,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -89,6 +90,18 @@ private fun startService(context: Context, sport: Sport) {
 private fun stopService(context: Context) {
     context.startService(
         Intent(context, RecordingService::class.java).setAction(RecordingService.ACTION_STOP),
+    )
+}
+
+private fun pauseService(context: Context) {
+    context.startService(
+        Intent(context, RecordingService::class.java).setAction(RecordingService.ACTION_PAUSE),
+    )
+}
+
+private fun resumeService(context: Context) {
+    context.startService(
+        Intent(context, RecordingService::class.java).setAction(RecordingService.ACTION_RESUME),
     )
 }
 
@@ -332,9 +345,9 @@ fun RecordingScreen(
                         .background(Palette.surface.copy(alpha = 0.85f))
                         .padding(horizontal = 10.dp, vertical = 6.dp),
                 )
-                if (state.isIdle) {
+                if (state.isIdle || state.phase == Phase.PAUSED) {
                     Text(
-                        text = t.paused,
+                        text = if (state.phase == Phase.PAUSED) t.pause else t.paused,
                         color = Palette.accent,
                         fontSize = 12.sp,
                         modifier = Modifier
@@ -398,12 +411,47 @@ fun RecordingScreen(
                     StatCell(formatDuration(state.elapsedNanos), t.time)
                     StatCell(paceText, t.pace)
                     StatCell(speedText, t.speed)
+                    if (state.phase == Phase.RECORDING || state.phase == Phase.PAUSED) {
+                        RoundIconButton(
+                            description = if (state.phase == Phase.PAUSED) t.resume else t.pause,
+                            onClick = {
+                                if (state.phase == Phase.PAUSED) resumeService(context)
+                                else pauseService(context)
+                            },
+                        ) {
+                            if (state.phase == Phase.PAUSED) {
+                                drawCircle(color = Palette.accent, radius = size.minDimension / 2f * 0.98f)
+                                val path = Path().apply {
+                                    moveTo(size.width * 0.40f, size.height * 0.30f)
+                                    lineTo(size.width * 0.72f, size.height * 0.50f)
+                                    lineTo(size.width * 0.40f, size.height * 0.70f)
+                                    close()
+                                }
+                                drawPath(path, Color(0xFF0E1113))
+                            } else {
+                                val w = size.width * 0.14f
+                                val h = size.height * 0.52f
+                                drawRoundRect(
+                                    color = Palette.text,
+                                    topLeft = Offset(size.width * 0.31f - w / 2f, (size.height - h) / 2f),
+                                    size = Size(w, h),
+                                    cornerRadius = CornerRadius(w * 0.4f),
+                                )
+                                drawRoundRect(
+                                    color = Palette.text,
+                                    topLeft = Offset(size.width * 0.69f - w / 2f, (size.height - h) / 2f),
+                                    size = Size(w, h),
+                                    cornerRadius = CornerRadius(w * 0.4f),
+                                )
+                            }
+                        }
+                    }
                     RoundRecordButton(
                         phase = state.phase,
                         description = if (state.phase == Phase.STOPPED) t.start else t.stop,
                         onClick = {
                             when (state.phase) {
-                                Phase.RECORDING, Phase.STARTING -> stopService(context)
+                                Phase.RECORDING, Phase.STARTING, Phase.PAUSED -> stopService(context)
                                 Phase.STOPPED -> {
                                     if (granted(context, Manifest.permission.ACCESS_FINE_LOCATION)) {
                                         startService(context, sport)
@@ -461,6 +509,7 @@ private fun RoundRecordButton(
 ) {
     val background = when (phase) {
         Phase.RECORDING -> Palette.danger
+        Phase.PAUSED -> Palette.danger
         Phase.STARTING -> Palette.surface
         Phase.STOPPED -> Palette.accent
     }
@@ -490,6 +539,26 @@ private fun RoundRecordButton(
                 )
             }
         }
+    }
+}
+
+/** Small secondary round button (44dp) for pause/resume. */
+@Composable
+private fun RoundIconButton(
+    description: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: DrawScope.() -> Unit,
+) {
+    Box(
+        modifier = modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .background(Palette.surface.copy(alpha = 0.9f))
+            .clickable(role = Role.Button, onClickLabel = description, onClick = onClick)
+            .semantics { contentDescription = description },
+    ) {
+        Canvas(modifier = Modifier.align(Alignment.Center).size(22.dp), onDraw = content)
     }
 }
 
