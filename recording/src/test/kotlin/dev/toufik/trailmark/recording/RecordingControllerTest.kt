@@ -143,4 +143,3 @@ class RecordingControllerTest {
         assertTrue(rows[0].elapsedNanos < 60_000_000_000L, "paused gap excluded from stored total")
     }
 }
-}
