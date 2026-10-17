@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -168,7 +169,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                     }
                     TrailmarkMap(
                         points = d.points,
-                        modifier = Modifier.fillMaxWidth().height(360.dp).padding(top = 12.dp),
+                        modifier = Modifier.fillMaxWidth().height(320.dp).padding(top = 12.dp),
                         packPath = packPath,
                         current = cursor,
                         sport = sportOf(d.row.sport),
@@ -196,11 +197,18 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                             },
                             modifier = Modifier.weight(1f).padding(horizontal = 10.dp),
                         )
-                        Text(
-                            "${formatDuration(replayNanos)} / ${formatDuration(total)}",
-                            color = Palette.textSecondary,
-                            fontSize = 12.sp,
-                        )
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                "${formatDistance(sample?.distanceM ?: 0.0)} ${t.km}",
+                                color = Palette.accent,
+                                fontSize = 13.sp,
+                            )
+                            Text(
+                                "${formatDuration(replayNanos)} / ${formatDuration(total)}",
+                                color = Palette.textSecondary,
+                                fontSize = 11.sp,
+                            )
+                        }
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -212,6 +220,25 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                                 onClick = { speed = s },
                                 label = { Text("\u00d7$s", fontSize = 12.sp) },
                             )
+                        }
+                    }
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().weight(1f, fill = false).padding(top = 6.dp),
+                    ) {
+                        items(a.splits.size) { i ->
+                            val s = a.splits[i]
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Text("${s.kmIndex} ${t.km}", color = Palette.text, fontSize = 13.sp)
+                                Text(formatPace(s.paceSecPerKm), color = Palette.accent, fontSize = 13.sp)
+                                Text(
+                                    formatDuration(s.elapsedNanos),
+                                    color = Palette.textSecondary,
+                                    fontSize = 13.sp,
+                                )
+                            }
                         }
                     }
                 }
