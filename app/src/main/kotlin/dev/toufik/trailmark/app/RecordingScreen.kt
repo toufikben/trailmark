@@ -44,8 +44,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
@@ -104,6 +108,8 @@ fun RecordingScreen(
     onLang: (Lang) -> Unit,
 ) {
     val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("trailmark", Context.MODE_PRIVATE) }
+    var darkMap by remember { mutableStateOf(prefs.getBoolean("map_dark", true)) }
     val t = LocalTexts.current
     val state by RecordingHolder.state.collectAsState()
     val packPath = remember { MapPacks.installedMapPack(context)?.absolutePath }
@@ -238,6 +244,7 @@ fun RecordingScreen(
                     onNeedPermission = {
                         locateLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION))
                     },
+                    dark = darkMap,
                     modifier = Modifier.fillMaxSize(),
                 )
                 Row(
@@ -275,6 +282,42 @@ fun RecordingScreen(
                         }
                         IconButton(onClick = onRegions, modifier = Modifier.size(48.dp)) {
                             Icon(Icons.Filled.Place, contentDescription = t.regions, tint = Palette.text)
+                        }
+                        IconButton(
+                            onClick = {
+                                darkMap = !darkMap
+                                prefs.edit().putBoolean("map_dark", darkMap).apply()
+                            },
+                            modifier = Modifier.size(48.dp),
+                        ) {
+                            Canvas(Modifier.size(22.dp)) {
+                                val tint = Palette.text
+                                val cx = size.width / 2f
+                                val cy = size.height / 2f
+                                val r = size.minDimension * 0.20f
+                                if (darkMap) {
+                                    for (i in 0 until 8) {
+                                        rotate(i * 45f) {
+                                            drawLine(
+                                                color = tint,
+                                                start = Offset(cx, cy - r * 1.6f),
+                                                end = Offset(cx, cy - r * 2.35f),
+                                                strokeWidth = r * 0.52f,
+                                                cap = StrokeCap.Round,
+                                            )
+                                        }
+                                    }
+                                    drawCircle(color = tint, radius = r, center = Offset(cx, cy))
+                                } else {
+                                    val o = size.minDimension * 0.42f
+                                    val path = Path().apply {
+                                        arcTo(Rect(cx - o * 1.1f, cy - o, cx + o * 1.1f, cy + o), 90f, 180f, true)
+                                        arcTo(Rect(cx - o * 1.35f, cy - o, cx + o * 0.65f, cy + o), 270f, 180f, false)
+                                        close()
+                                    }
+                                    drawPath(path, tint)
+                                }
+                            }
                         }
                     }
                 }

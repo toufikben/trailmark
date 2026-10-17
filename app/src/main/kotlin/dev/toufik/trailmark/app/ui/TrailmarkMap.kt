@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Path
 import android.Manifest
 import android.content.pm.PackageManager
 import android.location.Location
@@ -41,10 +42,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.PathParser
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.maps.GlyphStore
 import dev.toufik.trailmark.app.maps.ONLINE_STYLE_URL
+import dev.toufik.trailmark.app.maps.ONLINE_STYLE_URL_LIGHT
 import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.core.model.WaypointType
 import dev.toufik.trailmark.engine.Sport
@@ -73,7 +76,6 @@ import org.maplibre.android.style.layers.PropertyFactory.fillOpacity
 import org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap
 import org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement
 import org.maplibre.android.style.layers.PropertyFactory.iconImage
-import org.maplibre.android.style.layers.PropertyFactory.iconOpacity
 import org.maplibre.android.style.layers.PropertyFactory.iconRotate
 import org.maplibre.android.style.layers.PropertyFactory.iconRotationAlignment
 import org.maplibre.android.style.layers.PropertyFactory.iconSize
@@ -97,56 +99,72 @@ private fun isOnline(context: Context): Boolean {
 }
 
 /** A richer OpenMapTiles style with SDF labels (Arabic first, then French/English). */
-private fun vectorStyle(packPath: String, glyphsBase: String): String = """
+private fun vectorStyle(packPath: String, glyphsBase: String, dark: Boolean): String {
+    val bg = if (dark) "#0E1113" else "#F5F6F4"
+    val landcover = if (dark) "#141A16" else "#EDEFE9"
+    val landuse = if (dark) "#161C17" else "#EEF0EA"
+    val park = if (dark) "#16241A" else "#DCE7D6"
+    val water = if (dark) "#12232E" else "#C8DCEC"
+    val building = if (dark) "#1E2429" else "#E1E4E0"
+    val roadMinor = if (dark) "#333E48" else "#FFFFFF"
+    val roadMajor = if (dark) "#4A5560" else "#FFE2A0"
+    val rail = if (dark) "#2A3138" else "#D5D8D4"
+    val boundary = if (dark) "#3A444E" else "#C6CAC5"
+    val waterName = if (dark) "#8FA3B0" else "#5A7887"
+    val label = if (dark) "#E8EEEA" else "#1F2429"
+    val labelDim = if (dark) "#9DA4A1" else "#5C636B"
+    val halo = if (dark) "#0E1113" else "#FFFFFF"
+    return """
     {"version":8,"name":"trailmark-omt",
      "glyphs":"file://$glyphsBase/{fontstack}/{range}.pbf",
      "sources":{"openmaptiles":{"type":"vector","url":"pmtiles://file://$packPath"}},
      "layers":[
-       {"id":"background","type":"background","paint":{"background-color":"#0E1113"}},
+       {"id":"background","type":"background","paint":{"background-color":"${bg}"}},
        {"id":"landcover","type":"fill","source":"openmaptiles","source-layer":"landcover",
-        "paint":{"fill-color":"#141A16"}},
+        "paint":{"fill-color":"${landcover}"}},
        {"id":"landuse","type":"fill","source":"openmaptiles","source-layer":"landuse",
-        "paint":{"fill-color":"#161C17"}},
+        "paint":{"fill-color":"${landuse}"}},
        {"id":"park","type":"fill","source":"openmaptiles","source-layer":"park",
-        "paint":{"fill-color":"#16241A"}},
+        "paint":{"fill-color":"${park}"}},
        {"id":"water","type":"fill","source":"openmaptiles","source-layer":"water",
-        "paint":{"fill-color":"#12232E"}},
+        "paint":{"fill-color":"${water}"}},
        {"id":"waterway","type":"line","source":"openmaptiles","source-layer":"waterway",
-        "paint":{"line-color":"#12232E","line-width":1.0}},
+        "paint":{"line-color":"${water}","line-width":1.0}},
        {"id":"building","type":"fill-extrusion","source":"openmaptiles","source-layer":"building","minzoom":14,
-        "paint":{"fill-extrusion-color":"#1E2429",
+        "paint":{"fill-extrusion-color":"${building}",
          "fill-extrusion-height":["coalesce",["get","render_height"],8],
          "fill-extrusion-base":["coalesce",["get","render_min_height"],0],
          "fill-extrusion-opacity":0.85}},
        {"id":"road-minor","type":"line","source":"openmaptiles","source-layer":"transportation",
         "filter":["in","class","tertiary","minor","service","residential"],
-        "paint":{"line-color":"#333E48","line-width":["interpolate",["linear"],["zoom"],12,0.6,14,2.4]}},
+         "paint":{"line-color":"${roadMinor}","line-width":["interpolate",["linear"],["zoom"],12,0.6,14,2.4]}},
        {"id":"road-major","type":"line","source":"openmaptiles","source-layer":"transportation",
         "filter":["in","class","motorway","trunk","primary","secondary"],
-        "paint":{"line-color":"#4A5560","line-width":["interpolate",["linear"],["zoom"],8,1.2,14,5.0]}},
+         "paint":{"line-color":"${roadMajor}","line-width":["interpolate",["linear"],["zoom"],8,1.2,14,5.0]}},
        {"id":"rail","type":"line","source":"openmaptiles","source-layer":"transportation",
         "filter":["==","class","rail"],
-        "paint":{"line-color":"#2A3138","line-width":1.0}},
+         "paint":{"line-color":"${rail}","line-width":1.0}},
        {"id":"boundary","type":"line","source":"openmaptiles","source-layer":"boundary",
-        "paint":{"line-color":"#3A444E","line-width":1.0}},
+         "paint":{"line-color":"${boundary}","line-width":1.0}},
        {"id":"water-name","type":"symbol","source":"openmaptiles","source-layer":"water_name",
         "layout":{"text-field":["coalesce",["get","name:ar"],["get","name"]],
           "text-font":["TrailmarkSans"],"text-size":12,"text-max-width":8},
-        "paint":{"text-color":"#8FA3B0","text-halo-color":"#0E1113","text-halo-width":1.0}},
+         "paint":{"text-color":"${waterName}","text-halo-color":"${halo}","text-halo-width":1.0}},
        {"id":"place-name","type":"symbol","source":"openmaptiles","source-layer":"place",
         "filter":["in","class","city","town"],
         "layout":{"text-field":["coalesce",["get","name:ar"],["get","name:fr"],["get","name"]],
           "text-font":["TrailmarkSans"],
           "text-size":["interpolate",["linear"],["zoom"],6,11,12,15],"text-max-width":8},
-        "paint":{"text-color":"#E8EEEA","text-halo-color":"#0E1113","text-halo-width":1.4}},
+         "paint":{"text-color":"${label}","text-halo-color":"${halo}","text-halo-width":1.4}},
        {"id":"road-name","type":"symbol","source":"openmaptiles","source-layer":"transportation_name",
         "minzoom":13,
         "layout":{"text-field":["coalesce",["get","name:ar"],["get","name"]],
           "text-font":["TrailmarkSans"],"text-size":10,
           "symbol-placement":"line","text-rotation-alignment":"map"},
-        "paint":{"text-color":"#9DA4A1","text-halo-color":"#0E1113","text-halo-width":1.0}}
+         "paint":{"text-color":"${labelDim}","text-halo-color":"${halo}","text-halo-width":1.0}}
      ]}
-""".trimIndent()
+    """.trimIndent()
+}
 
 private val EMPTY: FeatureCollection = FeatureCollection.fromFeatures(emptyArray())
 
@@ -169,71 +187,81 @@ private fun accuracyPolygon(lat: Double, lon: Double, meters: Double): Feature {
     return Feature.fromGeometry(Polygon.fromLngLats(listOf(pts + pts.first())))
 }
 
-/** Position marker per sport — a small figure on a dark disc. */
+private const val ICON_BIKE =
+    "M15.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM5 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 " +
+        "5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 " +
+        "3.5-3.5 3.5zm5.8-10l2.4-2.4.8.8c1.3 1.3 3 2.1 5.1 2.1V9c-1.5 0-2.7-.6-3.6-1.5l-1.9-1.9" +
+        "c-.5-.4-1-.6-1.6-.6s-1.1.2-1.4.6L7.8 8.4c-.4.4-.6.9-.6 1.4 0 .6.2 1.1.6 1.4L11 14v5h2" +
+        "v-6.2l-2.2-2.3zM19 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3" +
+        ".5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5z"
+
+private const val ICON_RUN =
+    "M13.49 5.48c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm-3.6 13.9l1-4.4 2.1 2v6h2v-7.5" +
+        "l-2.1-2 .6-3c1.3 1.5 3.3 2.5 5.5 2.5v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1" +
+        "-.3 0-.5.1-.8.1l-5.2 2.2v4.7h2v-3.4l1.8-.7-1.6 8.1-4.9-1-.4 2 7 1.4z"
+
+private const val ICON_WALK =
+    "M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2" +
+        "v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1." +
+        "7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"
+
+private const val ICON_HIKE =
+    "M13.5,5.5c1.1,0,2-0.9,2-2s-0.9-2-2-2s-2,0.9-2,2S12.4,5.5,13.5,5.5z M17.5,10.78c-1.23-0.37" +
+        "-2.22-1.17-2.8-2.18l-1-1.6 c-0.41-0.65-1.11-1-1.84-1c-0.78,0-1.59,0.5-1.78,1.44S7,23," +
+        "7,23h2.1l1.8-8l2.1,2v6h2v-7.5l-2.1-2l0.6-3c1,1.15,2.41,2.01,4,2.34V23 H19V9h-1.5L17.5," +
+        "10.78z M7.43,13.13l-2.12-0.41c-0.54-0.11-0.9-0.63-0.79-1.17l0.76-3.93c0.21-1.08,1.26-" +
+        "1.79,2.34-1.58l1.16,0.23 L7.43,13.13z"
+
+private fun glyphPath(sport: Sport): Path = PathParser.createPathFromPathData(
+    when (sport) {
+        Sport.BIKE -> ICON_BIKE
+        Sport.RUN -> ICON_RUN
+        Sport.WALK -> ICON_WALK
+        Sport.HIKE -> ICON_HIKE
+    },
+)
+
+private fun drawSportGlyph(c: Canvas, sport: Sport, s: Float, fill: Int, halo: Int?) {
+    val path = glyphPath(sport)
+    val scale = (s * 0.60f) / 24f
+    c.save()
+    c.translate(s / 2f - 12f * scale, s / 2f - 12f * scale)
+    c.scale(scale, scale)
+    val p = Paint(Paint.ANTI_ALIAS_FLAG)
+    if (halo != null) {
+        p.style = Paint.Style.STROKE
+        p.strokeWidth = 1.7f
+        p.strokeJoin = Paint.Join.ROUND
+        p.color = halo
+        c.drawPath(path, p)
+    }
+    p.style = Paint.Style.FILL
+    p.color = fill
+    c.drawPath(path, p)
+    c.restore()
+}
+
+/** Position marker per sport — Material silhouette on a dark disc with an accent ring. */
 private fun markerBitmap(context: Context, sport: Sport): Bitmap {
     val s = (36 * context.resources.displayMetrics.density).toInt().coerceAtLeast(80).toFloat()
     val bmp = Bitmap.createBitmap(s.toInt(), s.toInt(), Bitmap.Config.ARGB_8888)
     val c = Canvas(bmp)
     val p = Paint(Paint.ANTI_ALIAS_FLAG)
-    p.color = 0xD90E1113.toInt()
+    p.color = 0xE60E1113.toInt()
     c.drawCircle(s / 2f, s / 2f, s / 2f - 2f, p)
-    p.color = 0xFFC6FF3D.toInt()
-    p.strokeWidth = s * 0.05f
-    p.strokeCap = Paint.Cap.ROUND
-    p.strokeJoin = Paint.Join.ROUND
     p.style = Paint.Style.STROKE
-    when (sport) {
-        Sport.BIKE -> {
-            val r = s * 0.115f
-            val cy = s * 0.66f
-            c.drawCircle(s * 0.28f, cy, r, p)
-            c.drawCircle(s * 0.72f, cy, r, p)
-            c.drawLine(s * 0.28f, cy, s * 0.50f, s * 0.44f, p)
-            c.drawLine(s * 0.50f, s * 0.44f, s * 0.72f, cy, p)
-            c.drawLine(s * 0.50f, s * 0.44f, s * 0.44f, s * 0.32f, p)
-            c.drawLine(s * 0.40f, s * 0.32f, s * 0.48f, s * 0.30f, p)
-            c.drawLine(s * 0.44f, s * 0.32f, s * 0.56f, s * 0.26f, p)
-            c.drawLine(s * 0.56f, s * 0.26f, s * 0.68f, s * 0.40f, p)
-            c.drawLine(s * 0.44f, s * 0.32f, s * 0.50f, s * 0.50f, p)
-            c.drawLine(s * 0.50f, s * 0.50f, s * 0.44f, s * 0.62f, p)
-            p.style = Paint.Style.FILL
-            c.drawCircle(s * 0.60f, s * 0.21f, s * 0.055f, p)
-        }
-        Sport.RUN -> {
-            c.drawLine(s * 0.54f, s * 0.28f, s * 0.46f, s * 0.48f, p)
-            c.drawLine(s * 0.46f, s * 0.48f, s * 0.60f, s * 0.58f, p)
-            c.drawLine(s * 0.60f, s * 0.58f, s * 0.66f, s * 0.72f, p)
-            c.drawLine(s * 0.46f, s * 0.48f, s * 0.34f, s * 0.56f, p)
-            c.drawLine(s * 0.34f, s * 0.56f, s * 0.30f, s * 0.72f, p)
-            c.drawLine(s * 0.50f, s * 0.34f, s * 0.66f, s * 0.40f, p)
-            c.drawLine(s * 0.50f, s * 0.34f, s * 0.36f, s * 0.28f, p)
-            p.style = Paint.Style.FILL
-            c.drawCircle(s * 0.56f, s * 0.20f, s * 0.055f, p)
-        }
-        Sport.WALK -> {
-            c.drawLine(s * 0.50f, s * 0.26f, s * 0.50f, s * 0.50f, p)
-            c.drawLine(s * 0.50f, s * 0.50f, s * 0.42f, s * 0.62f, p)
-            c.drawLine(s * 0.42f, s * 0.62f, s * 0.40f, s * 0.74f, p)
-            c.drawLine(s * 0.50f, s * 0.50f, s * 0.58f, s * 0.62f, p)
-            c.drawLine(s * 0.58f, s * 0.62f, s * 0.60f, s * 0.74f, p)
-            c.drawLine(s * 0.50f, s * 0.32f, s * 0.42f, s * 0.44f, p)
-            c.drawLine(s * 0.50f, s * 0.32f, s * 0.58f, s * 0.44f, p)
-            p.style = Paint.Style.FILL
-            c.drawCircle(s * 0.50f, s * 0.18f, s * 0.055f, p)
-        }
-        Sport.HIKE -> {
-            c.drawLine(s * 0.50f, s * 0.26f, s * 0.50f, s * 0.50f, p)
-            c.drawLine(s * 0.50f, s * 0.50f, s * 0.42f, s * 0.62f, p)
-            c.drawLine(s * 0.42f, s * 0.62f, s * 0.40f, s * 0.74f, p)
-            c.drawLine(s * 0.50f, s * 0.50f, s * 0.58f, s * 0.62f, p)
-            c.drawLine(s * 0.58f, s * 0.62f, s * 0.60f, s * 0.74f, p)
-            c.drawLine(s * 0.50f, s * 0.34f, s * 0.60f, s * 0.44f, p)
-            c.drawLine(s * 0.60f, s * 0.44f, s * 0.68f, s * 0.74f, p)
-            p.style = Paint.Style.FILL
-            c.drawCircle(s * 0.50f, s * 0.18f, s * 0.055f, p)
-            c.drawRoundRect(s * 0.38f, s * 0.28f, s * 0.455f, s * 0.42f, s * 0.03f, s * 0.03f, p)
-        }
-    }
+    p.strokeWidth = s * 0.04f
+    p.color = 0xFFC6FF3D.toInt()
+    c.drawCircle(s / 2f, s / 2f, s / 2f - 2f - p.strokeWidth / 2f, p)
+    drawSportGlyph(c, sport, s, 0xFFC6FF3D.toInt(), null)
+    return bmp
+}
+
+/** Ghost: the same silhouette, soft and translucent, with a dark halo so it reads on any map. */
+private fun ghostBitmap(context: Context, sport: Sport): Bitmap {
+    val s = (30 * context.resources.displayMetrics.density).toInt().coerceAtLeast(72).toFloat()
+    val bmp = Bitmap.createBitmap(s.toInt(), s.toInt(), Bitmap.Config.ARGB_8888)
+    drawSportGlyph(Canvas(bmp), sport, s, 0xBFE8EEEA.toInt(), 0x730E1113.toInt())
     return bmp
 }
 
@@ -248,6 +276,7 @@ fun TrailmarkMap(
     ghostRoute: List<StoredPoint> = emptyList(),
     ghostCurrent: StoredPoint? = null,
     onNeedPermission: () -> Unit = {},
+    dark: Boolean = true,
 ) {
     val context = LocalContext.current
     val t = LocalTexts.current
@@ -351,18 +380,18 @@ fun TrailmarkMap(
         }
     }
 
-    LaunchedEffect(packPath) {
+    LaunchedEffect(packPath, dark) {
         mapView.getMapAsync { map ->
             val builder = when {
                 packPath != null && !online ->
-                    Style.Builder().fromJson(vectorStyle(packPath, glyphsBase))
-                else -> Style.Builder().fromUri(ONLINE_STYLE_URL)
+                    Style.Builder().fromJson(vectorStyle(packPath, glyphsBase, dark))
+                else -> Style.Builder().fromUri(if (dark) ONLINE_STYLE_URL else ONLINE_STYLE_URL_LIGHT)
             }
             map.setStyle(builder) { s ->
                 if (online && s.getLayer("3d-buildings") == null) {
                     val b3d = FillExtrusionLayer("3d-buildings", "openmaptiles")
                         .withProperties(
-                            fillExtrusionColor("#1E2429"),
+                            fillExtrusionColor(if (dark) "#1E2429" else "#D8DBD6"),
                             fillExtrusionHeight(
                                 Expression.coalesce(Expression.get("render_height"), Expression.literal(8f)),
                             ),
@@ -384,6 +413,7 @@ fun TrailmarkMap(
                 )
                 s.addSource(GeoJsonSource("current-source", EMPTY))
                 Sport.entries.forEach { sp -> s.addImage("me-" + sp.name, markerBitmap(context, sp)) }
+                Sport.entries.forEach { sp -> s.addImage("me-ghost-" + sp.name, ghostBitmap(context, sp)) }
                 s.addLayer(
                     SymbolLayer("current-layer", "current-source").withProperties(
                         iconImage("me-" + sport.name),
@@ -421,9 +451,8 @@ fun TrailmarkMap(
                 s.addSource(GeoJsonSource("ghost-current-source", EMPTY))
                 s.addLayer(
                     SymbolLayer("ghost-current-layer", "ghost-current-source").withProperties(
-                        iconImage("me-" + sport.name),
-                        iconSize(0.9f),
-                        iconOpacity(0.45f),
+                        iconImage("me-ghost-" + sport.name),
+                        iconSize(1f),
                         iconRotate(0f),
                         iconRotationAlignment("map"),
                         iconAllowOverlap(true),
@@ -437,8 +466,9 @@ fun TrailmarkMap(
 
     LaunchedEffect(sport) {
         val img = "me-" + sport.name
+        val ghostImg = "me-ghost-" + sport.name
         style?.getLayerAs<SymbolLayer>("current-layer")?.setProperties(iconImage(img))
-        style?.getLayerAs<SymbolLayer>("ghost-current-layer")?.setProperties(iconImage(img))
+        style?.getLayerAs<SymbolLayer>("ghost-current-layer")?.setProperties(iconImage(ghostImg))
     }
 
     LaunchedEffect(route, current, style, ghost, ghostCurrent, userFix) {

@@ -14,6 +14,7 @@ const val MANIFEST_URL =
 
 /** The global online basemap. Also the style offline areas are downloaded for. */
 const val ONLINE_STYLE_URL = "https://tiles.openfreemap.org/styles/dark"
+const val ONLINE_STYLE_URL_LIGHT = "https://tiles.openfreemap.org/styles/positron"
 
 /** A File-backed [RegionFiles] rooted in the app's private storage. */
 class FileRegionFiles(private val dir: File) : RegionFiles {
