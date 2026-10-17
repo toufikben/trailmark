@@ -29,8 +29,8 @@ class OfflineRegions(private val context: Context) {
 
     suspend fun list(): List<SavedRegion> = suspendCancellableCoroutine { cont ->
         manager.listOfflineRegions(object : OfflineManager.ListOfflineRegionsCallback {
-            override fun onList(regions: Array<OfflineRegion>) {
-                if (regions.isEmpty()) {
+            override fun onList(regions: Array<OfflineRegion>?) {
+                if (regions.isNullOrEmpty()) {
                     cont.resume(emptyList())
                     return
                 }
@@ -38,20 +38,20 @@ class OfflineRegions(private val context: Context) {
                 var remaining = regions.size
                 regions.forEach { region ->
                     region.getStatus(object : OfflineRegion.OfflineRegionStatusCallback {
-                        override fun onStatus(status: OfflineRegionStatus) {
+                        override fun onStatus(status: OfflineRegionStatus?) {
                             out.add(
                                 SavedRegion(
                                     region.id,
                                     nameOf(region),
-                                    status.completedResourceCount,
-                                    status.completedResourceSize,
+                                    status?.completedResourceCount ?: 0L,
+                                    status?.completedResourceSize ?: 0L,
                                 ),
                             )
                             remaining -= 1
                             if (remaining == 0) cont.resume(out)
                         }
 
-                        override fun onError(error: String) {
+                        override fun onError(error: String?) {
                             out.add(SavedRegion(region.id, nameOf(region), 0, 0))
                             remaining -= 1
                             if (remaining == 0) cont.resume(out)
@@ -121,8 +121,8 @@ class OfflineRegions(private val context: Context) {
     }
     suspend fun delete(id: Long): Unit = suspendCancellableCoroutine { cont ->
         manager.listOfflineRegions(object : OfflineManager.ListOfflineRegionsCallback {
-            override fun onList(regions: Array<OfflineRegion>) {
-                val region = regions.firstOrNull { it.id == id }
+            override fun onList(regions: Array<OfflineRegion>?) {
+                val region = regions?.firstOrNull { it.id == id }
                 if (region == null) {
                     cont.resume(Unit)
                     return
@@ -145,7 +145,6 @@ class OfflineRegions(private val context: Context) {
     }
 
     private fun nameOf(region: OfflineRegion): String = runCatching {
-        val meta = region.metadata?.decodeToString() ?: return@runCatching "?"
-        JSONObject(meta).optString("name", "?")
+        JSONObject(region.metadata.decodeToString()).optString("name", "?")
     }.getOrDefault("?")
 }

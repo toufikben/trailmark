@@ -66,8 +66,8 @@ fun RegionsScreen(onBack: () -> Unit) {
             val m = parseManifest(text)
             manifest = m
             refreshInstalled(m.packs)
-        } catch (t: Throwable) {
-            error = t.message ?: t.loadFailed
+        } catch (e: Throwable) {
+            error = e.message ?: t.loadFailed
         }
     }
 
