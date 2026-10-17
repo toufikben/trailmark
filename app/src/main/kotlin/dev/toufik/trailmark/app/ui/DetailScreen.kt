@@ -2,7 +2,11 @@ package dev.toufik.trailmark.app.ui
 
 import android.content.Context
 import android.content.Intent
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,7 +14,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -20,12 +28,23 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
+import dev.toufik.trailmark.analytics.ReplayTrack
 import dev.toufik.trailmark.app.AppGraph
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
@@ -33,7 +52,9 @@ import dev.toufik.trailmark.app.formatDistance
 import dev.toufik.trailmark.app.formatDuration
 import dev.toufik.trailmark.app.formatPace
 import dev.toufik.trailmark.core.model.StoredPoint
+import dev.toufik.trailmark.core.model.WaypointType
 import dev.toufik.trailmark.data.ActivityRow
+import dev.toufik.trailmark.engine.Sport
 import dev.toufik.trailmark.portable.Gpx
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -118,12 +139,125 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                             shareGpx(context, d.points, d.row.startWallMillis, d.row.id)
                         }) { Text(t.share, color = Palette.accent) }
                     }
+                    val track = remember(d) { ReplayTrack(d.points) }
+                    var playing by remember(d) { mutableStateOf(false) }
+                    var speed by remember(d) { mutableStateOf(1) }
+                    var replayNanos by remember(d) { mutableStateOf(0L) }
+                    val sample = track.sampleAt(replayNanos)
+                    val cursor = sample?.let {
+                        StoredPoint(
+                            it.lat,
+                            it.lon,
+                            it.nanos,
+                            5.0,
+                            WaypointType.NORMAL,
+                            bearingDeg = it.bearingDeg,
+                        )
+                    }
+                    LaunchedEffect(playing, speed) {
+                        if (!playing) return@LaunchedEffect
+                        var last = withFrameNanos { it }
+                        while (playing) {
+                            withFrameNanos { now ->
+                                val dt = (now - last).coerceIn(0L, 250_000_000L)
+                                last = now
+                                replayNanos = (replayNanos + dt * speed).coerceAtMost(track.totalNanos)
+                                if (replayNanos >= track.totalNanos) playing = false
+                            }
+                        }
+                    }
                     TrailmarkMap(
                         points = d.points,
                         modifier = Modifier.fillMaxWidth().height(360.dp).padding(top = 12.dp),
                         packPath = packPath,
+                        current = cursor,
+                        sport = sportOf(d.row.sport),
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        ReplayButton(
+                            playing = playing,
+                            description = if (playing) t.pause else t.resume,
+                            onClick = {
+                                if (!playing && track.totalNanos > 0L && replayNanos >= track.totalNanos) {
+                                    replayNanos = 0L
+                                }
+                                playing = !playing
+                            },
+                        )
+                        val total = track.totalNanos
+                        Slider(
+                            value = if (total > 0L) (replayNanos.toDouble() / total).toFloat() else 0f,
+                            onValueChange = { f ->
+                                playing = false
+                                replayNanos = (total * f).toLong()
+                            },
+                            modifier = Modifier.weight(1f).padding(horizontal = 10.dp),
+                        )
+                        Text(
+                            "${formatDuration(replayNanos)} / ${formatDuration(total)}",
+                            color = Palette.textSecondary,
+                            fontSize = 12.sp,
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        listOf(1, 4, 16, 60).forEach { s ->
+                            FilterChip(
+                                selected = speed == s,
+                                onClick = { speed = s },
+                                label = { Text("\u00d7$s", fontSize = 12.sp) },
+                            )
+                        }
+                    }
                 }
+            }
+        }
+    }
+}
+
+private fun sportOf(name: String): Sport = Sport.entries.firstOrNull { it.name == name } ?: Sport.RUN
+
+/** Play/pause toggle for replay: accent disc with a dark play triangle, or pause bars. */
+@Composable
+private fun ReplayButton(playing: Boolean, description: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .background(Palette.surface.copy(alpha = 0.9f))
+            .clickable(role = Role.Button, onClickLabel = description, onClick = onClick)
+            .semantics { contentDescription = description },
+    ) {
+        Canvas(modifier = Modifier.align(Alignment.Center).size(22.dp)) {
+            if (playing) {
+                val w = size.width * 0.14f
+                val h = size.height * 0.52f
+                drawRoundRect(
+                    color = Palette.text,
+                    topLeft = Offset(size.width * 0.31f - w / 2f, (size.height - h) / 2f),
+                    size = Size(w, h),
+                    cornerRadius = CornerRadius(w * 0.4f),
+                )
+                drawRoundRect(
+                    color = Palette.text,
+                    topLeft = Offset(size.width * 0.69f - w / 2f, (size.height - h) / 2f),
+                    size = Size(w, h),
+                    cornerRadius = CornerRadius(w * 0.4f),
+                )
+            } else {
+                drawCircle(color = Palette.accent, radius = size.minDimension / 2f * 0.98f)
+                val path = Path().apply {
+                    moveTo(size.width * 0.40f, size.height * 0.30f)
+                    lineTo(size.width * 0.72f, size.height * 0.50f)
+                    lineTo(size.width * 0.40f, size.height * 0.70f)
+                    close()
+                }
+                drawPath(path, Color(0xFF0E1113))
             }
         }
     }
