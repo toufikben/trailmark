@@ -7,7 +7,9 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,12 +20,11 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Place
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -40,7 +41,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -159,7 +165,7 @@ fun RecordingScreen(
         Column(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
             Box(
                 modifier = Modifier
-                    .weight(5f)
+                    .weight(1f)
                     .fillMaxWidth()
                     .padding(start = 12.dp, top = 12.dp, end = 12.dp)
                     .clip(RoundedCornerShape(20.dp)),
@@ -232,15 +238,37 @@ fun RecordingScreen(
                             .padding(horizontal = 10.dp, vertical = 6.dp),
                     )
                 }
+
+                RoundRecordButton(
+                    phase = state.phase,
+                    description = if (state.phase == Phase.STOPPED) t.start else t.stop,
+                    onClick = {
+                        when (state.phase) {
+                            Phase.RECORDING, Phase.STARTING -> stopService(context)
+                            Phase.STOPPED -> {
+                                if (granted(context, Manifest.permission.ACCESS_FINE_LOCATION)) {
+                                    startService(context, sport)
+                                } else {
+                                    launcher.launch(permissions)
+                                }
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(16.dp),
+                )
             }
 
             Surface(
                 color = Palette.surface,
                 shape = RoundedCornerShape(20.dp),
-                modifier = Modifier.weight(5f).fillMaxWidth().padding(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 12.dp),
             ) {
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                 Row(
@@ -256,33 +284,28 @@ fun RecordingScreen(
                         )
                     }
                 }
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        text = formatDistance(state.distanceM),
-                        color = Palette.accent,
-                        fontSize = 52.sp,
-                        modifier = Modifier.semantics {
-                            contentDescription = "${formatDistance(state.distanceM)} ${t.km}"
-                        },
-                    )
-                    Text(
-                        text = " ${t.km}",
-                        color = Palette.textSecondary,
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    )
-                }
-                Text(text = formatDuration(state.elapsedNanos), color = Palette.text, fontSize = 20.sp)
                 val paceText = if (state.distanceM < 50) "--:--"
                 else formatPace((state.elapsedNanos / 1e9) / (state.distanceM / 1000))
                 val speedText = state.currentSpeedMps?.let { "%.1f".format(it * 3.6) } ?: "--"
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.Bottom,
                 ) {
-                    StatCell(t.pace, paceText)
-                    StatCell(t.speed, speedText)
-                    StatCell(t.points, state.fixCount.toString())
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = formatDistance(state.distanceM),
+                            color = Palette.accent,
+                            fontSize = 30.sp,
+                            modifier = Modifier.semantics {
+                                contentDescription = "${formatDistance(state.distanceM)} ${t.km}"
+                            },
+                        )
+                        Text(text = t.km, color = Palette.textSecondary, fontSize = 11.sp)
+                    }
+                    StatCell(formatDuration(state.elapsedNanos), t.time)
+                    StatCell(paceText, t.pace)
+                    StatCell(speedText, t.speed)
                 }
                 coachLine?.let {
                     Text(text = it, color = Palette.textSecondary, fontSize = 12.sp)
@@ -298,43 +321,6 @@ fun RecordingScreen(
                 }
                 state.storageError?.let {
                     Text(text = t.loadFailed, color = Palette.danger, fontSize = 12.sp)
-                }
-
-                Column(modifier = Modifier.weight(1f)) {}
-
-                when (state.phase) {
-                    Phase.RECORDING -> Button(
-                        onClick = { stopService(context) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Palette.danger,
-                            contentColor = Palette.text,
-                        ),
-                    ) { Text(t.stop) }
-
-                    Phase.STARTING -> Button(
-                        onClick = { stopService(context) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Palette.surface,
-                            contentColor = Palette.text,
-                        ),
-                    ) { Text(t.cancel) }
-
-                    Phase.STOPPED -> Button(
-                        onClick = {
-                            if (granted(context, Manifest.permission.ACCESS_FINE_LOCATION)) {
-                                startService(context, sport)
-                            } else {
-                                launcher.launch(permissions)
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Palette.surface,
-                            contentColor = Palette.text,
-                        ),
-                    ) { Text(t.start) }
                 }
 
                 val lastId = state.lastActivityId
@@ -354,6 +340,48 @@ private fun StatCell(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(text = value, color = Palette.text, fontSize = 16.sp)
         Text(text = label, color = Palette.textSecondary, fontSize = 11.sp)
+    }
+}
+
+/** Small icon-only record/stop button: accent dot to start, red square to stop. */
+@Composable
+private fun RoundRecordButton(
+    phase: Phase,
+    description: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val background = when (phase) {
+        Phase.RECORDING -> Palette.danger
+        Phase.STARTING -> Palette.surface
+        Phase.STOPPED -> Palette.accent
+    }
+    val iconTint = if (phase == Phase.STARTING) Palette.text else Color.White
+    Box(
+        modifier = modifier
+            .size(56.dp)
+            .clip(CircleShape)
+            .background(background)
+            .clickable(role = Role.Button, onClickLabel = description, onClick = onClick)
+            .semantics { contentDescription = description },
+    ) {
+        Canvas(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .size(22.dp),
+        ) {
+            if (phase == Phase.STOPPED) {
+                drawCircle(color = iconTint, radius = size.minDimension / 2f)
+            } else {
+                val side = size.minDimension * 0.82f
+                drawRoundRect(
+                    color = iconTint,
+                    topLeft = Offset((size.width - side) / 2f, (size.height - side) / 2f),
+                    size = Size(side, side),
+                    cornerRadius = CornerRadius(side * 0.22f),
+                )
+            }
+        }
     }
 }
 
