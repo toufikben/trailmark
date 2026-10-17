@@ -18,7 +18,7 @@ jobs:
       - name: Install fontnik
         run: |
           npm init -y >/dev/null
-          npm install @mapbox/node-fontnik
+          npm install fontnik
       - name: Fetch Noto fonts
         run: |
           curl -sSfL -o NotoSans-Regular.ttf \
@@ -30,7 +30,7 @@ jobs:
         run: |
           cat > gen.js <<'JS'
           const fs = require('fs');
-          const fontnik = require('@mapbox/node-fontnik');
+          const fontnik = require('fontnik');
           const latin = fs.readFileSync('NotoSans-Regular.ttf');
           const arabic = fs.readFileSync('NotoNaskhArabic-Regular.ttf');
           const starts = [0, 256, 512, 768, 1024, 1280, 1536, 1792, 2048];
