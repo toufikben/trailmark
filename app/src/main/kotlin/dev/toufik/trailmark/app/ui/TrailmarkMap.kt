@@ -424,11 +424,13 @@ fun TrailmarkMap(
                 val poiFilter = Expression.raw(
                     """["in","class","shop","restaurant","cafe","fast_food","bakery","bar","bank","pharmacy","hospital","fuel","supermarket","grocery","convenience","marketplace","hotel","station","bus","railway","transit","attraction","museum","theatre","cinema"]""",
                 )
+                val poiVis = visibility(if (pois) Property.VISIBLE else Property.NONE)
                 val poiDot = CircleLayer("poi-dot", "openmaptiles").withProperties(
                     circleColor(if (dark) "#AEB6BF" else "#8A929B"),
                     circleRadius(3.5f),
                     circleStrokeColor(if (dark) "#0E1113" else "#FFFFFF"),
                     circleStrokeWidth(1.2f),
+                    poiVis,
                 )
                 poiDot.withSourceLayer("poi")
                 poiDot.setFilter(poiFilter)
@@ -436,12 +438,13 @@ fun TrailmarkMap(
                 s.addLayer(poiDot)
                 val poiLabel = SymbolLayer("poi-label", "openmaptiles").withProperties(
                     textField(Expression.coalesce(Expression.get("name:ar"), Expression.get("name"))),
-                    textFont(if (offlineVector) "TrailmarkSans" else "Noto Sans Regular"),
+                    textFont(arrayOf(if (offlineVector) "TrailmarkSans" else "Noto Sans Regular")),
                     textSize(10f),
                     textMaxWidth(8f),
                     textColor(if (dark) "#C9D2CC" else "#3F464E"),
                     textHaloColor(if (dark) "#0E1113" else "#FFFFFF"),
                     textHaloWidth(1.0f),
+                    poiVis,
                 )
                 poiLabel.withSourceLayer("poi")
                 poiLabel.setFilter(poiFilter)
@@ -510,8 +513,8 @@ fun TrailmarkMap(
     LaunchedEffect(pois, style) {
         val s = style ?: return@LaunchedEffect
         val v = visibility(if (pois) Property.VISIBLE else Property.NONE)
-        s.setLayoutProperty("poi-dot", "visibility", v)
-        s.setLayoutProperty("poi-label", "visibility", v)
+        s.getLayerAs<CircleLayer>("poi-dot")?.setProperties(v)
+        s.getLayerAs<SymbolLayer>("poi-label")?.setProperties(v)
     }
 
     LaunchedEffect(sport) {
