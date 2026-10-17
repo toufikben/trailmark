@@ -25,16 +25,23 @@ sealed interface Screen {
 }
 
 class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        org.maplibre.android.MapLibre.getInstance(this)
-        if (intent?.getBooleanExtra("synthetic", false) == true) {
+    private var syntheticStarted = false
+
+    override fun onResume() {
+        super.onResume()
+        if (!syntheticStarted && intent?.getBooleanExtra("synthetic", false) == true) {
+            syntheticStarted = true
             val svc = Intent(this, dev.toufik.trailmark.app.service.RecordingService::class.java)
                 .setAction(dev.toufik.trailmark.app.service.RecordingService.ACTION_START)
                 .putExtra(dev.toufik.trailmark.app.service.RecordingService.EXTRA_SPORT, "RUN")
                 .putExtra(dev.toufik.trailmark.app.service.RecordingService.EXTRA_SYNTHETIC, true)
             ContextCompat.startForegroundService(this, svc)
         }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        org.maplibre.android.MapLibre.getInstance(this)
         setContent {
             var lang by remember { mutableStateOf(Lang.AR) }
             val texts = textsFor(lang)
