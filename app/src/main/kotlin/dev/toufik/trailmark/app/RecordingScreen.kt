@@ -87,8 +87,6 @@ private fun qualityLabel(t: Texts, q: GpsQuality): String = when (q) {
 }
 
 @Composable
-private fun StatCell(label: String, value: String) {
-@Composable
 fun RecordingScreen(
     onHistory: () -> Unit,
     onRegions: () -> Unit,
