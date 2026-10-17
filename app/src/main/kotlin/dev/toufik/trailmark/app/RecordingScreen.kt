@@ -38,6 +38,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -77,7 +78,6 @@ import dev.toufik.trailmark.engine.GpsQuality
 import dev.toufik.trailmark.engine.Sport
 import dev.toufik.trailmark.recording.Phase
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -507,6 +507,7 @@ private fun RoundRecordButton(
     }
     val iconTint = if (phase == Phase.STARTING) Palette.text else Color.White
     var holdFrac by remember { mutableStateOf(0f) }
+    val scope = rememberCoroutineScope()
     Box(
         modifier = modifier
             .size(56.dp)
@@ -517,23 +518,21 @@ private fun RoundRecordButton(
                     awaitFirstDown()
                     var fired = false
                     val t0 = System.nanoTime()
-                    coroutineScope {
-                        val holdJob = launch {
-                            while (true) {
-                                val f = (System.nanoTime() - t0).toDouble() / HOLD_TO_FINISH_NANOS
-                                holdFrac = f.toFloat().coerceIn(0f, 1f)
-                                if (f >= 1.0) {
-                                    fired = true
-                                    onLongClick()
-                                    break
-                                }
-                                delay(16L)
+                    val holdJob = scope.launch {
+                        while (true) {
+                            val f = (System.nanoTime() - t0).toDouble() / HOLD_TO_FINISH_NANOS
+                            holdFrac = f.toFloat().coerceIn(0f, 1f)
+                            if (f >= 1.0) {
+                                fired = true
+                                onLongClick()
+                                break
                             }
+                            delay(16L)
                         }
-                        val up = waitForUpOrCancellation()
-                        holdJob.cancel()
-                        if (up != null && !fired) onClick()
                     }
+                    val up = waitForUpOrCancellation()
+                    holdJob.cancel()
+                    if (up != null && !fired) onClick()
                     holdFrac = 0f
                 }
             }
