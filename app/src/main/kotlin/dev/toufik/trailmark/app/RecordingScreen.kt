@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -25,9 +26,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Place
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
@@ -380,43 +384,77 @@ fun RecordingScreen(
                         .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 14.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                if (state.phase == Phase.STOPPED) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
+                var sportMenu by remember { mutableStateOf(false) }
+                val canPickSport = state.phase == Phase.STOPPED
+                Box {
+                    Surface(
+                        onClick = { sportMenu = true },
+                        enabled = canPickSport,
+                        shape = RoundedCornerShape(24.dp),
+                        color = Color.Transparent,
+                        border = BorderStroke(1.dp, Palette.textSecondary.copy(alpha = 0.4f)),
                     ) {
-                        Sport.entries.forEach { s ->
-                            FilterChip(
-                                selected = sport == s,
-                                enabled = state.phase == Phase.STOPPED,
-                                onClick = { if (state.phase == Phase.STOPPED) sport = s },
-                                label = { Text(sportLabelOf(t, s)) },
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(start = 14.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+                        ) {
+                            Text(
+                                text = sportLabelOf(t, sport),
+                                color = if (canPickSport) Palette.text else Palette.textSecondary,
+                                fontSize = 13.sp,
+                            )
+                            Icon(
+                                Icons.Filled.ArrowDropDown,
+                                contentDescription = null,
+                                tint = Palette.textSecondary,
+                                modifier = Modifier.size(18.dp),
                             )
                         }
                     }
+                    DropdownMenu(expanded = sportMenu, onDismissRequest = { sportMenu = false }) {
+                        Sport.entries.forEach { s ->
+                            DropdownMenuItem(
+                                text = { Text(sportLabelOf(t, s)) },
+                                onClick = {
+                                    sport = s
+                                    sportMenu = false
+                                },
+                                trailingIcon = if (s == sport) {
+                                    { Icon(Icons.Filled.Check, contentDescription = null) }
+                                } else {
+                                    null
+                                },
+                            )
+                        }
+                    }
+                }
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(top = 6.dp),
+                ) {
+                    Text(
+                        text = formatDistance(state.distanceM),
+                        color = Palette.accent,
+                        fontSize = 40.sp,
+                        modifier = Modifier.semantics {
+                            contentDescription = "${formatDistance(state.distanceM)} ${t.km}"
+                        },
+                    )
+                    Text(text = t.km, color = Palette.textSecondary, fontSize = 11.sp)
                 }
                 val paceText = if (state.distanceM < 50) "--:--"
                 else formatPace((state.elapsedNanos / 1e9) / (state.distanceM / 1000))
                 val speedText = state.currentSpeedMps?.let { "%.1f".format(it * 3.6) } ?: "--"
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.Bottom,
+                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = formatDistance(state.distanceM),
-                            color = Palette.accent,
-                            fontSize = 30.sp,
-                            modifier = Modifier.semantics {
-                                contentDescription = "${formatDistance(state.distanceM)} ${t.km}"
-                            },
-                        )
-                        Text(text = t.km, color = Palette.textSecondary, fontSize = 11.sp)
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        StatCell(formatDuration(state.elapsedNanos), t.time)
                     }
-                    StatCell(formatDuration(state.elapsedNanos), t.time)
-                    StatCell(paceText, t.pace)
-                    StatCell(speedText, t.speed)
                     val startAction = {
                         if (granted(context, Manifest.permission.ACCESS_FINE_LOCATION)) {
                             startService(context, sport)
@@ -444,6 +482,13 @@ fun RecordingScreen(
                             if (state.phase == Phase.STOPPED) startAction() else stopService(context)
                         },
                     )
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        StatCell(speedText, t.speed)
+                        StatCell(paceText, t.pace)
+                    }
                 }
                 if (state.phase == Phase.RECORDING || state.phase == Phase.PAUSED) {
                     Text(
