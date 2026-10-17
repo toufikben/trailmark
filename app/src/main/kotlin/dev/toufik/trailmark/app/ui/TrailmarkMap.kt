@@ -63,6 +63,7 @@ import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.FillExtrusionLayer
 import org.maplibre.android.style.layers.FillLayer
 import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.layers.PropertyFactory.circleColor
 import org.maplibre.android.style.layers.PropertyFactory.circleRadius
@@ -83,6 +84,14 @@ import org.maplibre.android.style.layers.PropertyFactory.iconSize
 import org.maplibre.android.style.layers.PropertyFactory.lineColor
 import org.maplibre.android.style.layers.PropertyFactory.lineOpacity
 import org.maplibre.android.style.layers.PropertyFactory.lineWidth
+import org.maplibre.android.style.layers.PropertyFactory.textColor
+import org.maplibre.android.style.layers.PropertyFactory.textField
+import org.maplibre.android.style.layers.PropertyFactory.textFont
+import org.maplibre.android.style.layers.PropertyFactory.textHaloColor
+import org.maplibre.android.style.layers.PropertyFactory.textHaloWidth
+import org.maplibre.android.style.layers.PropertyFactory.textMaxWidth
+import org.maplibre.android.style.layers.PropertyFactory.textSize
+import org.maplibre.android.style.layers.PropertyFactory.visibility
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
@@ -281,6 +290,8 @@ fun TrailmarkMap(
 ) {
     val context = LocalContext.current
     val t = LocalTexts.current
+    val prefs = remember { context.getSharedPreferences("trailmark", Context.MODE_PRIVATE) }
+    var pois by remember { mutableStateOf(prefs.getBoolean("map_pois", false)) }
     val route = remember(points) { points.filter { it.type != WaypointType.REJECTED } }
     val ghost = remember(ghostRoute) { ghostRoute.filter { it.type != WaypointType.REJECTED } }
     val glyphsBase = remember { GlyphStore.ensure(context).absolutePath }
@@ -405,9 +416,37 @@ fun TrailmarkMap(
                             fillExtrusionOpacity(0.85f),
                         )
                         .apply { minZoom = 14f }
+                    b3d.withSourceLayer("building")
                     val below = s.layers.firstOrNull { it is SymbolLayer }?.id
                     if (below != null) s.addLayerBelow(b3d, below) else s.addLayer(b3d)
                 }
+                val offlineVector = packPath != null && !online
+                val poiFilter = Expression.raw(
+                    """["in","class","shop","restaurant","cafe","fast_food","bakery","bar","bank","pharmacy","hospital","fuel","supermarket","grocery","convenience","marketplace","hotel","station","bus","railway","transit","attraction","museum","theatre","cinema"]""",
+                )
+                val poiDot = CircleLayer("poi-dot", "openmaptiles").withProperties(
+                    circleColor(if (dark) "#AEB6BF" else "#8A929B"),
+                    circleRadius(3.5f),
+                    circleStrokeColor(if (dark) "#0E1113" else "#FFFFFF"),
+                    circleStrokeWidth(1.2f),
+                )
+                poiDot.withSourceLayer("poi")
+                poiDot.setFilter(poiFilter)
+                poiDot.minZoom = 15.5f
+                s.addLayer(poiDot)
+                val poiLabel = SymbolLayer("poi-label", "openmaptiles").withProperties(
+                    textField(Expression.coalesce(Expression.get("name:ar"), Expression.get("name"))),
+                    textFont(if (offlineVector) "TrailmarkSans" else "Noto Sans Regular"),
+                    textSize(10f),
+                    textMaxWidth(8f),
+                    textColor(if (dark) "#C9D2CC" else "#3F464E"),
+                    textHaloColor(if (dark) "#0E1113" else "#FFFFFF"),
+                    textHaloWidth(1.0f),
+                )
+                poiLabel.withSourceLayer("poi")
+                poiLabel.setFilter(poiFilter)
+                poiLabel.minZoom = 15.5f
+                s.addLayer(poiLabel)
                 s.addSource(GeoJsonSource("route-source", EMPTY))
                 s.addLayer(
                     LineLayer("route-layer", "route-source").withProperties(
@@ -466,6 +505,13 @@ fun TrailmarkMap(
                 style = s
             }
         }
+    }
+
+    LaunchedEffect(pois, style) {
+        val s = style ?: return@LaunchedEffect
+        val v = visibility(if (pois) Property.VISIBLE else Property.NONE)
+        s.setLayoutProperty("poi-dot", "visibility", v)
+        s.setLayoutProperty("poi-label", "visibility", v)
     }
 
     LaunchedEffect(sport) {
@@ -671,6 +717,23 @@ fun TrailmarkMap(
                     Text(
                         if (tiltDeg > 1.0) "2D" else "3D",
                         color = if (tiltDeg > 1.0) Palette.text else Palette.accent,
+                        fontSize = 13.sp,
+                    )
+                }
+            }
+            Surface(
+                onClick = {
+                    pois = !pois
+                    prefs.edit().putBoolean("map_pois", pois).apply()
+                },
+                color = Palette.surface.copy(alpha = 0.92f),
+                shape = CircleShape,
+                modifier = Modifier.size(44.dp),
+            ) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        "POI",
+                        color = if (pois) Palette.accent else Palette.text,
                         fontSize = 13.sp,
                     )
                 }
