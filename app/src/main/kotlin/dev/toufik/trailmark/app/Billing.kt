@@ -20,6 +20,7 @@ class BillingManager(
     context: Context,
     private val entitlements: Entitlements,
 ) {
+    private val appContext = context.applicationContext
     private var client: BillingClient? = null
     private var details: Map<String, ProductDetails> = emptyMap()
 
@@ -28,7 +29,7 @@ class BillingManager(
 
     fun connect() {
         if (client != null) return
-        val c = BillingClient.newBuilder(context)
+        val c = BillingClient.newBuilder(appContext)
             .enablePendingPurchases()
             .setListener { result, purchases ->
                 if (result.responseCode == BillingClient.BillingResponseCode.OK && purchases != null) {
@@ -62,9 +63,8 @@ class BillingManager(
         }
         c.queryProductDetailsAsync(
             QueryProductDetailsParams.newBuilder().setProductList(products).build(),
-        ) { result, queryResult ->
+        ) { result, list ->
             if (result.responseCode != BillingClient.BillingResponseCode.OK) return@queryProductDetailsAsync
-            val list = queryResult.productDetailsList ?: return@queryProductDetailsAsync
             details = list.associateBy { it.productId }
             _prices.value = list.associate { d -> d.productId to priceOf(d) }
         }

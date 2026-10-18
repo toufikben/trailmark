@@ -172,8 +172,8 @@ fun RegionsScreen(onBack: () -> Unit, onPaywall: () -> Unit) {
                                                 try {
                                                     withContext(Dispatchers.IO) { manager.install(pack) }
                                                     refreshInstalled(m.packs)
-                                                } catch (t: Throwable) {
-                                                    error = "${t.loadFailed}: ${t.message}"
+                                                } catch (e: Throwable) {
+                                                    error = "${t.loadFailed}: ${e.message}"
                                                 } finally {
                                                     installing = null
                                                 }
