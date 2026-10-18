@@ -5,6 +5,17 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,6 +52,7 @@ import androidx.core.content.ContextCompat
 import dev.toufik.trailmark.app.service.RecordingHolder
 import dev.toufik.trailmark.app.ui.DetailScreen
 import dev.toufik.trailmark.app.ui.HistoryScreen
+import dev.toufik.trailmark.app.ui.Motion
 import dev.toufik.trailmark.app.ui.PlanScreen
 import dev.toufik.trailmark.app.ui.ProgressScreen
 import dev.toufik.trailmark.app.ui.RegionsScreen
@@ -94,7 +106,17 @@ class MainActivity : ComponentActivity() {
                         }
                         Column(modifier = Modifier.fillMaxSize()) {
                             Box(modifier = Modifier.weight(1f)) {
-                                when (val s = screen) {
+                                AnimatedContent(
+                                    targetState = screen,
+                                    transitionSpec = {
+                                        val dir = if (tabRank(targetState) >= tabRank(initialState)) 1 else -1
+                                        (fadeIn(tween(Motion.MED, easing = Motion.EaseOut)) +
+                                            slideInVertically(tween(Motion.MED, easing = Motion.EaseOut)) { it / 14 * dir })
+                                            .togetherWith(fadeOut(tween(Motion.FAST)))
+                                    },
+                                    label = "tab-content",
+                                ) { s ->
+                                when (s) {
                                     Screen.Record -> RecordingScreen(
                                         onOpenDetail = { id -> screen = Screen.Detail(id) },
                                     )
@@ -111,6 +133,7 @@ class MainActivity : ComponentActivity() {
                                         activityId = s.id,
                                         onBack = { screen = Screen.History },
                                     )
+                                }
                                 }
                             }
                             TabBar(
@@ -134,7 +157,7 @@ private fun TabBar(current: Screen, recording: Boolean, onSelect: (Screen) -> Un
         selectedTextColor = Palette.accent,
         unselectedIconColor = Palette.textSecondary,
         unselectedTextColor = Palette.textSecondary,
-        indicatorColor = Palette.bg,
+        indicatorColor = Palette.accent.copy(alpha = 0.16f),
     )
     NavigationBar(containerColor = Palette.surface) {
         NavigationBarItem(
@@ -189,6 +212,13 @@ private fun TabLabel(text: String) {
 @Composable
 private fun RecordTabIcon(active: Boolean) {
     val color = LocalContentColor.current
+    val transition = rememberInfiniteTransition(label = "record-dot")
+    val pulse by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1100, easing = LinearEasing), RepeatMode.Reverse),
+        label = "dot-pulse",
+    )
     Canvas(modifier = Modifier.size(22.dp)) {
         val r = size.minDimension / 2f
         drawCircle(
@@ -196,11 +226,21 @@ private fun RecordTabIcon(active: Boolean) {
             radius = r * 0.78f,
             style = Stroke(width = r * 0.16f),
         )
+        val dotColor = if (active) Palette.danger.copy(alpha = 0.55f + 0.45f * pulse) else color
+        val dotRadius = if (active) r * (0.34f + 0.10f * pulse) else r * 0.38f
         drawCircle(
-            color = if (active) Palette.danger else color,
-            radius = r * 0.38f,
+            color = dotColor,
+            radius = dotRadius,
         )
     }
+}
+
+private fun tabRank(screen: Screen): Int = when (screen) {
+    Screen.Record -> 0
+    Screen.Plan, Screen.Regions -> 1
+    Screen.History, is Screen.Detail -> 2
+    Screen.Progress -> 3
+    Screen.Settings -> 4
 }
 
 @Composable

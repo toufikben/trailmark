@@ -2,6 +2,7 @@ package dev.toufik.trailmark.app.ui
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -9,10 +10,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
@@ -131,8 +133,8 @@ fun HistoryScreen(onOpen: (Long) -> Unit) {
                 }
 
                 else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(list, key = { it.id }) { row ->
-                        HistoryRow(row) { onOpen(row.id) }
+                    itemsIndexed(list, key = { _, row -> row.id }) { i, row ->
+                        HistoryRow(row, index = i) { onOpen(row.id) }
                         HorizontalDivider(color = Palette.surface)
                     }
                 }
@@ -142,20 +144,32 @@ fun HistoryScreen(onOpen: (Long) -> Unit) {
 }
 
 @Composable
-private fun HistoryRow(row: ActivityRow, onClick: () -> Unit) {
+private fun HistoryRow(row: ActivityRow, index: Int = 0, onClick: () -> Unit) {
     val t = LocalTexts.current
     val pace = if (row.distanceM < 50) null else (row.elapsedNanos / 1e9) / (row.distanceM / 1000)
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
+            .padding(vertical = 12.dp)
+            .appearIn(index.coerceAtMost(8), from = 8.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(sportLabel(t, row.sport), color = Palette.text, fontSize = 16.sp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Canvas(modifier = Modifier.size(8.dp)) {
+                    drawCircle(SPORT_COLORS[row.sport] ?: OTHER_SPORT_COLOR)
+                }
+                Text(
+                    sportLabel(t, row.sport),
+                    color = Palette.text,
+                    fontSize = 16.sp,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
             Text(formatDate(row.startWallMillis), color = Palette.textSecondary, fontSize = 12.sp)
         }
         Row(

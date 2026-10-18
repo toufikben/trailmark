@@ -37,6 +37,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -118,13 +120,19 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                 else -> {
                     val pace = if (d.row.distanceM < 50) null
                     else (d.row.elapsedNanos / 1e9) / (d.row.distanceM / 1000)
+                    val distAnim by animateFloatAsState(
+                        targetValue = d.row.distanceM.toFloat(),
+                        animationSpec = tween(Motion.SLOW, easing = Motion.EaseOut),
+                        label = "hero-distance",
+                    )
                     Text(
-                        formatDistance(d.row.distanceM),
+                        formatDistance(distAnim.toDouble()),
                         color = Palette.accent,
                         fontSize = 48.sp,
+                        modifier = Modifier.appearIn(0),
                     )
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp).appearIn(1),
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text("${t.time} ${formatDuration(d.row.elapsedNanos)}", color = Palette.text, fontSize = 15.sp)
@@ -139,7 +147,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                         dev.toufik.trailmark.analytics.analyze(d.points, d.row.elapsedNanos)
                     }
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp).appearIn(2),
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text(
@@ -206,7 +214,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                     }
                     TrailmarkMap(
                         points = d.points,
-                        modifier = Modifier.fillMaxWidth().height(320.dp).padding(top = 12.dp),
+                        modifier = Modifier.fillMaxWidth().height(320.dp).padding(top = 12.dp).appearIn(3),
                         packPath = packPath,
                         current = cursor,
                         sport = sportOf(d.row.sport),

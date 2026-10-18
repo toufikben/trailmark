@@ -36,7 +36,6 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -65,14 +64,6 @@ import java.util.Calendar
 
 private const val WEEK_MS = 7L * 24 * 60 * 60 * 1000
 private val SPORT_ORDER = listOf("RUN", "WALK", "BIKE", "HIKE")
-
-private val SPORT_COLORS = mapOf(
-    "RUN" to Color(0xFFC6FF3D),
-    "WALK" to Color(0xFF12A594),
-    "BIKE" to Color(0xFFF76808),
-    "HIKE" to Color(0xFF8A93A6),
-)
-private val OTHER_COLOR = Color(0xFF6E7681)
 
 private class Totals {
     var distanceM = 0.0
@@ -336,7 +327,7 @@ private fun SportSplitCard(t: Texts, rows: List<ActivityRow>) {
                     entries.forEach { (s, v) ->
                         val sweep = (v / total * 360.0).toFloat() * grow
                         drawArc(
-                            color = SPORT_COLORS[s] ?: OTHER_COLOR,
+                            color = SPORT_COLORS[s] ?: OTHER_SPORT_COLOR,
                             startAngle = start,
                             sweepAngle = sweep,
                             useCenter = false,
@@ -354,7 +345,7 @@ private fun SportSplitCard(t: Texts, rows: List<ActivityRow>) {
                             modifier = Modifier.padding(vertical = 3.dp),
                         ) {
                             Canvas(modifier = Modifier.size(8.dp)) {
-                                drawCircle(SPORT_COLORS[s] ?: OTHER_COLOR)
+                                drawCircle(SPORT_COLORS[s] ?: OTHER_SPORT_COLOR)
                             }
                             Text(
                                 sportLabel(t, s),
