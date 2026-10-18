@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.toufik.trailmark.app.LocalLang
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.Texts
@@ -41,7 +42,11 @@ private const val TILE_BUDGET = 3_000L
 private const val AVG_TILE_BYTES = 22_000.0
 /** Downloads the area around the current position from the global basemap. */
 @Composable
-fun OfflineAreaCard(onCompleted: () -> Unit) {
+fun OfflineAreaCard(
+    onCompleted: () -> Unit,
+    blocked: Boolean = false,
+    onBlocked: () -> Unit = {},
+) {
     val context = LocalContext.current
     val t = LocalTexts.current
     val scope = rememberCoroutineScope()
@@ -121,6 +126,10 @@ fun OfflineAreaCard(onCompleted: () -> Unit) {
                     Button(
                         enabled = !tooBig && p == null,
                         onClick = {
+                            if (blocked) {
+                                onBlocked()
+                                return@Button
+                            }
                             error = null
                             progress = 0
                             scope.launch {
@@ -155,6 +164,13 @@ fun OfflineAreaCard(onCompleted: () -> Unit) {
                             "  ${t.installing} $p%",
                             color = Palette.textSecondary,
                             fontSize = 13.sp,
+                        )
+                    }
+                    if (blocked) {
+                        Text(
+                            "  " + paywallText(LocalLang.current, "onlyPro"),
+                            color = Palette.textSecondary,
+                            fontSize = 12.sp,
                         )
                     }
                 }

@@ -53,6 +53,7 @@ import dev.toufik.trailmark.app.service.RecordingHolder
 import dev.toufik.trailmark.app.ui.DetailScreen
 import dev.toufik.trailmark.app.ui.HistoryScreen
 import dev.toufik.trailmark.app.ui.Motion
+import dev.toufik.trailmark.app.ui.PaywallScreen
 import dev.toufik.trailmark.app.ui.PlanScreen
 import dev.toufik.trailmark.app.ui.ProgressScreen
 import dev.toufik.trailmark.app.ui.RegionsScreen
@@ -66,6 +67,7 @@ sealed interface Screen {
     data object Progress : Screen
     data object Settings : Screen
     data object Regions : Screen
+    data object Paywall : Screen
     data class Detail(val id: Long) : Screen
 }
 
@@ -87,12 +89,21 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         org.maplibre.android.MapLibre.getInstance(this)
+        val entitlements = Entitlements(this)
+        val billing = BillingManager(this, entitlements)
+        billing.connect()
         setContent {
             var lang by remember { mutableStateOf(Lang.AR) }
             val texts = textsFor(lang)
             val direction = if (lang.rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
+            val premiumState by entitlements.state.collectAsState()
 
-            CompositionLocalProvider(LocalTexts provides texts, LocalLang provides lang) {
+            CompositionLocalProvider(
+                LocalTexts provides texts,
+                LocalLang provides lang,
+                LocalPremium provides premiumState,
+                LocalBilling provides billing,
+            ) {
                 TrailmarkTheme {
                     CompositionLocalProvider(LocalLayoutDirection provides direction) {
                         var screen by remember { mutableStateOf<Screen>(Screen.Record) }
@@ -101,6 +112,7 @@ class MainActivity : ComponentActivity() {
                             screen = when (val s = screen) {
                                 is Screen.Detail -> Screen.History
                                 Screen.Regions -> Screen.Plan
+                                Screen.Paywall -> Screen.Settings
                                 else -> Screen.Record
                             }
                         }
@@ -127,8 +139,16 @@ class MainActivity : ComponentActivity() {
                                         onOpen = { screen = Screen.Detail(it) },
                                     )
                                     Screen.Progress -> ProgressScreen()
-                                    Screen.Settings -> SettingsScreen(lang = lang, onLang = { lang = it })
-                                    Screen.Regions -> RegionsScreen(onBack = { screen = Screen.Plan })
+                                    Screen.Settings -> SettingsScreen(
+                                        lang = lang,
+                                        onLang = { lang = it },
+                                        onPaywall = { screen = Screen.Paywall },
+                                    )
+                                    Screen.Paywall -> PaywallScreen(onBack = { screen = Screen.Settings })
+                                    Screen.Regions -> RegionsScreen(
+                                        onBack = { screen = Screen.Plan },
+                                        onPaywall = { screen = Screen.Paywall },
+                                    )
                                     is Screen.Detail -> DetailScreen(
                                         activityId = s.id,
                                         onBack = { screen = Screen.History },
@@ -240,7 +260,7 @@ private fun tabRank(screen: Screen): Int = when (screen) {
     Screen.Plan, Screen.Regions -> 1
     Screen.History, is Screen.Detail -> 2
     Screen.Progress -> 3
-    Screen.Settings -> 4
+    Screen.Settings, Screen.Paywall -> 4
 }
 
 @Composable

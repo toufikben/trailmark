@@ -26,6 +26,18 @@ android {
                 keyPassword = "android"
             }
         }
+        create("release") {
+            val ks = System.getenv("RELEASE_KEYSTORE_FILE")?.let { file(it) }
+            val storePw = System.getenv("RELEASE_STORE_PASSWORD")
+            val alias = System.getenv("RELEASE_KEY_ALIAS")
+            val keyPw = System.getenv("RELEASE_KEY_PASSWORD")
+            if (ks != null && ks.exists() && storePw != null && alias != null && keyPw != null) {
+                storeFile = ks
+                storePassword = storePw
+                keyAlias = alias
+                keyPassword = keyPw
+            }
+        }
     }
 
     buildTypes {
@@ -36,6 +48,9 @@ android {
         }
         release {
             isMinifyEnabled = false
+            if (signingConfigs.getByName("release").storeFile != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
@@ -68,6 +83,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.sqldelight.android.driver)
     implementation(libs.maplibre.android)
+    implementation(libs.billing)
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.graphics)

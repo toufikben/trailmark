@@ -39,11 +39,36 @@ jobs:
         run: |
           if [ -z "$DEBUG_KEYSTORE_B64" ]; then echo "no shared debug keystore"; exit 0; fi
           printf '%s' "$DEBUG_KEYSTORE_B64" | base64 -d > app/shared-debug.jks
+      - name: Restore release keystore
+        env:
+          RELEASE_KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$RELEASE_KEYSTORE_B64" ]; then echo "no release keystore"; exit 0; fi
+          printf '%s' "$RELEASE_KEYSTORE_B64" | base64 -d > app/release-keystore.jks
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+      - name: Build signed release APK and AAB
+        env:
+          RELEASE_KEYSTORE_FILE: app/release-keystore.jks
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: ./gradlew :app:assembleRelease :app:bundleRelease --no-daemon --stacktrace
       - uses: actions/upload-artifact@v4
         with:
           name: trailmark-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trailmark-release-apk
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trailmark-release-aab
+          path: app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
           retention-days: 7

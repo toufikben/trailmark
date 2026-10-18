@@ -35,12 +35,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.toufik.trailmark.app.Lang
+import dev.toufik.trailmark.app.LocalPremium
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
 
-/** Language, map theme and app info — the top-bar controls moved here. */
+/** Language, subscription, map theme and app info. */
 @Composable
-fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit) {
+fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
     val context = LocalContext.current
     val t = LocalTexts.current
     val prefs = remember { context.getSharedPreferences("trailmark", Context.MODE_PRIVATE) }
@@ -59,6 +60,36 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit) {
             Text(t.language, color = Palette.textSecondary, fontSize = 13.sp)
             Spacer(Modifier.height(8.dp))
             LanguagePicker(lang, onLang)
+            Spacer(Modifier.height(24.dp))
+            Text(paywallText(lang, "title"), color = Palette.textSecondary, fontSize = 13.sp)
+            Spacer(Modifier.height(8.dp))
+            val premium = LocalPremium.current
+            val now = remember { System.currentTimeMillis() }
+            val status = when {
+                premium?.purchasedProduct != null -> paywallText(lang, "proActive")
+                (premium?.trialDaysLeft(now) ?: 0) > 0 ->
+                    paywallText(lang, "trialLeft")
+                        .replace("%d", (premium?.trialDaysLeft(now) ?: 0).toString())
+                else -> paywallText(lang, "trialEnded")
+            }
+            Surface(
+                color = Palette.surface,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable(onClick = onPaywall),
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(status, color = Palette.accent, fontSize = 14.sp)
+                    Text(
+                        paywallText(lang, "subtitle"),
+                        color = Palette.textSecondary,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
             Spacer(Modifier.height(24.dp))
             Text(t.mapTheme, color = Palette.textSecondary, fontSize = 13.sp)
             Spacer(Modifier.height(8.dp))

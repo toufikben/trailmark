@@ -26,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.toufik.trailmark.app.FREE_OFFLINE_AREAS
+import dev.toufik.trailmark.app.LocalPremium
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.maps.HttpBytesFetcher
@@ -41,10 +43,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun RegionsScreen(onBack: () -> Unit) {
+fun RegionsScreen(onBack: () -> Unit, onPaywall: () -> Unit) {
     val context = LocalContext.current
     val t = LocalTexts.current
     val scope = rememberCoroutineScope()
+    val premium = LocalPremium.current
+    val pro = premium == null || premium.isPro(System.currentTimeMillis())
     var manifest by remember { mutableStateOf<RegionManifest?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var installing by remember { mutableStateOf<String?>(null) }
@@ -80,9 +84,13 @@ fun RegionsScreen(onBack: () -> Unit) {
 
             LazyColumn(modifier = Modifier.fillMaxSize()) {
                 item(key = "offline-card") {
-                    OfflineAreaCard(onCompleted = {
-                        scope.launch { savedAreas = regions.list() }
-                    })
+                    OfflineAreaCard(
+                        blocked = !pro && savedAreas.size >= FREE_OFFLINE_AREAS,
+                        onBlocked = onPaywall,
+                        onCompleted = {
+                            scope.launch { savedAreas = regions.list() }
+                        },
+                    )
                 }
                 item(key = "saved-title") {
                     Text(
@@ -165,7 +173,7 @@ fun RegionsScreen(onBack: () -> Unit) {
                                                     withContext(Dispatchers.IO) { manager.install(pack) }
                                                     refreshInstalled(m.packs)
                                                 } catch (t: Throwable) {
-                                                    error = "فشل التنزيل: ${t.message}"
+                                                    error = "${t.loadFailed}: ${t.message}"
                                                 } finally {
                                                     installing = null
                                                 }
