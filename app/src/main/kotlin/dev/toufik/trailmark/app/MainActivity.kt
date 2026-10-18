@@ -32,7 +32,9 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.core.content.ContextCompat
@@ -139,38 +141,49 @@ private fun TabBar(current: Screen, recording: Boolean, onSelect: (Screen) -> Un
             selected = current is Screen.Record,
             onClick = { onSelect(Screen.Record) },
             icon = { RecordTabIcon(active = recording) },
-            label = { Text(t.tabRecord) },
+            label = { TabLabel(t.tabRecord) },
             colors = colors,
         )
         NavigationBarItem(
             selected = current is Screen.Plan || current is Screen.Regions,
             onClick = { onSelect(Screen.Plan) },
             icon = { Icon(Icons.Filled.Place, contentDescription = t.tabExplore, modifier = Modifier.size(22.dp)) },
-            label = { Text(t.tabExplore) },
+            label = { TabLabel(t.tabExplore) },
             colors = colors,
         )
         NavigationBarItem(
             selected = current is Screen.History || current is Screen.Detail,
             onClick = { onSelect(Screen.History) },
             icon = { Icon(Icons.Filled.List, contentDescription = t.tabHistory, modifier = Modifier.size(22.dp)) },
-            label = { Text(t.tabHistory) },
+            label = { TabLabel(t.tabHistory) },
             colors = colors,
         )
         NavigationBarItem(
             selected = current is Screen.Progress,
             onClick = { onSelect(Screen.Progress) },
             icon = { ProgressTabIcon() },
-            label = { Text(t.tabProgress) },
+            label = { TabLabel(t.tabProgress) },
             colors = colors,
         )
         NavigationBarItem(
             selected = current is Screen.Settings,
             onClick = { onSelect(Screen.Settings) },
             icon = { Icon(Icons.Filled.Settings, contentDescription = t.tabSettings, modifier = Modifier.size(22.dp)) },
-            label = { Text(t.tabSettings) },
+            label = { TabLabel(t.tabSettings) },
             colors = colors,
         )
     }
+}
+
+@Composable
+private fun TabLabel(text: String) {
+    Text(
+        text = text,
+        fontSize = 11.sp,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 @Composable
