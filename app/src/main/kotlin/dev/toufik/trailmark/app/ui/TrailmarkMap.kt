@@ -399,7 +399,7 @@ fun TrailmarkMap(
                 )
                 poiDot.withSourceLayer("poi")
                 poiDot.setFilter(poiFilter)
-                poiDot.minZoom = 15.5f
+                poiDot.minZoom = 14f
                 s.addLayer(poiDot)
                 val poiLabel = SymbolLayer("poi-label", "openmaptiles").withProperties(
                     textField(Expression.coalesce(Expression.get("name:ar"), Expression.get("name"))),
@@ -413,7 +413,7 @@ fun TrailmarkMap(
                 )
                 poiLabel.withSourceLayer("poi")
                 poiLabel.setFilter(poiFilter)
-                poiLabel.minZoom = 15.5f
+                poiLabel.minZoom = 14f
                 s.addLayer(poiLabel)
                 s.addSource(GeoJsonSource("plan-source", EMPTY))
                 s.addLayer(
@@ -610,7 +610,7 @@ fun TrailmarkMap(
                 if (!worldShown) {
                     val fix = userFix
                     map.cameraPosition = if (fix != null) {
-                        CameraPosition.Builder().target(LatLng(fix.lat, fix.lon)).zoom(13.5).tilt(tiltDeg).build()
+                        CameraPosition.Builder().target(LatLng(fix.lat, fix.lon)).zoom(14.0).tilt(tiltDeg).build()
                     } else {
                         CameraPosition.Builder().target(LatLng(20.0, 10.0)).zoom(1.6).build()
                     }
