@@ -144,7 +144,7 @@ fun PlanScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             }
 
             Surface(
-                color = Palette.surface.copy(alpha = 0.94f),
+                color = Palette.surface,
                 shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
             ) {
