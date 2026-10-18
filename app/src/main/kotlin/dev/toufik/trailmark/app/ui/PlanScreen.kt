@@ -39,7 +39,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.toufik.trailmark.app.LocalTexts
@@ -77,6 +79,8 @@ fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
     var anchor by remember { mutableStateOf<StoredPoint?>(null) }
     var plan by remember { mutableStateOf<PlannedRoute?>(null) }
     var loading by remember { mutableStateOf(false) }
+    var cardH by remember { mutableStateOf(0.dp) }
+    val density = LocalDensity.current
 
     val locateLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -111,11 +115,12 @@ fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
                     planChunks = plan?.chunks ?: emptyList(),
                     planDest = dest,
                     onMapClick = { lat, lon -> dest = lat to lon },
-                    onUserFix = { sp -> if (dest == null) anchor = sp },
+                    onUserFix = { sp -> if (anchor == null) anchor = sp },
                     onNeedPermission = {
                         locateLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION))
                     },
                     dark = darkMap,
+                    controlsBottomInset = cardH,
                     modifier = Modifier.fillMaxSize(),
                 )
                 Row(
@@ -157,7 +162,10 @@ fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
             Surface(
                 color = Palette.surface,
                 shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .onGloballyPositioned { cardH = with(density) { it.size.height.toDp() } },
             ) {
                 Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp)) {
                     val d = dest
@@ -176,7 +184,17 @@ fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
                             Spacer(Modifier.width(10.dp))
                             Text(t.calculating, color = Palette.textSecondary, fontSize = 13.sp)
                         }
-                        plan != null -> {
+                        anchor == null -> Text(
+                            t.waitingGps,
+                            color = Palette.textSecondary,
+                            fontSize = 13.sp,
+                        )
+                        plan == null -> Text(
+                            t.noRouteFound,
+                            color = Palette.textSecondary,
+                            fontSize = 13.sp,
+                        )
+                        else -> {
                             val p = plan!!
                             val secs = RoutePlanner.estimateSeconds(p, sport).toLong()
                             Row(

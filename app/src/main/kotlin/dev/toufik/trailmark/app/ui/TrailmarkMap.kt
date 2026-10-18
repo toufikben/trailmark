@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -215,6 +216,7 @@ fun TrailmarkMap(
     packPath: String? = null,
     current: StoredPoint? = null,
     attributionBottom: Int = 0,
+    controlsBottomInset: Dp = 0.dp,
     sport: Sport = Sport.RUN,
     ghostRoute: List<StoredPoint> = emptyList(),
     ghostCurrent: StoredPoint? = null,
@@ -701,7 +703,7 @@ fun TrailmarkMap(
         Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 12.dp, bottom = bottomPad),
+                .padding(end = 12.dp, bottom = bottomPad + controlsBottomInset),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Surface(
