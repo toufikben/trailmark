@@ -121,7 +121,12 @@ fun RecordingScreen(
     val t = LocalTexts.current
     val state by RecordingHolder.state.collectAsState()
     val packPath = remember { MapPacks.installedMapPack(context)?.absolutePath }
+    val scope = rememberCoroutineScope()
     var sport by remember { mutableStateOf(Sport.RUN) }
+
+    var pendingCapture by remember { mutableStateOf<java.io.File?>(null) }
+    var pendingKind by remember { mutableStateOf<String?>(null) }
+    var mediaFlash by remember { mutableStateOf(false) }
 
     var route by remember { mutableStateOf<List<StoredPoint>>(emptyList()) }
     var coachLine by remember { mutableStateOf<String?>(null) }
@@ -233,6 +238,72 @@ fun RecordingScreen(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { }
 
+    fun onCaptured(ok: Boolean) {
+        val file = pendingCapture
+        val kind = pendingKind
+        pendingCapture = null
+        pendingKind = null
+        val activityId = state.activityId
+        if (!ok || file == null || kind == null || activityId == null) return
+        val lat = state.currentLat
+        val lon = state.currentLon
+        val bearing = state.currentBearing
+        val distanceM = state.distanceM
+        val elapsedNanos = state.elapsedNanos
+        scope.launch {
+            withContext(Dispatchers.IO) {
+                AppGraph.repository(context).insertMedia(
+                    activityId = activityId,
+                    kind = kind,
+                    filePath = file.absolutePath,
+                    lat = lat,
+                    lon = lon,
+                    bearingDeg = bearing,
+                    distanceM = distanceM,
+                    elapsedNanos = elapsedNanos,
+                    createdWallMillis = System.currentTimeMillis(),
+                    durationMs = if (kind == "VIDEO") MediaCapture.videoDurationMs(file) else null,
+                    caption = null,
+                )
+            }
+            mediaFlash = true
+            delay(2500)
+            mediaFlash = false
+        }
+    }
+
+    val photoLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture(),
+    ) { ok -> onCaptured(ok) }
+
+    val videoLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CaptureVideo(),
+    ) { ok -> onCaptured(ok) }
+
+    fun capturePhoto() {
+        val file = MediaCapture.newPhotoFile(context)
+        pendingCapture = file
+        pendingKind = "PHOTO"
+        try {
+            photoLauncher.launch(MediaCapture.uriFor(context, file))
+        } catch (_: Exception) {
+            pendingCapture = null
+            pendingKind = null
+        }
+    }
+
+    fun captureVideo() {
+        val file = MediaCapture.newVideoFile(context)
+        pendingCapture = file
+        pendingKind = "VIDEO"
+        try {
+            videoLauncher.launch(MediaCapture.uriFor(context, file))
+        } catch (_: Exception) {
+            pendingCapture = null
+            pendingKind = null
+        }
+    }
+
     Surface(color = Palette.bg, modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
             Box(
@@ -275,6 +346,19 @@ fun RecordingScreen(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .padding(end = 12.dp, top = 12.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Palette.surface.copy(alpha = 0.85f))
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                    )
+                }
+                if (mediaFlash) {
+                    Text(
+                        text = t.mediaSaved,
+                        color = Palette.accent,
+                        fontSize = 12.sp,
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 12.dp)
                             .clip(RoundedCornerShape(12.dp))
                             .background(Palette.surface.copy(alpha = 0.85f))
                             .padding(horizontal = 10.dp, vertical = 6.dp),
@@ -387,12 +471,20 @@ fun RecordingScreen(
                     .align(Alignment.BottomCenter)
                     .padding(bottom = with(LocalDensity.current) { barHeightPx.toDp() } + 12.dp),
             ) {
-                SportPicker(
-                    t = t,
-                    sport = sport,
-                    enabled = state.phase == Phase.STOPPED,
-                    onPick = { sport = it },
-                )
+                if (state.phase == Phase.PAUSED && state.activityId != null) {
+                    MediaCaptureRow(
+                        t = t,
+                        onPhoto = { capturePhoto() },
+                        onVideo = { captureVideo() },
+                    )
+                } else {
+                    SportPicker(
+                        t = t,
+                        sport = sport,
+                        enabled = state.phase == Phase.STOPPED,
+                        onPick = { sport = it },
+                    )
+                }
             }
         }
     }
@@ -543,5 +635,83 @@ private fun bearingDeg(lat1: Double, lon1: Double, lat2: Double, lon2: Double): 
     val y = Math.sin(dl) * Math.cos(p2)
     val x = Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl)
     return (Math.toDegrees(Math.atan2(y, x)) + 360.0) % 360.0
+}
+
+/** Photo and video buttons shown while the recording is paused. */
+@Composable
+private fun MediaCaptureRow(
+    t: Texts,
+    onPhoto: () -> Unit,
+    onVideo: () -> Unit,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+        CaptureRoundButton(description = t.photo, onClick = onPhoto) { color ->
+            val w = size.width
+            val h = size.height
+            drawRoundRect(
+                color = color,
+                topLeft = Offset(w * 0.10f, h * 0.32f),
+                size = Size(w * 0.80f, h * 0.46f),
+                cornerRadius = CornerRadius(w * 0.10f),
+                style = Stroke(width = w * 0.09f),
+            )
+            drawRoundRect(
+                color = color,
+                topLeft = Offset(w * 0.30f, h * 0.20f),
+                size = Size(w * 0.22f, h * 0.14f),
+                cornerRadius = CornerRadius(w * 0.04f),
+                style = Stroke(width = w * 0.09f),
+            )
+            drawCircle(
+                color = color,
+                radius = w * 0.13f,
+                center = Offset(w * 0.50f, h * 0.55f),
+                style = Stroke(width = w * 0.09f),
+            )
+        }
+        CaptureRoundButton(description = t.video, onClick = onVideo) { color ->
+            val w = size.width
+            val h = size.height
+            drawRoundRect(
+                color = color,
+                topLeft = Offset(w * 0.10f, h * 0.30f),
+                size = Size(w * 0.62f, h * 0.48f),
+                cornerRadius = CornerRadius(w * 0.10f),
+                style = Stroke(width = w * 0.09f),
+            )
+            val path = Path().apply {
+                moveTo(w * 0.76f, h * 0.44f)
+                lineTo(w * 0.92f, h * 0.34f)
+                lineTo(w * 0.92f, h * 0.74f)
+                lineTo(w * 0.76f, h * 0.64f)
+                close()
+            }
+            drawPath(path, color)
+        }
+    }
+}
+
+@Composable
+private fun CaptureRoundButton(
+    description: String,
+    onClick: () -> Unit,
+    icon: androidx.compose.ui.graphics.drawscope.DrawScope.(Color) -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = Palette.surface.copy(alpha = 0.94f),
+        modifier = Modifier
+            .size(52.dp)
+            .semantics { contentDescription = description },
+    ) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(13.dp),
+        ) {
+            icon(Palette.text)
+        }
+    }
 }
 

@@ -95,6 +95,9 @@ data class Texts(
     val progressBestWeek: String,
     val progressBySport: String,
     val achievements: String,
+    val photo: String,
+    val video: String,
+    val mediaSaved: String,
 )
 
 /** Arabic (RTL) — the app's first language. */
@@ -188,6 +191,9 @@ val AR_TEXTS = Texts(
     progressBestWeek = "أفضل أسبوع",
     progressBySport = "حسب الرياضة",
     achievements = "الإنجازات",
+    photo = "صورة",
+    video = "فيديو",
+    mediaSaved = "تمّ حفظ الوسائط",
 )
 val FR_TEXTS = Texts(
     appName = "Trailmark",
@@ -279,6 +285,9 @@ val FR_TEXTS = Texts(
     progressBestWeek = "Meilleure semaine",
     progressBySport = "Par sport",
     achievements = "Succès",
+    photo = "Photo",
+    video = "Vidéo",
+    mediaSaved = "Média enregistré",
 )
 
 val EN_TEXTS = Texts(
@@ -371,6 +380,9 @@ val EN_TEXTS = Texts(
     progressBestWeek = "Best week",
     progressBySport = "By sport",
     achievements = "Achievements",
+    photo = "Photo",
+    video = "Video",
+    mediaSaved = "Media saved",
 )
 
 fun textsFor(lang: Lang): Texts = when (lang) {
