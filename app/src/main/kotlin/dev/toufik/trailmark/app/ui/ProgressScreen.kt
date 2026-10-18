@@ -1,5 +1,9 @@
 package dev.toufik.trailmark.app.ui
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -28,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -177,8 +182,8 @@ private fun SummaryRow(t: Texts, rows: List<ActivityRow>) {
             .padding(top = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        cards.forEach { (label, totals) ->
-            StatCard(t, label, totals, modifier = Modifier.weight(1f))
+        cards.forEachIndexed { i, (label, totals) ->
+            StatCard(t, label, totals, modifier = Modifier.weight(1f).appearIn(i))
         }
     }
 }
@@ -226,12 +231,20 @@ private fun WeeklyCard(t: Texts, rows: List<ActivityRow>) {
         sumsInRange(rows, from, from + WEEK_MS)
     }
     val maxSum = sums.max().coerceAtLeast(1.0)
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { shown = true }
+    val grow by animateFloatAsState(
+        targetValue = if (shown) 1f else 0f,
+        animationSpec = tween(Motion.SLOW, easing = Motion.EaseOut),
+        label = "weekly-grow",
+    )
     Surface(
         color = Palette.surface,
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 12.dp),
+            .padding(top = 12.dp)
+            .appearIn(2),
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -250,8 +263,10 @@ private fun WeeklyCard(t: Texts, rows: List<ActivityRow>) {
                 val barW = (size.width - gap * (sums.size - 1)) / sums.size
                 sums.forEachIndexed { i, v ->
                     if (v <= 0.0) return@forEachIndexed
+                    val reveal = (grow * 2.4f - i * 0.12f).coerceIn(0f, 1f)
+                    if (reveal <= 0f) return@forEachIndexed
                     val frac = (v / maxSum).toFloat().coerceIn(0.04f, 1f)
-                    val barH = size.height * frac
+                    val barH = size.height * frac * reveal
                     val x = i * (barW + gap)
                     val color = if (i == sums.size - 1) Palette.accent else Palette.accent.copy(alpha = 0.55f)
                     drawRoundRect(
@@ -289,12 +304,20 @@ private fun SportSplitCard(t: Texts, rows: List<ActivityRow>) {
     }
     val entries = values.filter { it.value > 0.0 }
     if (entries.isEmpty() || total <= 0.0) return
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { shown = true }
+    val grow by animateFloatAsState(
+        targetValue = if (shown) 1f else 0f,
+        animationSpec = tween(Motion.SLOW, easing = Motion.EaseOut),
+        label = "donut-grow",
+    )
     Surface(
         color = Palette.surface,
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 12.dp),
+            .padding(top = 12.dp)
+            .appearIn(3),
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Text(t.progressBySport, color = Palette.text, fontSize = 14.sp)
@@ -311,7 +334,7 @@ private fun SportSplitCard(t: Texts, rows: List<ActivityRow>) {
                     val inset = stroke / 2f
                     var start = -90f
                     entries.forEach { (s, v) ->
-                        val sweep = (v / total * 360.0).toFloat()
+                        val sweep = (v / total * 360.0).toFloat() * grow
                         drawArc(
                             color = SPORT_COLORS[s] ?: OTHER_COLOR,
                             startAngle = start,
@@ -363,7 +386,8 @@ private fun AchievementsCard(t: Texts, rows: List<ActivityRow>) {
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 12.dp),
+            .padding(top = 12.dp)
+            .appearIn(4),
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Text(t.achievements, color = Palette.text, fontSize = 14.sp)
@@ -393,11 +417,18 @@ private fun AchievementCell(
 ) {
     val title = achievementTitle(lang, st.id)
     val progress = achievementProgress(t, st)
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { shown = true }
+    val pop by animateFloatAsState(
+        targetValue = if (shown) 1f else 0.6f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "pop",
+    )
     Column(
         modifier = modifier.semantics { contentDescription = "$title $progress" },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Canvas(modifier = Modifier.size(44.dp)) {
+        Canvas(modifier = Modifier.size(44.dp).scale(if (st.unlocked) pop else 1f)) {
             val r = size.minDimension / 2f
             if (st.unlocked) {
                 drawCircle(Palette.accent, radius = r * 0.92f)

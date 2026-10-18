@@ -37,7 +37,15 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -66,6 +74,7 @@ import dev.toufik.trailmark.app.service.RecordingHolder
 import dev.toufik.trailmark.app.service.RecordingService
 import dev.toufik.trailmark.app.service.WeatherHolder
 import dev.toufik.trailmark.app.ui.MediaMark
+import dev.toufik.trailmark.app.ui.Motion
 import dev.toufik.trailmark.app.ui.PhotoViewer
 import dev.toufik.trailmark.app.ui.TrailmarkMap
 import dev.toufik.trailmark.app.ui.WeatherChip
@@ -433,9 +442,24 @@ fun RecordingScreen(
                         .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 10.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                val paceText = if (state.distanceM < 50) "--:--"
-                else formatPace((state.elapsedNanos / 1e9) / (state.distanceM / 1000))
-                val speedText = state.currentSpeedMps?.let { "%.1f".format(it * 3.6) } ?: "--"
+                val elapsedAnim by animateFloatAsState(
+                    targetValue = (state.elapsedNanos / 1e9).toFloat(),
+                    animationSpec = tween(Motion.MED, easing = Motion.EaseOut),
+                    label = "elapsed",
+                )
+                val distAnim by animateFloatAsState(
+                    targetValue = state.distanceM.toFloat(),
+                    animationSpec = tween(Motion.MED, easing = Motion.EaseOut),
+                    label = "distance",
+                )
+                val speedAnim by animateFloatAsState(
+                    targetValue = (state.currentSpeedMps ?: 0.0).toFloat(),
+                    animationSpec = tween(500, easing = Motion.EaseOut),
+                    label = "speed",
+                )
+                val paceText = if (distAnim < 50) "--:--"
+                else formatPace(elapsedAnim.toDouble() / (distAnim / 1000.0))
+                val speedText = if (state.currentSpeedMps == null) "--" else "%.1f".format(speedAnim * 3.6)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -444,12 +468,12 @@ fun RecordingScreen(
                         modifier = Modifier.weight(1f),
                         horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally),
                     ) {
-                        StatCell(formatDuration(state.elapsedNanos), t.time)
+                        StatCell(formatDuration((elapsedAnim * 1e9).toLong()), t.time)
                         StatCell(
-                            formatDistance(state.distanceM),
+                            formatDistance(distAnim.toDouble()),
                             t.km,
                             accent = true,
-                            desc = "${formatDistance(state.distanceM)} ${t.km}",
+                            desc = "${formatDistance(distAnim.toDouble())} ${t.km}",
                         )
                     }
                     val startAction = {
@@ -587,9 +611,26 @@ private fun RoundRecordButton(
     val iconTint = if (phase == Phase.STARTING) Palette.text else Color.White
     var holdFrac by remember { mutableStateOf(0f) }
     val scope = rememberCoroutineScope()
-    Box(
-        modifier = modifier
-            .size(56.dp)
+    val active = phase == Phase.RECORDING || phase == Phase.PAUSED
+    val pulseTransition = rememberInfiniteTransition(label = "record-pulse")
+    val pulse by pulseTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1600, easing = LinearEasing), RepeatMode.Reverse),
+        label = "pulse",
+    )
+    Box(modifier = modifier.size(56.dp)) {
+        if (active) {
+            Canvas(modifier = Modifier.matchParentSize().scale(1.5f)) {
+                drawCircle(
+                    color = Palette.danger.copy(alpha = 0.10f + 0.16f * pulse),
+                    radius = size.minDimension / 2f,
+                )
+            }
+        }
+        Box(
+        modifier = Modifier
+            .fillMaxSize()
             .clip(CircleShape)
             .background(background)
             .pointerInput(phase) {
@@ -683,6 +724,7 @@ private fun RoundRecordButton(
                     )
                 }
             }
+        }
         }
     }
 }
