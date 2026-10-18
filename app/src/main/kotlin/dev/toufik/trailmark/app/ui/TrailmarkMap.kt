@@ -205,10 +205,10 @@ private fun frameIconExpr(sport: Sport): Expression {
     return Expression.raw(sb.toString())
 }
 
-@Composable
 /** A media capture pinned to the map; idx points back into the caller's media list. */
 data class MediaMark(val idx: Int, val lat: Double?, val lon: Double?, val kind: String)
 
+@Composable
 fun TrailmarkMap(
     points: List<StoredPoint>,
     modifier: Modifier = Modifier,
