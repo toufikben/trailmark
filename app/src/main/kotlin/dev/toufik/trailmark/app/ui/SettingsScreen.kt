@@ -2,8 +2,12 @@ package dev.toufik.trailmark.app.ui
 
 import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -13,8 +17,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -46,26 +51,14 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
         ) {
             Text(t.tabSettings, color = Palette.text, fontSize = 22.sp)
             Spacer(Modifier.height(24.dp))
             Text(t.language, color = Palette.textSecondary, fontSize = 13.sp)
             Spacer(Modifier.height(8.dp))
-            Pill {
-                Lang.entries.forEach { l ->
-                    TextButton(
-                        onClick = { onLang(l) },
-                        modifier = Modifier.heightIn(min = 44.dp).width(64.dp),
-                    ) {
-                        Text(
-                            l.code.uppercase(),
-                            color = if (l == lang) Palette.accent else Palette.textSecondary,
-                            fontSize = 13.sp,
-                        )
-                    }
-                }
-            }
+            LanguagePicker(lang, onLang)
             Spacer(Modifier.height(24.dp))
             Text(t.mapTheme, color = Palette.textSecondary, fontSize = 13.sp)
             Spacer(Modifier.height(8.dp))
@@ -110,6 +103,35 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit) {
 private fun appVersion(context: Context): String = runCatching {
     context.packageManager.getPackageInfo(context.packageName, 0).versionName
 }.getOrNull() ?: "-"
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun LanguagePicker(lang: Lang, onLang: (Lang) -> Unit) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Lang.entries.forEach { l ->
+            val selected = l == lang
+            Surface(
+                color = if (selected) Palette.accent else Palette.surface,
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier
+                    .clickable { onLang(l) }
+                    .heightIn(min = 40.dp),
+            ) {
+                Box(modifier = Modifier.padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
+                    Text(
+                        l.label,
+                        color = if (selected) Palette.bg else Palette.textSecondary,
+                        fontSize = 14.sp,
+                    )
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun Pill(content: @Composable RowScope.() -> Unit) {

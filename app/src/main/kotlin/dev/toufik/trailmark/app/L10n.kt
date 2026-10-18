@@ -2,7 +2,24 @@ package dev.toufik.trailmark.app
 
 import androidx.compose.runtime.compositionLocalOf
 
-enum class Lang(val code: String, val rtl: Boolean) { AR("ar", true), FR("fr", false), EN("en", false) }
+enum class Lang(val code: String, val rtl: Boolean, val label: String) {
+    AR("ar", true, "العربية"),
+    EN("en", false, "English"),
+    FR("fr", false, "Français"),
+    ES("es", false, "Español"),
+    PT("pt", false, "Português"),
+    DE("de", false, "Deutsch"),
+    IT("it", false, "Italiano"),
+    NL("nl", false, "Nederlands"),
+    PL("pl", false, "Polski"),
+    RU("ru", false, "Русский"),
+    TR("tr", false, "Türkçe"),
+    ID("id", false, "Bahasa Indonesia"),
+    HI("hi", false, "हिन्दी"),
+    JA("ja", false, "日本語"),
+    KO("ko", false, "한국어"),
+    ZH("zh", false, "中文"),
+}
 
 /** Every user-visible string, in one place, per locale. */
 data class Texts(
@@ -425,75 +442,108 @@ val EN_TEXTS = Texts(
     wStorm = "Storm",
 )
 
-fun textsFor(lang: Lang): Texts = when (lang) {
-    Lang.AR -> AR_TEXTS
-    Lang.FR -> FR_TEXTS
-    Lang.EN -> EN_TEXTS
-}
+val AR_ACH = mapOf(
+    "first" to "أول خطوة",
+    "dist_10" to "10 كم",
+    "dist_50" to "50 كم",
+    "dist_100" to "100 كم",
+    "dist_250" to "250 كم",
+    "dist_500" to "500 كم",
+    "dist_1000" to "1000 كم",
+    "single_5" to "نزهة 5 كم",
+    "single_10" to "10 كم متواصلة",
+    "single_21" to "نصف ماراثون",
+    "single_42" to "ماراثون",
+    "count_10" to "10 أنشطة",
+    "count_25" to "25 نشاطاً",
+    "count_50" to "50 نشاطاً",
+    "count_100" to "100 نشاط",
+    "streak_3" to "3 أيام متتالية",
+    "streak_7" to "7 أيام متتالية",
+)
+
+val FR_ACH = mapOf(
+    "first" to "Premier pas",
+    "dist_10" to "10 km",
+    "dist_50" to "50 km",
+    "dist_100" to "100 km",
+    "dist_250" to "250 km",
+    "dist_500" to "500 km",
+    "dist_1000" to "1000 km",
+    "single_5" to "Sortie 5 km",
+    "single_10" to "10 km d'un coup",
+    "single_21" to "Semi-marathon",
+    "single_42" to "Marathon",
+    "count_10" to "10 activités",
+    "count_25" to "25 activités",
+    "count_50" to "50 activités",
+    "count_100" to "100 activités",
+    "streak_3" to "3 jours d'affilée",
+    "streak_7" to "7 jours d'affilée",
+)
+
+val EN_ACH = mapOf(
+    "first" to "First step",
+    "dist_10" to "10 km",
+    "dist_50" to "50 km",
+    "dist_100" to "100 km",
+    "dist_250" to "250 km",
+    "dist_500" to "500 km",
+    "dist_1000" to "1000 km",
+    "single_5" to "5 km outing",
+    "single_10" to "10 km in one go",
+    "single_21" to "Half marathon",
+    "single_42" to "Marathon",
+    "count_10" to "10 activities",
+    "count_25" to "25 activities",
+    "count_50" to "50 activities",
+    "count_100" to "100 activities",
+    "streak_3" to "3-day streak",
+    "streak_7" to "7-day streak",
+)
+
+private val ALL_TEXTS = mapOf(
+    Lang.AR to AR_TEXTS,
+    Lang.EN to EN_TEXTS,
+    Lang.FR to FR_TEXTS,
+    Lang.ES to ES_TEXTS,
+    Lang.PT to PT_TEXTS,
+    Lang.DE to DE_TEXTS,
+    Lang.IT to IT_TEXTS,
+    Lang.NL to NL_TEXTS,
+    Lang.PL to PL_TEXTS,
+    Lang.RU to RU_TEXTS,
+    Lang.TR to TR_TEXTS,
+    Lang.ID to ID_TEXTS,
+    Lang.HI to HI_TEXTS,
+    Lang.JA to JA_TEXTS,
+    Lang.KO to KO_TEXTS,
+    Lang.ZH to ZH_TEXTS,
+)
+
+private val ACHIEVEMENT_TITLES = mapOf(
+    Lang.AR to AR_ACH,
+    Lang.EN to EN_ACH,
+    Lang.FR to FR_ACH,
+    Lang.ES to ES_ACH,
+    Lang.PT to PT_ACH,
+    Lang.DE to DE_ACH,
+    Lang.IT to IT_ACH,
+    Lang.NL to NL_ACH,
+    Lang.PL to PL_ACH,
+    Lang.RU to RU_ACH,
+    Lang.TR to TR_ACH,
+    Lang.ID to ID_ACH,
+    Lang.HI to HI_ACH,
+    Lang.JA to JA_ACH,
+    Lang.KO to KO_ACH,
+    Lang.ZH to ZH_ACH,
+)
+
+fun textsFor(lang: Lang): Texts = ALL_TEXTS.getValue(lang)
 
 /** Localized short title for an achievement id from the analytics rules. */
-fun achievementTitle(lang: Lang, id: String): String = when (lang) {
-    Lang.AR -> when (id) {
-        "first" -> "أول خطوة"
-        "dist_10" -> "10 كم"
-        "dist_50" -> "50 كم"
-        "dist_100" -> "100 كم"
-        "dist_250" -> "250 كم"
-        "dist_500" -> "500 كم"
-        "dist_1000" -> "1000 كم"
-        "single_5" -> "نزهة 5 كم"
-        "single_10" -> "10 كم متواصلة"
-        "single_21" -> "نصف ماراثون"
-        "single_42" -> "ماراثون"
-        "count_10" -> "10 أنشطة"
-        "count_25" -> "25 نشاطاً"
-        "count_50" -> "50 نشاطاً"
-        "count_100" -> "100 نشاط"
-        "streak_3" -> "3 أيام متتالية"
-        "streak_7" -> "7 أيام متتالية"
-        else -> id
-    }
-    Lang.FR -> when (id) {
-        "first" -> "Premier pas"
-        "dist_10" -> "10 km"
-        "dist_50" -> "50 km"
-        "dist_100" -> "100 km"
-        "dist_250" -> "250 km"
-        "dist_500" -> "500 km"
-        "dist_1000" -> "1000 km"
-        "single_5" -> "Sortie 5 km"
-        "single_10" -> "10 km d'un coup"
-        "single_21" -> "Semi-marathon"
-        "single_42" -> "Marathon"
-        "count_10" -> "10 activités"
-        "count_25" -> "25 activités"
-        "count_50" -> "50 activités"
-        "count_100" -> "100 activités"
-        "streak_3" -> "3 jours d'affilée"
-        "streak_7" -> "7 jours d'affilée"
-        else -> id
-    }
-    Lang.EN -> when (id) {
-        "first" -> "First step"
-        "dist_10" -> "10 km"
-        "dist_50" -> "50 km"
-        "dist_100" -> "100 km"
-        "dist_250" -> "250 km"
-        "dist_500" -> "500 km"
-        "dist_1000" -> "1000 km"
-        "single_5" -> "5 km outing"
-        "single_10" -> "10 km in one go"
-        "single_21" -> "Half marathon"
-        "single_42" -> "Marathon"
-        "count_10" -> "10 activities"
-        "count_25" -> "25 activities"
-        "count_50" -> "50 activities"
-        "count_100" -> "100 activities"
-        "streak_3" -> "3-day streak"
-        "streak_7" -> "7-day streak"
-        else -> id
-    }
-}
+fun achievementTitle(lang: Lang, id: String): String = ACHIEVEMENT_TITLES[lang]?.get(id) ?: id
 
 val LocalTexts = compositionLocalOf { AR_TEXTS }
 val LocalLang = compositionLocalOf { Lang.AR }
