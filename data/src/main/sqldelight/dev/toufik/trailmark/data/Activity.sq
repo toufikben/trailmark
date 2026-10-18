@@ -44,6 +44,21 @@ CREATE TABLE app_flag (
   value INTEGER NOT NULL
 );
 
+CREATE TABLE media (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  activity_id INTEGER NOT NULL REFERENCES activity(id),
+  kind TEXT NOT NULL,
+  file_path TEXT NOT NULL,
+  lat REAL,
+  lon REAL,
+  bearing_deg REAL,
+  distance_m REAL NOT NULL DEFAULT 0,
+  elapsed_nanos INTEGER NOT NULL DEFAULT 0,
+  created_wall_millis INTEGER NOT NULL,
+  duration_ms INTEGER,
+  caption TEXT
+);
+
 insertActivity:
 INSERT INTO activity(uuid, sport, start_wall_millis) VALUES (?, ?, ?);
 
@@ -84,3 +99,13 @@ SELECT value FROM app_flag WHERE key = ? LIMIT 1;
 
 setFlag:
 INSERT OR REPLACE INTO app_flag(key, value) VALUES (?, ?);
+
+insertMedia:
+INSERT INTO media(activity_id, kind, file_path, lat, lon, bearing_deg, distance_m, elapsed_nanos, created_wall_millis, duration_ms, caption)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+listMedia:
+SELECT * FROM media WHERE activity_id = ? ORDER BY elapsed_nanos ASC, id ASC;
+
+deleteMedia:
+DELETE FROM media WHERE id = ?;

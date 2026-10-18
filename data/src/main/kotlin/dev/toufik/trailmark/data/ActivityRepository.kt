@@ -29,6 +29,22 @@ class ActivityRow(
     val isOpen: Boolean,
 )
 
+/** One captured media item pinned to a place and a moment along the route. */
+class MediaRow(
+    val id: Long,
+    val activityId: Long,
+    val kind: String,
+    val filePath: String,
+    val lat: Double?,
+    val lon: Double?,
+    val bearingDeg: Double?,
+    val distanceM: Double,
+    val elapsedNanos: Long,
+    val createdWallMillis: Long,
+    val durationMs: Long?,
+    val caption: String?,
+)
+
 /**
  * The write/read boundary. Every point is durable before the next arrives; the
  * checkpoint maps the unmeasured 1σ to SQL NULL and back to the sentinel, so a
@@ -152,7 +168,7 @@ class ActivityRepository(private val db: TrailmarkDb) {
     }
 
     fun loadPoints(activityId: Long): List<StoredPoint> =
-        q.selectPoints(activityId).executeAsList().map { p ->
+        q.selectPoints(activity_id = activityId).executeAsList().map { p ->
             StoredPoint(
                 lat = p.lat,
                 lon = p.lon,
@@ -164,6 +180,57 @@ class ActivityRepository(private val db: TrailmarkDb) {
                 bearingDeg = p.bearing_deg,
             )
         }
+
+    fun insertMedia(
+        activityId: Long,
+        kind: String,
+        filePath: String,
+        lat: Double?,
+        lon: Double?,
+        bearingDeg: Double?,
+        distanceM: Double,
+        elapsedNanos: Long,
+        createdWallMillis: Long,
+        durationMs: Long?,
+        caption: String?,
+    ): Long {
+        q.insertMedia(
+            activity_id = activityId,
+            kind = kind,
+            file_path = filePath,
+            lat = lat,
+            lon = lon,
+            bearing_deg = bearingDeg,
+            distance_m = distanceM,
+            elapsed_nanos = elapsedNanos,
+            created_wall_millis = createdWallMillis,
+            duration_ms = durationMs,
+            caption = caption,
+        )
+        return q.lastId().executeAsOne()
+    }
+
+    fun listMedia(activityId: Long): List<MediaRow> =
+        q.listMedia(activity_id = activityId).executeAsList().map { m ->
+            MediaRow(
+                id = m.id,
+                activityId = m.activity_id,
+                kind = m.kind,
+                filePath = m.file_path,
+                lat = m.lat,
+                lon = m.lon,
+                bearingDeg = m.bearing_deg,
+                distanceM = m.distance_m,
+                elapsedNanos = m.elapsed_nanos,
+                createdWallMillis = m.created_wall_millis,
+                durationMs = m.duration_ms,
+                caption = m.caption,
+            )
+        }
+
+    fun deleteMedia(id: Long) {
+        q.deleteMedia(id = id)
+    }
 
     fun flag(key: String, default: Boolean = false): Boolean =
         (q.getFlag(key).executeAsOneOrNull())?.let { it != 0L } ?: default

@@ -92,4 +92,44 @@ class ActivityRepositoryTest {
         repo.setFlag(ONBOARDED_FLAG, true)
         assertTrue(repo.flag(ONBOARDED_FLAG))
     }
+
+    @Test
+    fun mediaRoundTripsInRouteOrder() {
+        val id = repo.insertActivity("m1", "HIKE", 1000)
+        val photoId = repo.insertMedia(
+            activityId = id,
+            kind = "PHOTO",
+            filePath = "/data/media/p1.jpg",
+            lat = 36.75,
+            lon = 3.18,
+            bearingDeg = 90.0,
+            distanceM = 1200.0,
+            elapsedNanos = 600_000_000_000L,
+            createdWallMillis = 2000,
+            durationMs = null,
+            caption = "viewpoint",
+        )
+        repo.insertMedia(id, "VIDEO", "/data/media/v1.mp4", null, null, null, 300.0, 120_000_000_000L, 1500, 8000, null)
+        val rows = repo.listMedia(id)
+        assertEquals(2, rows.size)
+        assertEquals("VIDEO", rows[0].kind)
+        assertEquals("PHOTO", rows[1].kind)
+        assertEquals(photoId, rows[1].id)
+        assertEquals(1200.0, rows[1].distanceM, 1e-9)
+        assertEquals("viewpoint", rows[1].caption)
+        assertNull(rows[0].lat)
+        assertEquals(8000L, rows[0].durationMs)
+    }
+
+    @Test
+    fun mediaIsScopedToItsActivityAndDeletable() {
+        val a = repo.insertActivity("m2", "RUN", 1)
+        val b = repo.insertActivity("m3", "RUN", 2)
+        val mediaId = repo.insertMedia(a, "PHOTO", "/p.jpg", null, null, null, 0.0, 0L, 1, null, null)
+        repo.insertMedia(b, "PHOTO", "/q.jpg", null, null, null, 0.0, 0L, 1, null, null)
+        assertEquals(1, repo.listMedia(a).size)
+        repo.deleteMedia(mediaId)
+        assertTrue(repo.listMedia(a).isEmpty())
+        assertEquals(1, repo.listMedia(b).size)
+    }
 }

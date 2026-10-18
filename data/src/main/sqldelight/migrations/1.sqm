@@ -1,0 +1,14 @@
+CREATE TABLE media (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  activity_id INTEGER NOT NULL REFERENCES activity(id),
+  kind TEXT NOT NULL,
+  file_path TEXT NOT NULL,
+  lat REAL,
+  lon REAL,
+  bearing_deg REAL,
+  distance_m REAL NOT NULL DEFAULT 0,
+  elapsed_nanos INTEGER NOT NULL DEFAULT 0,
+  created_wall_millis INTEGER NOT NULL,
+  duration_ms INTEGER,
+  caption TEXT
+);
