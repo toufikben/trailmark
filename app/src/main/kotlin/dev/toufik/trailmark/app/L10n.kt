@@ -94,6 +94,7 @@ data class Texts(
     val progressLast12Weeks: String,
     val progressBestWeek: String,
     val progressBySport: String,
+    val achievements: String,
 )
 
 /** Arabic (RTL) — the app's first language. */
@@ -186,6 +187,7 @@ val AR_TEXTS = Texts(
     progressLast12Weeks = "آخر 12 أسبوعاً",
     progressBestWeek = "أفضل أسبوع",
     progressBySport = "حسب الرياضة",
+    achievements = "الإنجازات",
 )
 val FR_TEXTS = Texts(
     appName = "Trailmark",
@@ -276,6 +278,7 @@ val FR_TEXTS = Texts(
     progressLast12Weeks = "12 dernières semaines",
     progressBestWeek = "Meilleure semaine",
     progressBySport = "Par sport",
+    achievements = "Succès",
 )
 
 val EN_TEXTS = Texts(
@@ -367,12 +370,77 @@ val EN_TEXTS = Texts(
     progressLast12Weeks = "Last 12 weeks",
     progressBestWeek = "Best week",
     progressBySport = "By sport",
+    achievements = "Achievements",
 )
 
 fun textsFor(lang: Lang): Texts = when (lang) {
     Lang.AR -> AR_TEXTS
     Lang.FR -> FR_TEXTS
     Lang.EN -> EN_TEXTS
+}
+
+/** Localized short title for an achievement id from the analytics rules. */
+fun achievementTitle(lang: Lang, id: String): String = when (lang) {
+    Lang.AR -> when (id) {
+        "first" -> "أول خطوة"
+        "dist_10" -> "10 كم"
+        "dist_50" -> "50 كم"
+        "dist_100" -> "100 كم"
+        "dist_250" -> "250 كم"
+        "dist_500" -> "500 كم"
+        "dist_1000" -> "1000 كم"
+        "single_5" -> "نزهة 5 كم"
+        "single_10" -> "10 كم متواصلة"
+        "single_21" -> "نصف ماراثون"
+        "single_42" -> "ماراثون"
+        "count_10" -> "10 أنشطة"
+        "count_25" -> "25 نشاطاً"
+        "count_50" -> "50 نشاطاً"
+        "count_100" -> "100 نشاط"
+        "streak_3" -> "3 أيام متتالية"
+        "streak_7" -> "7 أيام متتالية"
+        else -> id
+    }
+    Lang.FR -> when (id) {
+        "first" -> "Premier pas"
+        "dist_10" -> "10 km"
+        "dist_50" -> "50 km"
+        "dist_100" -> "100 km"
+        "dist_250" -> "250 km"
+        "dist_500" -> "500 km"
+        "dist_1000" -> "1000 km"
+        "single_5" -> "Sortie 5 km"
+        "single_10" -> "10 km d'un coup"
+        "single_21" -> "Semi-marathon"
+        "single_42" -> "Marathon"
+        "count_10" -> "10 activités"
+        "count_25" -> "25 activités"
+        "count_50" -> "50 activités"
+        "count_100" -> "100 activités"
+        "streak_3" -> "3 jours d'affilée"
+        "streak_7" -> "7 jours d'affilée"
+        else -> id
+    }
+    Lang.EN -> when (id) {
+        "first" -> "First step"
+        "dist_10" -> "10 km"
+        "dist_50" -> "50 km"
+        "dist_100" -> "100 km"
+        "dist_250" -> "250 km"
+        "dist_500" -> "500 km"
+        "dist_1000" -> "1000 km"
+        "single_5" -> "5 km outing"
+        "single_10" -> "10 km in one go"
+        "single_21" -> "Half marathon"
+        "single_42" -> "Marathon"
+        "count_10" -> "10 activities"
+        "count_25" -> "25 activities"
+        "count_50" -> "50 activities"
+        "count_100" -> "100 activities"
+        "streak_3" -> "3-day streak"
+        "streak_7" -> "7-day streak"
+        else -> id
+    }
 }
 
 val LocalTexts = compositionLocalOf { AR_TEXTS }

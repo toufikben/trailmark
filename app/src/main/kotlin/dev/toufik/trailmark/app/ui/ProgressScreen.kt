@@ -32,16 +32,25 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.toufik.trailmark.analytics.ActivityStat
+import dev.toufik.trailmark.analytics.AchievementState
+import dev.toufik.trailmark.analytics.evaluateAchievements
 import dev.toufik.trailmark.app.AppGraph
+import dev.toufik.trailmark.app.LocalLang
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.Texts
+import dev.toufik.trailmark.app.achievementTitle
 import dev.toufik.trailmark.app.formatDistance
 import dev.toufik.trailmark.app.formatDuration
 import dev.toufik.trailmark.data.ActivityRow
@@ -121,6 +130,7 @@ fun ProgressScreen() {
                             SummaryRow(t, filtered)
                             WeeklyCard(t, filtered)
                             if (sport == null) SportSplitCard(t, list)
+                            AchievementsCard(t, list)
                         }
                         Spacer(Modifier.height(12.dp))
                     }
@@ -343,6 +353,112 @@ private fun SportSplitCard(t: Texts, rows: List<ActivityRow>) {
         }
     }
 }
+
+@Composable
+private fun AchievementsCard(t: Texts, rows: List<ActivityRow>) {
+    val lang = LocalLang.current
+    val states = evaluateAchievements(rows.map { ActivityStat(it.startWallMillis, it.distanceM) })
+    Surface(
+        color = Palette.surface,
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp),
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Text(t.achievements, color = Palette.text, fontSize = 14.sp)
+            states.chunked(3).forEach { rowStates ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    rowStates.forEach { st ->
+                        AchievementCell(lang, t, st, modifier = Modifier.weight(1f))
+                    }
+                    repeat(3 - rowStates.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AchievementCell(
+    lang: dev.toufik.trailmark.app.Lang,
+    t: Texts,
+    st: AchievementState,
+    modifier: Modifier = Modifier,
+) {
+    val title = achievementTitle(lang, st.id)
+    val progress = achievementProgress(t, st)
+    Column(
+        modifier = modifier.semantics { contentDescription = "$title $progress" },
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Canvas(modifier = Modifier.size(44.dp)) {
+            val r = size.minDimension / 2f
+            if (st.unlocked) {
+                drawCircle(Palette.accent, radius = r * 0.92f)
+                val p = Path().apply {
+                    moveTo(r * 0.56f, r * 1.06f)
+                    lineTo(r * 0.90f, r * 1.36f)
+                    lineTo(r * 1.46f, r * 0.72f)
+                }
+                drawPath(
+                    p,
+                    color = Palette.bg,
+                    style = Stroke(
+                        width = r * 0.20f,
+                        cap = StrokeCap.Round,
+                        join = StrokeJoin.Round,
+                    ),
+                )
+            } else {
+                val rr = r * 0.92f
+                drawCircle(
+                    color = Palette.textSecondary.copy(alpha = 0.30f),
+                    radius = rr,
+                    style = Stroke(width = r * 0.13f),
+                )
+                val frac = (st.current / st.target).toFloat().coerceIn(0f, 1f)
+                if (frac > 0f) {
+                    drawArc(
+                        color = Palette.accent.copy(alpha = 0.85f),
+                        startAngle = -90f,
+                        sweepAngle = 360f * frac,
+                        useCenter = false,
+                        topLeft = Offset(r - rr, r - rr),
+                        size = Size(rr * 2f, rr * 2f),
+                        style = Stroke(width = r * 0.13f, cap = StrokeCap.Round),
+                    )
+                }
+            }
+        }
+        Text(
+            title,
+            color = if (st.unlocked) Palette.text else Palette.textSecondary,
+            fontSize = 10.sp,
+            maxLines = 2,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        Text(
+            progress,
+            color = Palette.textSecondary,
+            fontSize = 9.sp,
+            maxLines = 1,
+        )
+    }
+}
+
+private fun achievementProgress(t: Texts, st: AchievementState): String =
+    if (st.id.startsWith("dist_") || st.id.startsWith("single_")) {
+        "${(st.current / 1000).toInt()}/${(st.target / 1000).toInt()} ${t.km}"
+    } else {
+        "${st.current.toInt()}/${st.target.toInt()}"
+    }
 
 private fun totalsSince(rows: List<ActivityRow>, fromMillis: Long): Totals {
     val out = Totals()
