@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -284,7 +285,7 @@ fun RecordingScreen(
                         Lang.entries.forEach { l ->
                             TextButton(
                                 onClick = { onLang(l) },
-                                modifier = Modifier.heightIn(min = 44.dp),
+                                modifier = Modifier.heightIn(min = 44.dp).width(44.dp),
                             ) {
                                 Text(
                                     l.code.uppercase(),
