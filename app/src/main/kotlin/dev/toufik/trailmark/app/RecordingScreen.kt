@@ -18,18 +18,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Place
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -47,13 +40,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -122,16 +113,11 @@ private fun qualityLabel(t: Texts, q: GpsQuality): String = when (q) {
 
 @Composable
 fun RecordingScreen(
-    onHistory: () -> Unit,
-    onRegions: () -> Unit,
-    onPlan: () -> Unit,
     onOpenDetail: (Long) -> Unit,
-    lang: Lang,
-    onLang: (Lang) -> Unit,
 ) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("trailmark", Context.MODE_PRIVATE) }
-    var darkMap by remember { mutableStateOf(prefs.getBoolean("map_dark", true)) }
+    val darkMap = remember { prefs.getBoolean("map_dark", true) }
     val t = LocalTexts.current
     val state by RecordingHolder.state.collectAsState()
     val packPath = remember { MapPacks.installedMapPack(context)?.absolutePath }
@@ -248,7 +234,7 @@ fun RecordingScreen(
     ) { }
 
     Surface(color = Palette.bg, modifier = Modifier.fillMaxSize()) {
-        Box(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
+        Box(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -270,106 +256,13 @@ fun RecordingScreen(
                     dark = darkMap,
                     modifier = Modifier.fillMaxSize(),
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(24.dp))
-                            .background(Palette.surface.copy(alpha = 0.85f))
-                            .padding(horizontal = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Lang.entries.forEach { l ->
-                            TextButton(
-                                onClick = { onLang(l) },
-                                modifier = Modifier.heightIn(min = 44.dp).width(44.dp),
-                            ) {
-                                Text(
-                                    l.code.uppercase(),
-                                    color = if (l == lang) Palette.accent else Palette.textSecondary,
-                                    fontSize = 12.sp,
-                                )
-                            }
-                        }
-                    }
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(24.dp))
-                            .background(Palette.surface.copy(alpha = 0.85f)),
-                    ) {
-                        IconButton(onClick = onPlan, modifier = Modifier.size(48.dp)) {
-                            Canvas(Modifier.size(22.dp).semantics { contentDescription = t.plan }) {
-                                val tint = Palette.text
-                                val w = size.width
-                                val h = size.height
-                                val path = Path().apply {
-                                    moveTo(w * 0.08f, h * 0.86f)
-                                    cubicTo(w * 0.35f, h * 0.86f, w * 0.30f, h * 0.40f, w * 0.55f, h * 0.40f)
-                                    cubicTo(w * 0.80f, h * 0.40f, w * 0.70f, h * 0.14f, w * 0.92f, h * 0.14f)
-                                }
-                                drawPath(
-                                    path,
-                                    tint,
-                                    style = Stroke(width = w * 0.10f, cap = StrokeCap.Round),
-                                )
-                                drawCircle(tint, radius = w * 0.11f, center = Offset(w * 0.08f, h * 0.86f))
-                                drawCircle(Palette.accent, radius = w * 0.13f, center = Offset(w * 0.92f, h * 0.14f))
-                            }
-                        }
-                        IconButton(onClick = onHistory, modifier = Modifier.size(48.dp)) {
-                            Icon(Icons.Filled.List, contentDescription = t.history, tint = Palette.text)
-                        }
-                        IconButton(onClick = onRegions, modifier = Modifier.size(48.dp)) {
-                            Icon(Icons.Filled.Place, contentDescription = t.regions, tint = Palette.text)
-                        }
-                        IconButton(
-                            onClick = {
-                                darkMap = !darkMap
-                                prefs.edit().putBoolean("map_dark", darkMap).apply()
-                            },
-                            modifier = Modifier.size(48.dp),
-                        ) {
-                            Canvas(Modifier.size(22.dp).semantics { contentDescription = t.mapTheme }) {
-                                val tint = Palette.text
-                                val cx = size.width / 2f
-                                val cy = size.height / 2f
-                                val r = size.minDimension * 0.20f
-                                if (darkMap) {
-                                    for (i in 0 until 8) {
-                                        rotate(i * 45f) {
-                                            drawLine(
-                                                color = tint,
-                                                start = Offset(cx, cy - r * 1.6f),
-                                                end = Offset(cx, cy - r * 2.35f),
-                                                strokeWidth = r * 0.52f,
-                                                cap = StrokeCap.Round,
-                                            )
-                                        }
-                                    }
-                                    drawCircle(color = tint, radius = r, center = Offset(cx, cy))
-                                } else {
-                                    val o = size.minDimension * 0.42f
-                                    val path = Path().apply {
-                                        arcTo(Rect(cx - o * 1.1f, cy - o, cx + o * 1.1f, cy + o), 90f, 180f, true)
-                                        arcTo(Rect(cx - o * 1.35f, cy - o, cx + o * 0.65f, cy + o), 270f, 180f, false)
-                                        close()
-                                    }
-                                    drawPath(path, tint)
-                                }
-                            }
-                        }
-                    }
-                }
                 Text(
                     text = qualityLabel(t, state.quality),
                     color = Palette.text,
                     fontSize = 12.sp,
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(start = 12.dp, top = 64.dp)
+                        .padding(start = 12.dp, top = 12.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(Palette.surface.copy(alpha = 0.85f))
                         .padding(horizontal = 10.dp, vertical = 6.dp),
@@ -381,7 +274,7 @@ fun RecordingScreen(
                         fontSize = 12.sp,
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .padding(end = 12.dp, top = 64.dp)
+                            .padding(end = 12.dp, top = 12.dp)
                             .clip(RoundedCornerShape(12.dp))
                             .background(Palette.surface.copy(alpha = 0.85f))
                             .padding(horizontal = 10.dp, vertical = 6.dp),

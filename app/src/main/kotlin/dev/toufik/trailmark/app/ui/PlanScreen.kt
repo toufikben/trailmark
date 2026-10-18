@@ -15,12 +15,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -66,7 +66,7 @@ import java.util.Calendar
  * gradient-colored line (red steep, amber mild, gray flat, green downhill).
  */
 @Composable
-fun PlanScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
+fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val t = LocalTexts.current
     val prefs = remember { context.getSharedPreferences("trailmark", Context.MODE_PRIVATE) }
@@ -98,7 +98,7 @@ fun PlanScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     }
 
     Surface(color = Palette.bg, modifier = modifier.fillMaxSize()) {
-        Box(Modifier.fillMaxSize().safeDrawingPadding()) {
+        Box(Modifier.fillMaxSize().statusBarsPadding()) {
             Box(
                 Modifier
                     .fillMaxSize()
@@ -128,18 +128,29 @@ fun PlanScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                             .background(Palette.surface.copy(alpha = 0.85f)),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
-                            Icon(Icons.Filled.ArrowBack, contentDescription = t.back, tint = Palette.text)
-                        }
                         Text(
                             text = t.plan,
                             color = Palette.text,
                             fontSize = 14.sp,
-                            modifier = Modifier.padding(end = 14.dp),
+                            modifier = Modifier.padding(horizontal = 14.dp),
                         )
                     }
                     Spacer(Modifier.weight(1f))
-                    SportPicker(t = t, sport = sport, enabled = true, onPick = { sport = it })
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(Palette.surface.copy(alpha = 0.85f)),
+                        ) {
+                            IconButton(onClick = onRegions, modifier = Modifier.size(48.dp)) {
+                                Icon(Icons.Filled.Place, contentDescription = t.mapRegions, tint = Palette.text)
+                            }
+                        }
+                        SportPicker(t = t, sport = sport, enabled = true, onPick = { sport = it })
+                    }
                 }
             }
 

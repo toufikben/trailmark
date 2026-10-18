@@ -75,6 +75,17 @@ data class Texts(
     val clear: String,
     val directEstimate: String,
     val elevationProfile: String,
+    val tabRecord: String,
+    val tabExplore: String,
+    val tabHistory: String,
+    val tabProgress: String,
+    val tabSettings: String,
+    val themeDark: String,
+    val themeLight: String,
+    val about: String,
+    val version: String,
+    val attribution: String,
+    val progressSoon: String,
 )
 
 /** Arabic (RTL) — the app's first language. */
@@ -148,6 +159,17 @@ val AR_TEXTS = Texts(
     clear = "مسح",
     directEstimate = "تقدير مباشر — لا تتوفر بيانات الطرق والارتفاع",
     elevationProfile = "مقطع الارتفاع",
+    tabRecord = "التسجيل",
+    tabExplore = "استكشف",
+    tabHistory = "السجل",
+    tabProgress = "تقدّمي",
+    tabSettings = "الإعدادات",
+    themeDark = "داكن",
+    themeLight = "فاتح",
+    about = "حول التطبيق",
+    version = "الإصدار",
+    attribution = "بيانات الخرائط © مساهمو OpenStreetMap",
+    progressSoon = "الإحصائيات والمنحنيات والإنجازات قريباً",
 )
 val FR_TEXTS = Texts(
     appName = "Trailmark",
@@ -219,6 +241,17 @@ val FR_TEXTS = Texts(
     clear = "Effacer",
     directEstimate = "Estimation directe — pas de données routières ni d'altitude",
     elevationProfile = "Profil d'altitude",
+    tabRecord = "Démarrer",
+    tabExplore = "Explorer",
+    tabHistory = "Historique",
+    tabProgress = "Progrès",
+    tabSettings = "Réglages",
+    themeDark = "Sombre",
+    themeLight = "Clair",
+    about = "À propos",
+    version = "Version",
+    attribution = "Données cartographiques © contributeurs OpenStreetMap",
+    progressSoon = "Statistiques, graphiques et succès bientôt",
 )
 
 val EN_TEXTS = Texts(
@@ -291,6 +324,17 @@ val EN_TEXTS = Texts(
     clear = "Clear",
     directEstimate = "Straight-line estimate — no road or elevation data",
     elevationProfile = "Elevation profile",
+    tabRecord = "Record",
+    tabExplore = "Explore",
+    tabHistory = "History",
+    tabProgress = "Progress",
+    tabSettings = "Settings",
+    themeDark = "Dark",
+    themeLight = "Light",
+    about = "About",
+    version = "Version",
+    attribution = "Map data © OpenStreetMap contributors",
+    progressSoon = "Stats, charts and achievements coming soon",
 )
 
 fun textsFor(lang: Lang): Texts = when (lang) {
