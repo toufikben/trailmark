@@ -85,7 +85,15 @@ data class Texts(
     val about: String,
     val version: String,
     val attribution: String,
-    val progressSoon: String,
+    val progressWeek: String,
+    val progressMonth: String,
+    val progressAllTime: String,
+    val progressActivities: String,
+    val progressAllSports: String,
+    val progressWeeklyDistance: String,
+    val progressLast12Weeks: String,
+    val progressBestWeek: String,
+    val progressBySport: String,
 )
 
 /** Arabic (RTL) — the app's first language. */
@@ -169,7 +177,15 @@ val AR_TEXTS = Texts(
     about = "حول التطبيق",
     version = "الإصدار",
     attribution = "بيانات الخرائط © مساهمو OpenStreetMap",
-    progressSoon = "الإحصائيات والمنحنيات والإنجازات قريباً",
+    progressWeek = "هذا الأسبوع",
+    progressMonth = "هذا الشهر",
+    progressAllTime = "الإجمالي",
+    progressActivities = "أنشطة",
+    progressAllSports = "الكل",
+    progressWeeklyDistance = "المسافة الأسبوعية",
+    progressLast12Weeks = "آخر 12 أسبوعاً",
+    progressBestWeek = "أفضل أسبوع",
+    progressBySport = "حسب الرياضة",
 )
 val FR_TEXTS = Texts(
     appName = "Trailmark",
@@ -251,7 +267,15 @@ val FR_TEXTS = Texts(
     about = "À propos",
     version = "Version",
     attribution = "Données cartographiques © contributeurs OpenStreetMap",
-    progressSoon = "Statistiques, graphiques et succès bientôt",
+    progressWeek = "Cette semaine",
+    progressMonth = "Ce mois",
+    progressAllTime = "Total",
+    progressActivities = "Activités",
+    progressAllSports = "Tout",
+    progressWeeklyDistance = "Distance hebdomadaire",
+    progressLast12Weeks = "12 dernières semaines",
+    progressBestWeek = "Meilleure semaine",
+    progressBySport = "Par sport",
 )
 
 val EN_TEXTS = Texts(
@@ -334,7 +358,15 @@ val EN_TEXTS = Texts(
     about = "About",
     version = "Version",
     attribution = "Map data © OpenStreetMap contributors",
-    progressSoon = "Stats, charts and achievements coming soon",
+    progressWeek = "This week",
+    progressMonth = "This month",
+    progressAllTime = "All time",
+    progressActivities = "Activities",
+    progressAllSports = "All",
+    progressWeeklyDistance = "Weekly distance",
+    progressLast12Weeks = "Last 12 weeks",
+    progressBestWeek = "Best week",
+    progressBySport = "By sport",
 )
 
 fun textsFor(lang: Lang): Texts = when (lang) {
