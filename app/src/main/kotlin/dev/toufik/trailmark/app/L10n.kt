@@ -100,6 +100,14 @@ data class Texts(
     val photo: String,
     val video: String,
     val mediaSaved: String,
+    val wClear: String,
+    val wPartly: String,
+    val wCloudy: String,
+    val wFog: String,
+    val wDrizzle: String,
+    val wRain: String,
+    val wSnow: String,
+    val wStorm: String,
 )
 
 /** Arabic (RTL) — the app's first language. */
@@ -198,6 +206,14 @@ val AR_TEXTS = Texts(
     photo = "صورة",
     video = "فيديو",
     mediaSaved = "تمّ حفظ الوسائط",
+    wClear = "صافٍ",
+    wPartly = "غائم جزئياً",
+    wCloudy = "غائم",
+    wFog = "ضباب",
+    wDrizzle = "رذاذ",
+    wRain = "مطر",
+    wSnow = "ثلج",
+    wStorm = "عاصفة رعدية",
 )
 val FR_TEXTS = Texts(
     appName = "Trailmark",
@@ -294,6 +310,14 @@ val FR_TEXTS = Texts(
     photo = "Photo",
     video = "Vidéo",
     mediaSaved = "Média enregistré",
+    wClear = "Dégagé",
+    wPartly = "Partiellement nuageux",
+    wCloudy = "Nuageux",
+    wFog = "Brouillard",
+    wDrizzle = "Bruine",
+    wRain = "Pluie",
+    wSnow = "Neige",
+    wStorm = "Orage",
 )
 
 val EN_TEXTS = Texts(
@@ -391,6 +415,14 @@ val EN_TEXTS = Texts(
     photo = "Photo",
     video = "Video",
     mediaSaved = "Media saved",
+    wClear = "Clear",
+    wPartly = "Partly cloudy",
+    wCloudy = "Cloudy",
+    wFog = "Fog",
+    wDrizzle = "Drizzle",
+    wRain = "Rain",
+    wSnow = "Snow",
+    wStorm = "Storm",
 )
 
 fun textsFor(lang: Lang): Texts = when (lang) {

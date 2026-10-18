@@ -52,6 +52,7 @@ class RecordingService : Service() {
 
     private fun startRecording(intent: Intent) {
         if (controller != null) return
+        WeatherHolder.update(null)
         createChannel()
         val synthetic = intent.getBooleanExtra(EXTRA_SYNTHETIC, false)
         ServiceCompat.startForeground(
@@ -86,8 +87,23 @@ class RecordingService : Service() {
 
     private fun stopRecording() {
         val c = controller
+        val repo = dev.toufik.trailmark.app.AppGraph.repository(this)
         scope.launch {
             c?.stop()
+            val finished = c?.state?.value?.lastActivityId
+            val weather = WeatherHolder.state.value
+            if (finished != null && weather != null) {
+                runCatching {
+                    repo.setWeather(
+                        activityId = finished,
+                        tempC = weather.tempC,
+                        windKmh = weather.windKmh,
+                        windDeg = weather.windDeg,
+                        code = weather.code,
+                    )
+                }
+            }
+            WeatherHolder.update(null)
             RecordingHolder.update(RecordingState())
             stateJob?.cancel()
             controller = null

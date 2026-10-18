@@ -56,6 +56,7 @@ import dev.toufik.trailmark.analytics.ReplayTrack
 import dev.toufik.trailmark.app.AppGraph
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
+import dev.toufik.trailmark.app.WeatherNow
 import dev.toufik.trailmark.app.formatDistance
 import dev.toufik.trailmark.app.formatDuration
 import dev.toufik.trailmark.app.formatPace
@@ -151,6 +152,15 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                             color = Palette.textSecondary,
                             fontSize = 14.sp,
                         )
+                    }
+                    val wTemp = d.row.weatherTempC
+                    val wWind = d.row.weatherWindKmh
+                    val wDeg = d.row.weatherWindDeg
+                    val wCode = d.row.weatherCode
+                    if (wTemp != null && wWind != null && wDeg != null && wCode != null) {
+                        Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                            WeatherChip(t = t, w = WeatherNow(wTemp, wWind, wDeg.toInt(), wCode.toInt()))
+                        }
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                         TextButton(onClick = {

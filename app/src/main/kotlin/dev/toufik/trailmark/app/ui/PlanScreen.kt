@@ -47,6 +47,8 @@ import androidx.compose.ui.unit.sp
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.SportPicker
+import dev.toufik.trailmark.app.WeatherNow
+import dev.toufik.trailmark.app.WeatherService
 import dev.toufik.trailmark.app.formatDistance
 import dev.toufik.trailmark.app.formatDuration
 import dev.toufik.trailmark.app.maps.MapPacks
@@ -79,6 +81,7 @@ fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
     var anchor by remember { mutableStateOf<StoredPoint?>(null) }
     var plan by remember { mutableStateOf<PlannedRoute?>(null) }
     var loading by remember { mutableStateOf(false) }
+    var destWeather by remember { mutableStateOf<WeatherNow?>(null) }
     var cardH by remember { mutableStateOf(0.dp) }
     val density = LocalDensity.current
 
@@ -99,6 +102,15 @@ fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
             RoutePlanner.plan(a.lat, a.lon, d.first, d.second, sport)
         }
         loading = false
+    }
+
+    LaunchedEffect(dest) {
+        val d = dest
+        if (d == null) {
+            destWeather = null
+            return@LaunchedEffect
+        }
+        destWeather = WeatherService.at(d.first, d.second)
     }
 
     Surface(color = Palette.bg, modifier = modifier.fillMaxSize()) {
@@ -213,6 +225,10 @@ fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
                                 PlanStat("↑ ${p.ascentM.toInt()} ${t.metre}", t.elevation)
                                 PlanStat("↓ ${p.descentM.toInt()} ${t.metre}", t.descent)
                                 PlanStat("%.0f%%".format(maxAbsGradePercent(p.chunks)), t.maxGrade)
+                            }
+                            destWeather?.let { w ->
+                                Spacer(Modifier.height(10.dp))
+                                WeatherChip(t = t, w = w)
                             }
                             if (p.direct) {
                                 Spacer(Modifier.height(10.dp))

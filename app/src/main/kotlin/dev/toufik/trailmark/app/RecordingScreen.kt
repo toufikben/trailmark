@@ -59,12 +59,16 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import dev.toufik.trailmark.analytics.Ghost
 import dev.toufik.trailmark.analytics.ghostDeltaM
+import dev.toufik.trailmark.app.WeatherNow
+import dev.toufik.trailmark.app.WeatherService
 import dev.toufik.trailmark.app.maps.MapPacks
 import dev.toufik.trailmark.app.service.RecordingHolder
 import dev.toufik.trailmark.app.service.RecordingService
+import dev.toufik.trailmark.app.service.WeatherHolder
 import dev.toufik.trailmark.app.ui.MediaMark
 import dev.toufik.trailmark.app.ui.PhotoViewer
 import dev.toufik.trailmark.app.ui.TrailmarkMap
+import dev.toufik.trailmark.app.ui.WeatherChip
 import dev.toufik.trailmark.app.ui.openVideoPlayer
 import dev.toufik.trailmark.coach.Coach
 import dev.toufik.trailmark.coach.CoachEvent
@@ -136,6 +140,7 @@ fun RecordingScreen(
     var media by remember { mutableStateOf<List<MediaRow>>(emptyList()) }
     var viewerMedia by remember { mutableStateOf<MediaRow?>(null) }
     var coachLine by remember { mutableStateOf<String?>(null) }
+    var weather by remember { mutableStateOf<WeatherNow?>(null) }
     var ghost by remember { mutableStateOf<Ghost?>(null) }
     var ghostRoute by remember { mutableStateOf<List<StoredPoint>>(emptyList()) }
     var ghostStartNanos by remember { mutableStateOf(0L) }
@@ -152,6 +157,28 @@ fun RecordingScreen(
             route = withContext(Dispatchers.IO) { AppGraph.repository(context).loadPoints(id) }
             media = withContext(Dispatchers.IO) { AppGraph.repository(context).listMedia(id) }
             delay(1500)
+        }
+    }
+
+    val recRef = rememberUpdatedState(state)
+    LaunchedEffect(state.phase) {
+        if (state.phase != Phase.RECORDING) {
+            weather = null
+            return@LaunchedEffect
+        }
+        while (true) {
+            val cur = recRef.value
+            val la = cur.currentLat
+            val lo = cur.currentLon
+            if (la != null && lo != null) {
+                WeatherService.at(la, lo)?.let {
+                    weather = it
+                    WeatherHolder.update(it)
+                }
+                delay(5 * 60 * 1000L)
+            } else {
+                delay(30_000L)
+            }
         }
     }
 
@@ -344,17 +371,26 @@ fun RecordingScreen(
                     dark = darkMap,
                     modifier = Modifier.fillMaxSize(),
                 )
-                Text(
-                    text = qualityLabel(t, state.quality),
-                    color = Palette.text,
-                    fontSize = 12.sp,
+                Column(
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(start = 12.dp, top = 12.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Palette.surface.copy(alpha = 0.85f))
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                )
+                        .padding(start = 12.dp, top = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        text = qualityLabel(t, state.quality),
+                        color = Palette.text,
+                        fontSize = 12.sp,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Palette.surface.copy(alpha = 0.85f))
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                    )
+                    val w = weather
+                    if (w != null && state.phase != Phase.STOPPED) {
+                        WeatherChip(t = t, w = w)
+                    }
+                }
                 if (state.isIdle || state.phase == Phase.PAUSED) {
                     Text(
                         text = if (state.phase == Phase.PAUSED) t.pause else t.paused,

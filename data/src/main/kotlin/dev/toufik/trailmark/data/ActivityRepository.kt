@@ -27,6 +27,10 @@ class ActivityRow(
     val rejectedCount: Long,
     val mockDetected: Boolean,
     val isOpen: Boolean,
+    val weatherTempC: Double?,
+    val weatherWindKmh: Double?,
+    val weatherWindDeg: Long?,
+    val weatherCode: Long?,
 )
 
 /** One captured media item pinned to a place and a moment along the route. */
@@ -96,6 +100,16 @@ class ActivityRepository(private val db: TrailmarkDb) {
         )
     }
 
+    fun setWeather(activityId: Long, tempC: Double, windKmh: Double, windDeg: Int, code: Int) {
+        q.setWeather(
+            weather_temp_c = tempC,
+            weather_wind_kmh = windKmh,
+            weather_wind_deg = windDeg.toLong(),
+            weather_code = code.toLong(),
+            id = activityId,
+        )
+    }
+
     fun saveResume(
         activityId: Long,
         lastStored: StoredPoint,
@@ -147,6 +161,10 @@ class ActivityRepository(private val db: TrailmarkDb) {
             rejectedCount = r.rejected_count,
             mockDetected = r.mock_detected != 0L,
             isOpen = false,
+            weatherTempC = r.weather_temp_c,
+            weatherWindKmh = r.weather_wind_kmh,
+            weatherWindDeg = r.weather_wind_deg,
+            weatherCode = r.weather_code,
         )
     }
 
@@ -163,6 +181,10 @@ class ActivityRepository(private val db: TrailmarkDb) {
                 rejectedCount = r.rejected_count,
                 mockDetected = r.mock_detected != 0L,
                 isOpen = open,
+                weatherTempC = r.weather_temp_c,
+                weatherWindKmh = r.weather_wind_kmh,
+                weatherWindDeg = r.weather_wind_deg,
+                weatherCode = r.weather_code,
             )
         }
     }

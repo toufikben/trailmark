@@ -1,0 +1,4 @@
+ALTER TABLE activity ADD COLUMN weather_temp_c REAL;
+ALTER TABLE activity ADD COLUMN weather_wind_kmh REAL;
+ALTER TABLE activity ADD COLUMN weather_wind_deg INTEGER;
+ALTER TABLE activity ADD COLUMN weather_code INTEGER;

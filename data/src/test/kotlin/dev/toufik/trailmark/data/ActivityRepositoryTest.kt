@@ -132,4 +132,16 @@ class ActivityRepositoryTest {
         assertTrue(repo.listMedia(a).isEmpty())
         assertEquals(1, repo.listMedia(b).size)
     }
+
+    @Test
+    fun weatherSnapshotRoundTrips() {
+        val id = repo.insertActivity("w1", "RUN", 1)
+        assertNull(repo.listActivities().single().weatherTempC)
+        repo.setWeather(id, tempC = 21.5, windKmh = 14.0, windDeg = 270, code = 3)
+        val row = repo.activityById(id)!!
+        assertEquals(21.5, row.weatherTempC ?: -1.0, 1e-9)
+        assertEquals(14.0, row.weatherWindKmh ?: -1.0, 1e-9)
+        assertEquals(270L, row.weatherWindDeg)
+        assertEquals(3L, row.weatherCode)
+    }
 }
