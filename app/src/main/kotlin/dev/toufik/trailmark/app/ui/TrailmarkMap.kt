@@ -3,6 +3,7 @@ package dev.toufik.trailmark.app.ui
 import android.content.Context
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.PointF
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
@@ -205,6 +206,9 @@ private fun frameIconExpr(sport: Sport): Expression {
 }
 
 @Composable
+/** A media capture pinned to the map; idx points back into the caller's media list. */
+data class MediaMark(val idx: Int, val lat: Double?, val lon: Double?, val kind: String)
+
 fun TrailmarkMap(
     points: List<StoredPoint>,
     modifier: Modifier = Modifier,
@@ -217,6 +221,8 @@ fun TrailmarkMap(
     speedMps: Double? = null,
     planChunks: List<RouteChunk> = emptyList(),
     planDest: Pair<Double, Double>? = null,
+    mediaMarks: List<MediaMark> = emptyList(),
+    onMediaTap: ((Int) -> Unit)? = null,
     onMapClick: ((Double, Double) -> Unit)? = null,
     onUserFix: ((StoredPoint) -> Unit)? = null,
     onNeedPermission: () -> Unit = {},
@@ -242,6 +248,7 @@ fun TrailmarkMap(
     var frameIndex by remember { mutableStateOf(0) }
     val onMapClickRef = rememberUpdatedState(onMapClick)
     val onUserFixRef = rememberUpdatedState(onUserFix)
+    val onMediaTapRef = rememberUpdatedState(onMediaTap)
     val lm = remember { context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager }
     fun locationGranted(): Boolean = ContextCompat.checkSelfPermission(
         context,
@@ -288,6 +295,16 @@ fun TrailmarkMap(
                 }
             }
             map.addOnMapClickListener { latLng ->
+                val mk = onMediaTapRef.value
+                if (mk != null) {
+                    val pt = map.projection.toScreenLocation(latLng)
+                    val hit = map.queryRenderedFeatures(pt, "media-dots").firstOrNull()
+                    val idx = hit?.getNumberProperty("idx")?.toInt()
+                    if (idx != null) {
+                        mk(idx)
+                        return@addOnMapClickListener true
+                    }
+                }
                 val cb = onMapClickRef.value
                 if (cb != null) {
                     cb(latLng.latitude, latLng.longitude)
@@ -497,6 +514,15 @@ fun TrailmarkMap(
                         iconIgnorePlacement(true),
                     ),
                 )
+                s.addSource(GeoJsonSource("media-source", EMPTY))
+                s.addLayer(
+                    CircleLayer("media-dots", "media-source").withProperties(
+                        circleColor("#E5484D"),
+                        circleRadius(6.5f),
+                        circleStrokeColor("#FFFFFF"),
+                        circleStrokeWidth(2.5f),
+                    ),
+                )
                 style = s
             }
         }
@@ -540,6 +566,24 @@ fun TrailmarkMap(
             EMPTY
         }
         s.getSourceAs<GeoJsonSource>("plan-dest-source")?.setGeoJson(fc)
+    }
+
+    LaunchedEffect(mediaMarks, style) {
+        val s = style ?: return@LaunchedEffect
+        val features = mediaMarks.mapNotNull { m ->
+            val la = m.lat
+            val lo = m.lon
+            if (la == null || lo == null) {
+                null
+            } else {
+                Feature.fromGeometry(Point.fromLngLat(lo, la)).apply {
+                    addNumberProperty("idx", m.idx.toDouble())
+                }
+            }
+        }
+        s.getSourceAs<GeoJsonSource>("media-source")?.setGeoJson(
+            if (features.isEmpty()) EMPTY else FeatureCollection.fromFeatures(features.toTypedArray()),
+        )
     }
 
     LaunchedEffect(route, current, style, ghost, ghostCurrent, userFix, frameIndex) {
