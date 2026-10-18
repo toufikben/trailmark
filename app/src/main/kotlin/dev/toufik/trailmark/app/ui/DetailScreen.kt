@@ -3,8 +3,10 @@ package dev.toufik.trailmark.app.ui
 import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,7 +18,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Slider
@@ -27,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -38,6 +43,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -55,13 +62,18 @@ import dev.toufik.trailmark.app.formatPace
 import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.core.model.WaypointType
 import dev.toufik.trailmark.data.ActivityRow
+import dev.toufik.trailmark.data.MediaRow
 import dev.toufik.trailmark.engine.Sport
 import dev.toufik.trailmark.portable.Gpx
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private data class Detail(val row: ActivityRow, val points: List<StoredPoint>)
+private data class Detail(
+    val row: ActivityRow,
+    val points: List<StoredPoint>,
+    val media: List<MediaRow>,
+)
 
 @Composable
 fun DetailScreen(activityId: Long, onBack: () -> Unit) {
@@ -69,6 +81,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
     val t = LocalTexts.current
     var detail by remember { mutableStateOf<Detail?>(null) }
     var loading by remember { mutableStateOf(true) }
+    var viewerMedia by remember { mutableStateOf<MediaRow?>(null) }
     val packPath = remember { dev.toufik.trailmark.app.maps.MapPacks.installedMapPack(context)?.absolutePath }
     val darkMap = remember {
         context.getSharedPreferences("trailmark", Context.MODE_PRIVATE).getBoolean("map_dark", true)
@@ -78,12 +91,13 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
         detail = withContext(Dispatchers.IO) {
             val repo = AppGraph.repository(context)
             val a = repo.activityById(activityId) ?: return@withContext null
-            Detail(a, repo.loadPoints(activityId))
+            Detail(a, repo.loadPoints(activityId), repo.listMedia(activityId))
         }
         loading = false
     }
 
     Surface(color = Palette.bg, modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().statusBarsPadding().padding(16.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onBack) { Text(t.back, color = Palette.accent) }
@@ -158,15 +172,25 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                             bearingDeg = it.bearingDeg,
                         )
                     }
-                    LaunchedEffect(playing, speed) {
+                    LaunchedEffect(playing, speed, d.media) {
                         if (!playing) return@LaunchedEffect
                         var last = withFrameNanos { it }
                         while (playing) {
                             withFrameNanos { now ->
                                 val dt = (now - last).coerceIn(0L, 250_000_000L)
                                 last = now
-                                replayNanos = (replayNanos + dt * speed).coerceAtMost(track.totalNanos)
-                                if (replayNanos >= track.totalNanos) playing = false
+                                val next = replayNanos + dt * speed
+                                val hit = d.media.firstOrNull { m ->
+                                    m.elapsedNanos > replayNanos && m.elapsedNanos <= next
+                                }
+                                if (hit != null) {
+                                    replayNanos = hit.elapsedNanos.coerceAtMost(track.totalNanos)
+                                    playing = false
+                                    if (hit.kind == "PHOTO") viewerMedia = hit
+                                } else {
+                                    replayNanos = next.coerceAtMost(track.totalNanos)
+                                    if (replayNanos >= track.totalNanos) playing = false
+                                }
                             }
                         }
                     }
@@ -176,6 +200,15 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                         packPath = packPath,
                         current = cursor,
                         sport = sportOf(d.row.sport),
+                        mediaMarks = d.media.mapIndexed { i, m -> MediaMark(i, m.lat, m.lon, m.kind) },
+                        onMediaTap = { i ->
+                            val m = d.media.getOrNull(i) ?: return@TrailmarkMap
+                            if (m.kind == "VIDEO") {
+                                openVideoPlayer(context, m.filePath)
+                            } else {
+                                viewerMedia = m
+                            }
+                        },
                         dark = darkMap,
                     )
                     Row(
@@ -226,6 +259,25 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                             )
                         }
                     }
+                    if (d.media.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(top = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            d.media.forEach { m ->
+                                MediaThumb(m) {
+                                    if (m.kind == "VIDEO") {
+                                        openVideoPlayer(context, m.filePath)
+                                    } else {
+                                        viewerMedia = m
+                                    }
+                                }
+                            }
+                        }
+                    }
                     LazyColumn(
                         modifier = Modifier.fillMaxWidth().weight(1f, fill = false).padding(top = 6.dp),
                     ) {
@@ -248,10 +300,58 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                 }
             }
         }
+        }
+        viewerMedia?.let { m ->
+            if (m.kind == "PHOTO") {
+                PhotoViewer(media = m, description = t.photo) { viewerMedia = null }
+            }
+        }
     }
 }
 
 private fun sportOf(name: String): Sport = Sport.entries.firstOrNull { it.name == name } ?: Sport.RUN
+
+/** One gallery cell: a downsampled photo or a play badge for a video. */
+@Composable
+private fun MediaThumb(m: MediaRow, onOpen: () -> Unit) {
+    val thumb by produceState<android.graphics.Bitmap?>(null, m.filePath) {
+        if (m.kind == "PHOTO") {
+            value = withContext(Dispatchers.IO) {
+                val opts = android.graphics.BitmapFactory.Options().apply { inSampleSize = 4 }
+                android.graphics.BitmapFactory.decodeFile(m.filePath, opts)
+            }
+        }
+    }
+    Box(
+        modifier = Modifier
+            .size(64.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Palette.surface)
+            .clickable(onClick = onOpen),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (m.kind == "PHOTO") {
+            thumb?.let {
+                Image(
+                    bitmap = it.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        } else {
+            Canvas(modifier = Modifier.size(20.dp)) {
+                val path = Path().apply {
+                    moveTo(size.width * 0.20f, size.height * 0.12f)
+                    lineTo(size.width * 0.86f, size.height * 0.50f)
+                    lineTo(size.width * 0.20f, size.height * 0.88f)
+                    close()
+                }
+                drawPath(path, Palette.accent)
+            }
+        }
+    }
+}
 
 /** Play/pause toggle for replay: accent disc with a dark play triangle, or pause bars. */
 @Composable

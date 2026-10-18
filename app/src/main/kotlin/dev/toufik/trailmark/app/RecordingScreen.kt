@@ -8,9 +8,7 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -33,7 +31,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -47,10 +44,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -68,7 +63,9 @@ import dev.toufik.trailmark.app.maps.MapPacks
 import dev.toufik.trailmark.app.service.RecordingHolder
 import dev.toufik.trailmark.app.service.RecordingService
 import dev.toufik.trailmark.app.ui.MediaMark
+import dev.toufik.trailmark.app.ui.PhotoViewer
 import dev.toufik.trailmark.app.ui.TrailmarkMap
+import dev.toufik.trailmark.app.ui.openVideoPlayer
 import dev.toufik.trailmark.coach.Coach
 import dev.toufik.trailmark.coach.CoachEvent
 import dev.toufik.trailmark.coach.Locale
@@ -336,13 +333,7 @@ fun RecordingScreen(
                     onMediaTap = { i ->
                         val m = media.getOrNull(i) ?: return@TrailmarkMap
                         if (m.kind == "VIDEO") {
-                            val intent = Intent(Intent.ACTION_VIEW)
-                                .setDataAndType(
-                                    MediaCapture.uriFor(context, java.io.File(m.filePath)),
-                                    "video/*",
-                                )
-                                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            runCatching { context.startActivity(intent) }
+                            openVideoPlayer(context, m.filePath)
                         } else {
                             viewerMedia = m
                         }
@@ -656,32 +647,6 @@ private fun RoundRecordButton(
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun PhotoViewer(media: MediaRow, description: String, onDismiss: () -> Unit) {
-    val bitmap by produceState<android.graphics.Bitmap?>(null, media.filePath) {
-        value = withContext(Dispatchers.IO) { android.graphics.BitmapFactory.decodeFile(media.filePath) }
-    }
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.88f))
-            .clickable(onClick = onDismiss)
-            .semantics { contentDescription = description },
-        contentAlignment = Alignment.Center,
-    ) {
-        bitmap?.let {
-            Image(
-                bitmap = it.asImageBitmap(),
-                contentDescription = description,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-            )
         }
     }
 }
