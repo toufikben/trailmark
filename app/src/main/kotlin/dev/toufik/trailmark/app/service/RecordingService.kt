@@ -283,14 +283,30 @@ class RecordingService : Service() {
             "$prefix${dev.toufik.trailmark.app.formatDistance(live.distanceM)} " +
                 "${dev.toufik.trailmark.app.distanceUnit(t)} \u00b7 ${dev.toufik.trailmark.app.formatDuration(live.elapsedNanos)}"
         }
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_track)
             .setContentTitle("Trailmark")
             .setContentText(text)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
             .setContentIntent(open)
-            .build()
+        if (live != null) {
+            if (live.phase == Phase.RECORDING) {
+                builder.addAction(0, t.pause, actionIntent(ACTION_PAUSE, 1))
+            } else {
+                builder.addAction(0, t.resume, actionIntent(ACTION_RESUME, 2))
+            }
+        }
+        return builder.build()
     }
+
+    private fun actionIntent(action: String, requestCode: Int): PendingIntent =
+        PendingIntent.getService(
+            this,
+            requestCode,
+            Intent(this, RecordingService::class.java).setAction(action),
+            PendingIntent.FLAG_IMMUTABLE,
+        )
 
     companion object {
         const val ACTION_START = "dev.toufik.trailmark.action.START"
