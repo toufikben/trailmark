@@ -109,6 +109,7 @@ val HI_TEXTS = Texts(
     descent = "उतार",
     maxGrade = "अधिकतम ढलान",
     clear = "साफ़ करें",
+    done = "हो गया",
     directEstimate = "सीधी दूरी का अनुमान — सड़क या ऊँचाई डेटा नहीं",
     elevationProfile = "ऊँचाई प्रोफ़ाइल",
     tabRecord = "रिकॉर्ड",

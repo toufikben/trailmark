@@ -109,6 +109,7 @@ val IT_TEXTS = Texts(
     descent = "Discesa",
     maxGrade = "Pendenza max",
     clear = "Cancella",
+    done = "Fatto",
     directEstimate = "Stima in linea d'aria — senza dati stradali o di altitudine",
     elevationProfile = "Profilo altimetrico",
     tabRecord = "Registra",

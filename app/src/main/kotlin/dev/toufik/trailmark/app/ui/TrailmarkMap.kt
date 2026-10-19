@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import dev.toufik.trailmark.app.LocalLang
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.maps.GlyphStore
@@ -112,8 +113,12 @@ private fun isOnline(context: Context): Boolean {
     return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
 }
 
-/** A richer OpenMapTiles style with SDF labels (Arabic first, then French/English). */
-private fun vectorStyle(packPath: String, glyphsBase: String, dark: Boolean): String {
+/** `["coalesce",["get","name:xx"],["get","name"]]` — labels follow the app language. */
+private fun nameField(lang: String): String =
+    """["coalesce",["get","name:$lang"],["get","name"]]"""
+
+/** A richer OpenMapTiles style with SDF labels localized to [lang], falling back to the local name. */
+private fun vectorStyle(packPath: String, glyphsBase: String, dark: Boolean, lang: String): String {
     val bg = if (dark) "#0E1113" else "#F5F6F4"
     val landcover = if (dark) "#141A16" else "#EDEFE9"
     val landuse = if (dark) "#161C17" else "#EEF0EA"
@@ -160,19 +165,19 @@ private fun vectorStyle(packPath: String, glyphsBase: String, dark: Boolean): St
          "paint":{"line-color":"${rail}","line-width":1.0}},
        {"id":"boundary","type":"line","source":"openmaptiles","source-layer":"boundary",
          "paint":{"line-color":"${boundary}","line-width":1.0}},
-       {"id":"water-name","type":"symbol","source":"openmaptiles","source-layer":"water_name",
-        "layout":{"text-field":["coalesce",["get","name:ar"],["get","name"]],
-          "text-font":["TrailmarkSans"],"text-size":12,"text-max-width":8},
-         "paint":{"text-color":"${waterName}","text-halo-color":"${halo}","text-halo-width":1.0}},
-       {"id":"place-name","type":"symbol","source":"openmaptiles","source-layer":"place",
-        "filter":["in","class","city","town"],
-        "layout":{"text-field":["coalesce",["get","name:ar"],["get","name:fr"],["get","name"]],
-          "text-font":["TrailmarkSans"],
-          "text-size":["interpolate",["linear"],["zoom"],6,11,12,15],"text-max-width":8},
-         "paint":{"text-color":"${label}","text-halo-color":"${halo}","text-halo-width":1.4}},
-       {"id":"road-name","type":"symbol","source":"openmaptiles","source-layer":"transportation_name",
-        "minzoom":13,
-        "layout":{"text-field":["coalesce",["get","name:ar"],["get","name"]],
+        {"id":"water-name","type":"symbol","source":"openmaptiles","source-layer":"water_name",
+         "layout":{"text-field":${nameField(lang)},
+           "text-font":["TrailmarkSans"],"text-size":12,"text-max-width":8},
+          "paint":{"text-color":"${waterName}","text-halo-color":"${halo}","text-halo-width":1.0}},
+        {"id":"place-name","type":"symbol","source":"openmaptiles","source-layer":"place",
+         "filter":["in","class","city","town"],
+         "layout":{"text-field":${nameField(lang)},
+           "text-font":["TrailmarkSans"],
+           "text-size":["interpolate",["linear"],["zoom"],6,11,12,15],"text-max-width":8},
+          "paint":{"text-color":"${label}","text-halo-color":"${halo}","text-halo-width":1.4}},
+        {"id":"road-name","type":"symbol","source":"openmaptiles","source-layer":"transportation_name",
+         "minzoom":13,
+         "layout":{"text-field":${nameField(lang)},
           "text-font":["TrailmarkSans"],"text-size":10,
           "symbol-placement":"line","text-rotation-alignment":"map"},
          "paint":{"text-color":"${labelDim}","text-halo-color":"${halo}","text-halo-width":1.0}}
@@ -237,6 +242,7 @@ fun TrailmarkMap(
 ) {
     val context = LocalContext.current
     val t = LocalTexts.current
+    val lang = LocalLang.current
     val prefs = remember { context.getSharedPreferences("trailmark", Context.MODE_PRIVATE) }
     var pois by remember { mutableStateOf(prefs.getBoolean("map_pois", false)) }
     val route = remember(points) { points.filter { it.type != WaypointType.REJECTED } }
@@ -386,11 +392,11 @@ fun TrailmarkMap(
         }
     }
 
-    LaunchedEffect(packPath, dark) {
+    LaunchedEffect(packPath, dark, lang.code) {
         mapView.getMapAsync { map ->
             val builder = when {
                 packPath != null && !online ->
-                    Style.Builder().fromJson(vectorStyle(packPath, glyphsBase, dark))
+                    Style.Builder().fromJson(vectorStyle(packPath, glyphsBase, dark, lang.code))
                 else -> Style.Builder().fromUri(if (dark) ONLINE_STYLE_URL else ONLINE_STYLE_URL_LIGHT)
             }
             map.setStyle(builder) { s ->
@@ -428,7 +434,12 @@ fun TrailmarkMap(
                 poiDot.minZoom = 14f
                 s.addLayer(poiDot)
                 val poiLabel = SymbolLayer("poi-label", "openmaptiles").withProperties(
-                    textField(Expression.coalesce(Expression.get("name:ar"), Expression.get("name"))),
+                    textField(
+                        Expression.coalesce(
+                            Expression.get("name:" + lang.code),
+                            Expression.get("name"),
+                        ),
+                    ),
                     textFont(arrayOf(if (offlineVector) "TrailmarkSans" else "Noto Sans Regular")),
                     textSize(10f),
                     textMaxWidth(8f),

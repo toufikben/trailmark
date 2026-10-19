@@ -109,6 +109,7 @@ val ES_TEXTS = Texts(
     descent = "Descenso",
     maxGrade = "Pendiente máx.",
     clear = "Borrar",
+    done = "Listo",
     directEstimate = "Estimación en línea recta — sin datos de vías ni altitud",
     elevationProfile = "Perfil de altitud",
     tabRecord = "Grabar",

@@ -109,6 +109,7 @@ val JA_TEXTS = Texts(
     descent = "下降",
     maxGrade = "最大勾配",
     clear = "クリア",
+    done = "完了",
     directEstimate = "直線距離の推定 — 道路・標高データなし",
     elevationProfile = "標高プロファイル",
     tabRecord = "記録",

@@ -100,6 +100,7 @@ fun PlanScreen(
     val darkMap = remember { prefs.getBoolean("map_dark", true) }
     var sport by remember { mutableStateOf(Sport.RUN) }
     var stops by remember { mutableStateOf<List<Pair<Double, Double>>>(emptyList()) }
+    var drafting by remember { mutableStateOf(false) }
     var anchor by remember { mutableStateOf<StoredPoint?>(null) }
     val packPath = remember(anchor, stops) {
         val lat = anchor?.lat ?: stops.firstOrNull()?.first
@@ -176,7 +177,10 @@ fun PlanScreen(
                     packPath = packPath,
                     planChunks = plan?.chunks ?: emptyList(),
                     planStops = stops,
-                    onMapClick = { lat, lon -> stops = stops + (lat to lon) },
+                    onMapClick = { lat, lon ->
+                        stops = stops + (lat to lon)
+                        drafting = true
+                    },
                     onUserFix = { sp -> if (anchor == null) anchor = sp },
                     onNeedPermission = {
                         locateLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION))
@@ -290,6 +294,7 @@ fun PlanScreen(
                                         .fillMaxWidth()
                                         .clickable {
                                             stops = stops + (r.lat to r.lon)
+                                            drafting = true
                                             query = ""
                                             results = emptyList()
                                         }
@@ -332,6 +337,39 @@ fun PlanScreen(
                             color = Palette.textSecondary,
                             fontSize = 13.sp,
                         )
+                        drafting -> Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "${t.points} ${stops.size}",
+                                color = Palette.textSecondary,
+                                fontSize = 12.sp,
+                            )
+                            Spacer(Modifier.weight(1f))
+                            TextButton(onClick = {
+                                stops = stops.dropLast(1)
+                                if (stops.isEmpty()) drafting = false
+                            }) {
+                                Text("↶", color = Palette.accent, fontSize = 18.sp)
+                            }
+                            TextButton(onClick = {
+                                stops = emptyList()
+                                plan = null
+                                drafting = false
+                            }) {
+                                Text(t.clear, color = Palette.accent)
+                            }
+                            Spacer(Modifier.width(4.dp))
+                            Button(
+                                onClick = { drafting = false },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Palette.accent,
+                                    contentColor = Palette.bg,
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.height(36.dp),
+                            ) {
+                                Text(t.done, fontSize = 13.sp)
+                            }
+                        }
                         loading -> Row(verticalAlignment = Alignment.CenterVertically) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(16.dp),

@@ -109,6 +109,7 @@ val ZH_TEXTS = Texts(
     descent = "下降",
     maxGrade = "最大坡度",
     clear = "清除",
+    done = "完成",
     directEstimate = "直线估算 — 无道路和海拔数据",
     elevationProfile = "海拔剖面",
     tabRecord = "记录",

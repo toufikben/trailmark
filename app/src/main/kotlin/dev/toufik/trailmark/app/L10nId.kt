@@ -109,6 +109,7 @@ val ID_TEXTS = Texts(
     descent = "Turunan",
     maxGrade = "Kemiringan maks",
     clear = "Hapus",
+    done = "Selesai",
     directEstimate = "Perkiraan garis lurus — tanpa data jalan dan ketinggian",
     elevationProfile = "Profil elevasi",
     tabRecord = "Rekam",
