@@ -85,6 +85,7 @@ import dev.toufik.trailmark.data.SegmentRow
 import dev.toufik.trailmark.engine.Sport
 import dev.toufik.trailmark.portable.Fit
 import dev.toufik.trailmark.portable.Gpx
+import dev.toufik.trailmark.portable.Tcx
 import java.io.File
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
@@ -253,6 +254,16 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                                 t.share,
                             )
                         }) { Text("FIT", color = Palette.accent) }
+                        TextButton(onClick = {
+                            shareTcx(
+                                context,
+                                d.points,
+                                d.row.startWallMillis,
+                                d.row.sport,
+                                d.row.id,
+                                t.share,
+                            )
+                        }) { Text("TCX", color = Palette.accent) }
                         TextButton(onClick = {
                             scope.launch {
                                 val card = withContext(Dispatchers.IO) {
@@ -776,6 +787,26 @@ private fun shareGpx(
     val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
     val send = Intent(Intent.ACTION_SEND).apply {
         type = "application/gpx+xml"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(send, chooserTitle))
+}
+
+private fun shareTcx(
+    context: Context,
+    points: List<StoredPoint>,
+    startWallMillis: Long,
+    sport: String,
+    id: Long,
+    chooserTitle: String,
+) {
+    val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+    val file = File(dir, "trailmark-$id.tcx")
+    file.writeText(Tcx.write(points, startWallMillis, sport))
+    val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
+    val send = Intent(Intent.ACTION_SEND).apply {
+        type = "application/vnd.garmin.tcx+xml"
         putExtra(Intent.EXTRA_STREAM, uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
