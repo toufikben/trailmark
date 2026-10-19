@@ -22,30 +22,54 @@ private const val ACCENT = 0xFFC6FF3D.toInt()
 private const val ACCENT_DIM = 0x8CC6FF3D.toInt()
 private const val GEAR = 0xFF9BD32A.toInt()
 
-/** Draws a 54 dp animated marker for the given sport and cycle frame. */
+/** Draws a 58 dp animated marker for the given sport and cycle frame. */
 fun spriteBitmap(context: Context, sport: Sport, frame: Int): Bitmap {
     val d = context.resources.displayMetrics.density
-    val s = (54f * d).roundToInt().coerceAtLeast(130)
+    val s = (58f * d).roundToInt().coerceAtLeast(140)
     val bmp = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888)
     val c = Canvas(bmp)
     val p = Paint(Paint.ANTI_ALIAS_FLAG)
-    p.color = 0xE60E1113.toInt()
-    c.drawCircle(s / 2f, s / 2f, s / 2f - 2f, p)
-    p.style = Paint.Style.STROKE
-    p.strokeWidth = s * 0.036f
-    p.color = ACCENT
-    c.drawCircle(s / 2f, s / 2f, s / 2f - 2f - p.strokeWidth / 2f, p)
-    c.save()
-    val k = s * 0.96f
-    c.translate((s - k) / 2f, (s - k) / 2f)
-    c.scale(k, k)
-    when (sport) {
-        Sport.BIKE -> drawCyclist(c, frame)
-        Sport.RUN -> drawRunner(c, frame, swing = 0.62f, lean = 0.10f, bob = 0.013f, armSwing = 0.95f)
-        Sport.WALK -> drawRunner(c, frame, swing = 0.34f, lean = 0.0f, bob = 0.006f, armSwing = 0.55f)
-        Sport.HIKE -> drawHiker(c, frame)
+
+    // Ground contact: a soft accent pool under the figure, no ring around it.
+    p.color = 0x40C6FF3D
+    c.drawOval(s * 0.20f, s * 0.770f, s * 0.80f, s * 0.890f, p)
+    p.color = 0x59000000
+    c.drawOval(s * 0.26f, s * 0.790f, s * 0.74f, s * 0.870f, p)
+
+    // Speed streaks trail behind the figure while moving; the idle frame (0) stays clean.
+    if (frame != 0) {
+        val t = frame / SPRITE_FRAMES.toFloat()
+        val wave = 0.35f + 0.65f * sin(t * PI).toFloat()
+        val sp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+            color = 0x73C6FF3D
+            strokeWidth = s * 0.016f
+        }
+        c.drawLine(s * 0.075f, s * 0.400f, s * (0.075f + 0.13f * wave), s * 0.400f, sp)
+        c.drawLine(s * 0.030f, s * 0.550f, s * (0.030f + 0.20f * wave), s * 0.550f, sp)
+        c.drawLine(s * 0.095f, s * 0.680f, s * (0.095f + 0.11f * wave), s * 0.680f, sp)
     }
-    c.restore()
+
+    // The figure itself, drawn once into a layer and composited with a soft dark halo
+    // so it stays readable on both light and dark map styles.
+    val fig = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888)
+    val fc = Canvas(fig)
+    fc.save()
+    val k = s * 0.96f
+    fc.translate((s - k) / 2f, (s - k) / 2f + s * 0.01f)
+    fc.scale(k, k)
+    when (sport) {
+        Sport.BIKE -> drawCyclist(fc, frame)
+        Sport.RUN -> drawRunner(fc, frame, swing = 0.62f, lean = 0.10f, bob = 0.013f, armSwing = 0.95f)
+        Sport.WALK -> drawRunner(fc, frame, swing = 0.34f, lean = 0.0f, bob = 0.006f, armSwing = 0.55f)
+        Sport.HIKE -> drawHiker(fc, frame)
+    }
+    fc.restore()
+    val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        setShadowLayer(s * 0.045f, 0f, 0f, 0xE60E1113.toInt())
+    }
+    c.drawBitmap(fig, 0f, 0f, halo)
     return bmp
 }
 

@@ -330,6 +330,8 @@ fun TrailmarkMap(
             val ms = if (kmh < 1.0) 400L else (1100.0 / kmh).toLong().coerceIn(80L, 170L)
             delay(ms)
             if (kmh >= 1.0) frameIndex = (frameIndex + 1) % SPRITE_FRAMES
+            val size = 0.90f + (kmh.coerceIn(0.0, 30.0) / 30.0 * 0.18).toFloat()
+            style?.getLayerAs<SymbolLayer>("current-layer")?.setProperties(iconSize(size))
         }
     }
 
@@ -636,7 +638,11 @@ fun TrailmarkMap(
             FeatureCollection.fromFeatures(arrayOf(f))
         } ?: EMPTY
         s.getSourceAs<GeoJsonSource>("current-source")?.setGeoJson(curFc)
-        current?.bearingDeg?.let { lastBearing = it.toFloat() }
+        current?.bearingDeg?.let { b ->
+            val target = b.toFloat()
+            val delta = ((target - lastBearing + 540f) % 360f) - 180f
+            lastBearing = (lastBearing + delta * 0.4f + 360f) % 360f
+        }
         s.getLayerAs<SymbolLayer>("current-layer")?.setProperties(iconRotate(lastBearing))
         val ghostCurFc = ghostCurrent?.let {
             FeatureCollection.fromFeatures(

@@ -10,8 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -27,6 +26,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -65,6 +66,9 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
     val t = LocalTexts.current
     val prefs = remember { context.getSharedPreferences("trailmark", Context.MODE_PRIVATE) }
     var dark by remember { mutableStateOf(prefs.getBoolean("map_dark", true)) }
+    var imperial by remember { mutableStateOf(Units.imperial) }
+    var voice by remember { mutableStateOf(prefs.getBoolean("voice_coach", true)) }
+    var autoPauseOn by remember { mutableStateOf(prefs.getBoolean("auto_pause", true)) }
 
     Surface(color = Palette.bg, modifier = Modifier.fillMaxSize()) {
         Column(
@@ -75,13 +79,13 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                 .padding(16.dp),
         ) {
             Text(t.tabSettings, color = Palette.text, fontSize = 22.sp)
-            Spacer(Modifier.height(24.dp))
-            Text(t.language, color = Palette.textSecondary, fontSize = 13.sp)
-            Spacer(Modifier.height(8.dp))
-            LanguagePicker(lang, onLang)
-            Spacer(Modifier.height(24.dp))
-            Text(paywallText(lang, "title"), color = Palette.textSecondary, fontSize = 13.sp)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(18.dp))
+
+            SectionLabel(t.language)
+            LanguageDropdown(lang, onLang)
+            Spacer(Modifier.height(18.dp))
+
+            SectionLabel(paywallText(lang, "title"))
             val premium = LocalPremium.current
             val now = remember { System.currentTimeMillis() }
             val status = when {
@@ -109,64 +113,60 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                     )
                 }
             }
-            Spacer(Modifier.height(24.dp))
-            Text(t.mapTheme, color = Palette.textSecondary, fontSize = 13.sp)
-            Spacer(Modifier.height(8.dp))
-            Pill {
-                ThemeButton(t.themeDark, selected = dark) {
-                    dark = true
-                    prefs.edit().putBoolean("map_dark", true).apply()
+            Spacer(Modifier.height(18.dp))
+
+            SettingsCard {
+                CardRow(t.mapTheme) {
+                    Pill {
+                        ThemeButton(t.themeDark, selected = dark) {
+                            dark = true
+                            prefs.edit().putBoolean("map_dark", true).apply()
+                        }
+                        ThemeButton(t.themeLight, selected = !dark) {
+                            dark = false
+                            prefs.edit().putBoolean("map_dark", false).apply()
+                        }
+                    }
                 }
-                ThemeButton(t.themeLight, selected = !dark) {
-                    dark = false
-                    prefs.edit().putBoolean("map_dark", false).apply()
+                CardRow(t.units) {
+                    Pill {
+                        ThemeButton(t.unitsMetric, selected = !imperial) {
+                            imperial = false
+                            Units.set(context, false)
+                        }
+                        ThemeButton(t.unitsImperial, selected = imperial) {
+                            imperial = true
+                            Units.set(context, true)
+                        }
+                    }
                 }
-            }
-            Spacer(Modifier.height(24.dp))
-            Text(t.units, color = Palette.textSecondary, fontSize = 13.sp)
-            Spacer(Modifier.height(8.dp))
-            var imperial by remember { mutableStateOf(Units.imperial) }
-            Pill {
-                ThemeButton(t.unitsMetric, selected = !imperial) {
-                    imperial = false
-                    Units.set(context, false)
+                CardRow(t.voiceCoach) {
+                    Pill {
+                        ThemeButton(t.on, selected = voice) {
+                            voice = true
+                            prefs.edit().putBoolean("voice_coach", true).apply()
+                        }
+                        ThemeButton(t.off, selected = !voice) {
+                            voice = false
+                            prefs.edit().putBoolean("voice_coach", false).apply()
+                        }
+                    }
                 }
-                ThemeButton(t.unitsImperial, selected = imperial) {
-                    imperial = true
-                    Units.set(context, true)
-                }
-            }
-            Spacer(Modifier.height(24.dp))
-            Text(t.voiceCoach, color = Palette.textSecondary, fontSize = 13.sp)
-            Spacer(Modifier.height(8.dp))
-            var voice by remember { mutableStateOf(prefs.getBoolean("voice_coach", true)) }
-            Pill {
-                ThemeButton(t.on, selected = voice) {
-                    voice = true
-                    prefs.edit().putBoolean("voice_coach", true).apply()
-                }
-                ThemeButton(t.off, selected = !voice) {
-                    voice = false
-                    prefs.edit().putBoolean("voice_coach", false).apply()
-                }
-            }
-            Spacer(Modifier.height(24.dp))
-            Text(t.autoPause, color = Palette.textSecondary, fontSize = 13.sp)
-            Spacer(Modifier.height(8.dp))
-            var autoPauseOn by remember { mutableStateOf(prefs.getBoolean("auto_pause", true)) }
-            Pill {
-                ThemeButton(t.on, selected = autoPauseOn) {
-                    autoPauseOn = true
-                    prefs.edit().putBoolean("auto_pause", true).apply()
-                }
-                ThemeButton(t.off, selected = !autoPauseOn) {
-                    autoPauseOn = false
-                    prefs.edit().putBoolean("auto_pause", false).apply()
+                CardRow(t.autoPause) {
+                    Pill {
+                        ThemeButton(t.on, selected = autoPauseOn) {
+                            autoPauseOn = true
+                            prefs.edit().putBoolean("auto_pause", true).apply()
+                        }
+                        ThemeButton(t.off, selected = !autoPauseOn) {
+                            autoPauseOn = false
+                            prefs.edit().putBoolean("auto_pause", false).apply()
+                        }
+                    }
                 }
             }
-            Spacer(Modifier.height(24.dp))
-            Text(t.healthConnect, color = Palette.textSecondary, fontSize = 13.sp)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(18.dp))
+
             val healthAvailable = remember { HealthSync.available(context) }
             var healthOn by remember { mutableStateOf(prefs.getBoolean("health_sync", true)) }
             var healthGranted by remember { mutableStateOf(false) }
@@ -200,62 +200,61 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                 lifecycleOwner.lifecycle.addObserver(obs)
                 onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
             }
-            Pill {
-                when {
-                    !healthAvailable -> TextButton(onClick = {
-                        runCatching {
-                            context.startActivity(
-                                Intent(
-                                    Intent.ACTION_VIEW,
-                                    Uri.parse(
-                                        "market://details?id=com.google.android.apps.healthdata",
-                                    ),
-                                ),
-                            )
-                        }
-                    }) { Text(t.download, color = Palette.textSecondary, fontSize = 13.sp) }
-
-                    !healthGranted -> TextButton(onClick = {
-                        val contract = healthContract
-                        if (contract != null) {
+            SettingsCard {
+                CardRow(t.healthConnect) {
+                    when {
+                        !healthAvailable -> TextButton(onClick = {
                             runCatching {
-                                healthLauncher.launch(
-                                    contract.createIntent(
-                                        context,
-                                        HealthSync.writePermissions,
+                                context.startActivity(
+                                    Intent(
+                                        Intent.ACTION_VIEW,
+                                        Uri.parse(
+                                            "market://details?id=com.google.android.apps.healthdata",
+                                        ),
                                     ),
                                 )
                             }
-                        }
-                    }) { Text(t.connect, color = Palette.accent, fontSize = 13.sp) }
+                        }) { Text(t.download, color = Palette.textSecondary, fontSize = 13.sp) }
 
-                    else -> {
-                        ThemeButton(t.on, selected = healthOn) {
-                            healthOn = true
-                            prefs.edit().putBoolean("health_sync", true).apply()
-                        }
-                        ThemeButton(t.off, selected = !healthOn) {
-                            healthOn = false
-                            prefs.edit().putBoolean("health_sync", false).apply()
+                        !healthGranted -> TextButton(onClick = {
+                            val contract = healthContract
+                            if (contract != null) {
+                                runCatching {
+                                    healthLauncher.launch(
+                                        contract.createIntent(
+                                            context,
+                                            HealthSync.writePermissions,
+                                        ),
+                                    )
+                                }
+                            }
+                        }) { Text(t.connect, color = Palette.accent, fontSize = 13.sp) }
+
+                        else -> Pill {
+                            ThemeButton(t.on, selected = healthOn) {
+                                healthOn = true
+                                prefs.edit().putBoolean("health_sync", true).apply()
+                            }
+                            ThemeButton(t.off, selected = !healthOn) {
+                                healthOn = false
+                                prefs.edit().putBoolean("health_sync", false).apply()
+                            }
                         }
                     }
                 }
             }
-            Spacer(Modifier.height(24.dp))
-            Text(t.weight, color = Palette.textSecondary, fontSize = 13.sp)
-            Spacer(Modifier.height(8.dp))
-            var weightText by remember {
-                mutableStateOf(prefs.getFloat("weight_kg", 70f).toInt().toString())
-            }
-            Surface(color = Palette.surface, shape = RoundedCornerShape(16.dp)) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    BasicTextField(
+            Spacer(Modifier.height(18.dp))
+
+            SettingsCard {
+                CardRow(t.weight) {
+                    var weightText by remember {
+                        mutableStateOf(prefs.getFloat("weight_kg", 70f).toInt().toString())
+                    }
+                    NumberField(
                         value = weightText,
-                        onValueChange = { s ->
-                            val clean = s.filter { it.isDigit() }.take(3)
+                        unit = "kg",
+                        maxDigits = 3,
+                        onValue = { clean ->
                             weightText = clean
                             clean.toIntOrNull()?.let { v ->
                                 if (v in 30..250) {
@@ -263,29 +262,15 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                                 }
                             }
                         },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        textStyle = TextStyle(color = Palette.text, fontSize = 16.sp),
-                        singleLine = true,
-                        modifier = Modifier
-                            .width(56.dp)
-                            .heightIn(min = 44.dp),
                     )
-                    Text("kg", color = Palette.textSecondary, fontSize = 13.sp)
                 }
-            }
-            Spacer(Modifier.height(24.dp))
-            Text(t.monthlyGoal, color = Palette.textSecondary, fontSize = 13.sp)
-            Spacer(Modifier.height(8.dp))
-            var goalText by remember { mutableStateOf(prefs.getInt("goal_km", 100).toString()) }
-            Surface(color = Palette.surface, shape = RoundedCornerShape(16.dp)) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    BasicTextField(
+                CardRow(t.monthlyGoal) {
+                    var goalText by remember { mutableStateOf(prefs.getInt("goal_km", 100).toString()) }
+                    NumberField(
                         value = goalText,
-                        onValueChange = { s ->
-                            val clean = s.filter { it.isDigit() }.take(4)
+                        unit = t.km,
+                        maxDigits = 4,
+                        onValue = { clean ->
                             goalText = clean
                             clean.toIntOrNull()?.let { v ->
                                 if (v in 1..9999) {
@@ -293,19 +278,12 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                                 }
                             }
                         },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        textStyle = TextStyle(color = Palette.text, fontSize = 16.sp),
-                        singleLine = true,
-                        modifier = Modifier
-                            .width(64.dp)
-                            .heightIn(min = 44.dp),
                     )
-                    Text(t.km, color = Palette.textSecondary, fontSize = 13.sp)
                 }
             }
-            Spacer(Modifier.height(24.dp))
-            Text(t.about, color = Palette.textSecondary, fontSize = 13.sp)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(18.dp))
+
+            SectionLabel(t.about)
             Surface(
                 color = Palette.surface,
                 shape = RoundedCornerShape(16.dp),
@@ -335,31 +313,102 @@ private fun appVersion(context: Context): String = runCatching {
     context.packageManager.getPackageInfo(context.packageName, 0).versionName
 }.getOrNull() ?: "-"
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun LanguagePicker(lang: Lang, onLang: (Lang) -> Unit) {
-    FlowRow(
+private fun SectionLabel(text: String) {
+    Text(text, color = Palette.textSecondary, fontSize = 12.sp)
+    Spacer(Modifier.height(8.dp))
+}
+
+@Composable
+private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
+    Surface(
+        color = Palette.surface,
+        shape = RoundedCornerShape(16.dp),
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Lang.entries.forEach { l ->
-            val selected = l == lang
-            Surface(
-                color = if (selected) Palette.accent else Palette.surface,
-                shape = RoundedCornerShape(20.dp),
-                modifier = Modifier
-                    .clickable { onLang(l) }
-                    .heightIn(min = 48.dp),
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), content = content)
+    }
+}
+
+@Composable
+private fun CardRow(label: String, control: @Composable () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, color = Palette.text, fontSize = 14.sp, modifier = Modifier.weight(1f))
+        control()
+    }
+}
+
+@Composable
+private fun LanguageDropdown(lang: Lang, onLang: (Lang) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        Surface(
+            onClick = { open = true },
+            color = Palette.surface,
+            shape = RoundedCornerShape(12.dp),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(modifier = Modifier.padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
-                    Text(
-                        l.label,
-                        color = if (selected) Palette.bg else Palette.textSecondary,
-                        fontSize = 14.sp,
-                    )
-                }
+                Text(lang.label, color = Palette.accent, fontSize = 14.sp)
+                Spacer(Modifier.width(8.dp))
+                Text("▾", color = Palette.textSecondary, fontSize = 12.sp)
             }
+        }
+        DropdownMenu(
+            expanded = open,
+            onDismissRequest = { open = false },
+            modifier = Modifier
+                .heightIn(max = 360.dp)
+                .background(Palette.surface),
+        ) {
+            Lang.entries.sortedBy { it.label }.forEach { l ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            l.label,
+                            color = if (l == lang) Palette.accent else Palette.text,
+                            fontSize = 14.sp,
+                        )
+                    },
+                    onClick = {
+                        open = false
+                        if (l != lang) onLang(l)
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NumberField(
+    value: String,
+    unit: String,
+    maxDigits: Int,
+    onValue: (String) -> Unit,
+) {
+    Surface(color = Palette.bg, shape = RoundedCornerShape(12.dp)) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            BasicTextField(
+                value = value,
+                onValueChange = { s -> onValue(s.filter { it.isDigit() }.take(maxDigits)) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                textStyle = TextStyle(color = Palette.text, fontSize = 16.sp),
+                singleLine = true,
+                modifier = Modifier
+                    .width(56.dp)
+                    .heightIn(min = 44.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(unit, color = Palette.textSecondary, fontSize = 13.sp)
         }
     }
 }
@@ -369,7 +418,7 @@ private fun Pill(content: @Composable RowScope.() -> Unit) {
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(24.dp))
-            .background(Palette.surface),
+            .background(Palette.bg),
         verticalAlignment = Alignment.CenterVertically,
         content = content,
     )
