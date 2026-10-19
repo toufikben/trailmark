@@ -561,7 +561,20 @@ fun RecordingScreen(
             viewerMedia?.let { m ->
                 if (m.kind == "PHOTO") {
                     BackHandler { viewerMedia = null }
-                    PhotoViewer(media = m, description = t.photo) { viewerMedia = null }
+                    PhotoViewer(
+                        media = m,
+                        description = t.photo,
+                        captionLabel = t.caption,
+                        onSaveCaption = { cap ->
+                            scope.launch {
+                                withContext(Dispatchers.IO) {
+                                    AppGraph.repository(context).setMediaCaption(m.id, cap)
+                                }
+                                viewerMedia = m.copy(caption = cap)
+                            }
+                        },
+                        onDismiss = { viewerMedia = null },
+                    )
                 }
             }
         }
@@ -569,7 +582,8 @@ fun RecordingScreen(
 }
 
 @Composable
-private fun StatCell(value: String, label: String, accent: Boolean = false, desc: String? = null) {    Column(
+private fun StatCell(value: String, label: String, accent: Boolean = false, desc: String? = null) {
+    Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = if (desc != null) {
             Modifier.clearAndSetSemantics { contentDescription = desc }
