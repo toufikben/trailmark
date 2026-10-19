@@ -48,7 +48,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.toufik.trailmark.analytics.ActivityStat
 import dev.toufik.trailmark.analytics.AchievementState
+import dev.toufik.trailmark.analytics.PersonalRecords
 import dev.toufik.trailmark.analytics.evaluateAchievements
+import dev.toufik.trailmark.analytics.personalRecords
 import dev.toufik.trailmark.app.AppGraph
 import dev.toufik.trailmark.app.LocalLang
 import dev.toufik.trailmark.app.LocalTexts
@@ -77,10 +79,21 @@ fun ProgressScreen() {
     val context = LocalContext.current
     val t = LocalTexts.current
     var rows by remember { mutableStateOf<List<ActivityRow>?>(null) }
+    var records by remember { mutableStateOf<PersonalRecords?>(null) }
     var sport by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
-        rows = withContext(Dispatchers.IO) { AppGraph.repository(context).listActivities() }
+        val list = withContext(Dispatchers.IO) { AppGraph.repository(context).listActivities() }
+        rows = list
+        records = withContext(Dispatchers.IO) {
+            val repo = AppGraph.repository(context)
+            val routes = list
+                .filter { !it.isOpen && it.distanceM >= 1000.0 }
+                .sortedByDescending { it.distanceM }
+                .take(80)
+                .map { repo.loadPoints(it.id) }
+            personalRecords(routes)
+        }
     }
 
     Surface(color = Palette.bg, modifier = Modifier.fillMaxSize()) {
@@ -125,7 +138,10 @@ fun ProgressScreen() {
                         } else {
                             SummaryRow(t, filtered)
                             WeeklyCard(t, filtered)
-                            if (sport == null) SportSplitCard(t, list)
+                            if (sport == null) {
+                                records?.let { RecordsCard(t, it) }
+                                SportSplitCard(t, list)
+                            }
                             AchievementsCard(t, list)
                         }
                         Spacer(Modifier.height(12.dp))
@@ -209,6 +225,53 @@ private fun StatCard(t: Texts, label: String, totals: Totals, modifier: Modifier
                 maxLines = 1,
                 modifier = Modifier.padding(top = 2.dp),
             )
+        }
+    }
+}
+
+@Composable
+private fun RecordsCard(t: Texts, records: PersonalRecords) {
+    val tiles = listOfNotNull(
+        records.best1kSec?.let { "1 ${t.km}" to it },
+        records.best5kSec?.let { "5 ${t.km}" to it },
+        records.best10kSec?.let { "10 ${t.km}" to it },
+    )
+    if (tiles.isEmpty()) return
+    Surface(
+        color = Palette.surface,
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp)
+            .appearIn(3),
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Text(t.records, color = Palette.text, fontSize = 14.sp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                tiles.forEach { (label, sec) ->
+                    Surface(
+                        color = Palette.bg,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text(label, color = Palette.textSecondary, fontSize = 11.sp, maxLines = 1)
+                            Text(
+                                formatDuration((sec * 1_000_000_000L).toLong()),
+                                color = Palette.accent,
+                                fontSize = 15.sp,
+                                maxLines = 1,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

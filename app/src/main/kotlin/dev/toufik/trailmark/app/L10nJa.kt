@@ -24,6 +24,7 @@ val JA_TEXTS = Texts(
     share = "GPX を共有",
     storyCard = "ストーリーカード",
     bestWindow = "ベスト時間帯",
+    records = "自己ベスト",
     importGpx = "GPX をインポート",
     elevation = "獲得標高",
     maxSpeed = "最大",

@@ -24,6 +24,7 @@ val KO_TEXTS = Texts(
     share = "GPX 공유",
     storyCard = "스토리 카드",
     bestWindow = "최적 시간대",
+    records = "개인 기록",
     importGpx = "GPX 가져오기",
     elevation = "고도",
     maxSpeed = "최고",

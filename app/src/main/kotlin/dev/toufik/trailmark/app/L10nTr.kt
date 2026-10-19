@@ -24,6 +24,7 @@ val TR_TEXTS = Texts(
     share = "GPX paylaş",
     storyCard = "Hikaye kartı",
     bestWindow = "En iyi pencere",
+    records = "Kişisel rekorlar",
     importGpx = "GPX içe aktar",
     elevation = "Tırmanış",
     maxSpeed = "Maks",

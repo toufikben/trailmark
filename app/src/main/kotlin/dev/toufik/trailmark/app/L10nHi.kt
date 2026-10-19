@@ -24,6 +24,7 @@ val HI_TEXTS = Texts(
     share = "GPX साझा करें",
     storyCard = "स्टोरी कार्ड",
     bestWindow = "सर्वोत्तम समय",
+    records = "व्यक्तिगत रिकॉर्ड",
     importGpx = "GPX आयात करें",
     elevation = "ऊँचाई",
     maxSpeed = "अधिकतम",

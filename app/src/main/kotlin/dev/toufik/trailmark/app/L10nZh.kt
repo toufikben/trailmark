@@ -24,6 +24,7 @@ val ZH_TEXTS = Texts(
     share = "分享 GPX",
     storyCard = "故事卡片",
     bestWindow = "最佳时段",
+    records = "个人纪录",
     importGpx = "导入 GPX",
     elevation = "累计爬升",
     maxSpeed = "最高",

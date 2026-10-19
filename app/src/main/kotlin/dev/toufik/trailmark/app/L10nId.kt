@@ -24,6 +24,7 @@ val ID_TEXTS = Texts(
     share = "Bagikan GPX",
     storyCard = "Kartu story",
     bestWindow = "Jendela terbaik",
+    records = "Rekor pribadi",
     importGpx = "Impor GPX",
     elevation = "Elevasi",
     maxSpeed = "Maks",

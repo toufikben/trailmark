@@ -24,6 +24,7 @@ val DE_TEXTS = Texts(
     share = "GPX teilen",
     storyCard = "Story-Karte",
     bestWindow = "Bestes Zeitfenster",
+    records = "Bestleistungen",
     importGpx = "GPX importieren",
     elevation = "Höhenmeter",
     maxSpeed = "Max",

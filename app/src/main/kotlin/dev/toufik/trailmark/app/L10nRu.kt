@@ -24,6 +24,7 @@ val RU_TEXTS = Texts(
     share = "Поделиться GPX",
     storyCard = "Карточка истории",
     bestWindow = "Лучшее окно",
+    records = "Личные рекорды",
     importGpx = "Импорт GPX",
     elevation = "Набор высоты",
     maxSpeed = "Макс",

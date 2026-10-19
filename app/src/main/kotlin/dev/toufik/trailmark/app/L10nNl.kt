@@ -24,6 +24,7 @@ val NL_TEXTS = Texts(
     share = "GPX delen",
     storyCard = "Story-kaart",
     bestWindow = "Beste venster",
+    records = "Persoonlijke records",
     importGpx = "GPX importeren",
     elevation = "Hoogtemeters",
     maxSpeed = "Max",

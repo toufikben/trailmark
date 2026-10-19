@@ -24,6 +24,7 @@ val PT_TEXTS = Texts(
     share = "Compartilhar GPX",
     storyCard = "Cartão story",
     bestWindow = "Melhor janela",
+    records = "Recordes pessoais",
     importGpx = "Importar GPX",
     elevation = "Elevação",
     maxSpeed = "Máx",
