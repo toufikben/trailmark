@@ -110,6 +110,7 @@ val KO_TEXTS = Texts(
     maxGrade = "최대 경사",
     clear = "지우기",
     done = "완료",
+    flyover = "플라이오버",
     directEstimate = "직선 거리 추정 — 도로·고도 데이터 없음",
     elevationProfile = "고도 프로필",
     tabRecord = "기록",

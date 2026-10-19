@@ -110,6 +110,7 @@ val IT_TEXTS = Texts(
     maxGrade = "Pendenza max",
     clear = "Cancella",
     done = "Fatto",
+    flyover = "Sorvolo",
     directEstimate = "Stima in linea d'aria — senza dati stradali o di altitudine",
     elevationProfile = "Profilo altimetrico",
     tabRecord = "Registra",

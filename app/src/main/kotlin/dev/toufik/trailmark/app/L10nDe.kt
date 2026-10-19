@@ -110,6 +110,7 @@ val DE_TEXTS = Texts(
     maxGrade = "Max. Steigung",
     clear = "Zurücksetzen",
     done = "Fertig",
+    flyover = "Überflug",
     directEstimate = "Luftlinien-Schätzung — keine Straßen- oder Höhendaten",
     elevationProfile = "Höhenprofil",
     tabRecord = "Aufnehmen",

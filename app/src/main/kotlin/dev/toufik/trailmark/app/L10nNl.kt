@@ -110,6 +110,7 @@ val NL_TEXTS = Texts(
     maxGrade = "Max. helling",
     clear = "Wissen",
     done = "Klaar",
+    flyover = "Vlucht",
     directEstimate = "Schatting in rechte lijn — geen weg- of hoogtedata",
     elevationProfile = "Hoogteprofiel",
     tabRecord = "Opnemen",

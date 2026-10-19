@@ -110,6 +110,7 @@ val ES_TEXTS = Texts(
     maxGrade = "Pendiente máx.",
     clear = "Borrar",
     done = "Listo",
+    flyover = "Vuelo",
     directEstimate = "Estimación en línea recta — sin datos de vías ni altitud",
     elevationProfile = "Perfil de altitud",
     tabRecord = "Grabar",

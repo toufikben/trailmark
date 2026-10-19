@@ -110,6 +110,7 @@ val TR_TEXTS = Texts(
     maxGrade = "Maks. eğim",
     clear = "Temizle",
     done = "Tamam",
+    flyover = "Uçuş",
     directEstimate = "Kuş uçuşu tahmin — yol ve yükseklik verisi yok",
     elevationProfile = "Yükseklik profili",
     tabRecord = "Kaydet",

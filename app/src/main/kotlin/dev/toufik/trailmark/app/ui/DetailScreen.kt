@@ -350,6 +350,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                     var playing by remember(d) { mutableStateOf(false) }
                     var speed by remember(d) { mutableStateOf(1) }
                     var replayNanos by remember(d) { mutableStateOf(0L) }
+                    var flyover by remember(d) { mutableStateOf(false) }
                     val sample = track.sampleAt(replayNanos)
                     val cursor = sample?.let {
                         StoredPoint(
@@ -399,6 +400,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                             }
                         },
                         dark = darkMap,
+                        flyover = flyover,
                     )
                     if (d.speedKmh.size >= 2 || d.elevM.size >= 2) {
                         Surface(
@@ -458,6 +460,19 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
+                        FilterChip(
+                            selected = flyover,
+                            onClick = {
+                                val on = !flyover
+                                flyover = on
+                                if (on) {
+                                    speed = 16
+                                    replayNanos = 0L
+                                    playing = true
+                                }
+                            },
+                            label = { Text(t.flyover, fontSize = 12.sp) },
+                        )
                         listOf(1, 4, 16, 60).forEach { s ->
                             FilterChip(
                                 selected = speed == s,

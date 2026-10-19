@@ -110,6 +110,7 @@ val PL_TEXTS = Texts(
     maxGrade = "Maks. nachylenie",
     clear = "Wyczyść",
     done = "Gotowe",
+    flyover = "Przelot",
     directEstimate = "Szacunek po linii prostej — brak danych dróg i wysokości",
     elevationProfile = "Profil wysokości",
     tabRecord = "Nagrywaj",

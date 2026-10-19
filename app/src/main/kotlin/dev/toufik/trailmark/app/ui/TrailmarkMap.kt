@@ -239,6 +239,7 @@ fun TrailmarkMap(
     onUserFix: ((StoredPoint) -> Unit)? = null,
     onNeedPermission: () -> Unit = {},
     dark: Boolean = true,
+    flyover: Boolean = false,
 ) {
     val context = LocalContext.current
     val t = LocalTexts.current
@@ -700,7 +701,11 @@ fun TrailmarkMap(
         s.getSourceAs<GeoJsonSource>("user-accuracy-source")?.setGeoJson(accFc)
     }
 
-    LaunchedEffect(route.size, current, following, userFix, tiltDeg) {
+    LaunchedEffect(flyover) {
+        tiltDeg = if (flyover) 55.0 else 0.0
+    }
+
+    LaunchedEffect(route.size, current, following, userFix, tiltDeg, flyover) {
         mapView.getMapAsync { map ->
             val c = current ?: run {
                 if (!worldShown) {
@@ -739,7 +744,7 @@ fun TrailmarkMap(
                 smoothBearing = (smoothBearing + delta * 0.3f + 360f) % 360f
                 map.cameraPosition = CameraPosition.Builder()
                     .target(LatLng(c.lat, c.lon))
-                    .zoom(if (fitted) map.cameraPosition.zoom else 16.0)
+                    .zoom(if (flyover) 15.5 else if (fitted) map.cameraPosition.zoom else 16.0)
                     .bearing(smoothBearing.toDouble())
                     .tilt(tiltDeg)
                     .build()

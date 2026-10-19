@@ -110,6 +110,7 @@ val RU_TEXTS = Texts(
     maxGrade = "Макс. уклон",
     clear = "Сбросить",
     done = "Готово",
+    flyover = "Облёт",
     directEstimate = "Оценка по прямой — без данных дорог и высот",
     elevationProfile = "Профиль высоты",
     tabRecord = "Запись",
