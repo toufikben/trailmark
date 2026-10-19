@@ -42,14 +42,16 @@ fun computeSplits(points: List<StoredPoint>): List<Split> {
                 val nanosAt = a.timeNanos + (segTime * frac).roundToLong()
                 val prevNanosAbs =
                     if (out.isEmpty()) startNanos else startNanos + out.last().elapsedNanos
+                val altA = a.altitudeM
+                val altP = p.altitudeM
                 val crossing = StoredPoint(
                     lat = a.lat + (p.lat - a.lat) * frac,
                     lon = a.lon + (p.lon - a.lon) * frac,
                     timeNanos = nanosAt,
                     accuracyM = p.accuracyM,
                     type = WaypointType.NORMAL,
-                    altitudeM = if (a.altitudeM != null && p.altitudeM != null) {
-                        a.altitudeM + (p.altitudeM - a.altitudeM) * frac
+                    altitudeM = if (altA != null && altP != null) {
+                        altA + (altP - altA) * frac
                     } else {
                         null
                     },

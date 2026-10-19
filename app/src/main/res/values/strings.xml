@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Trailmark</string>
+    <string name="health_rationale_heading">Health Connect</string>
+    <string name="health_rationale_body">Trailmark saves your finished workouts — activity type, distance and estimated calories — to Health Connect so other health apps can read them. Trailmark only writes finished activities; it never reads your health data.</string>
+    <string name="health_rationale_note">You can change this permission at any time in the Health Connect settings.</string>
 </resources>

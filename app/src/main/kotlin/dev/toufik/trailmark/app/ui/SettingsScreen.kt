@@ -1,8 +1,11 @@
 package dev.toufik.trailmark.app.ui
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
@@ -52,6 +55,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -169,9 +173,18 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
             }
             Spacer(Modifier.height(20.dp))
 
+            SectionLabel(t.permissions)
             val healthAvailable = remember { HealthSync.available(context) }
             var healthOn by remember { mutableStateOf(prefs.getBoolean("health_sync", true)) }
             var healthGranted by remember { mutableStateOf(false) }
+            var locationGranted by remember { mutableStateOf(locationOk(context)) }
+            var notificationsGranted by remember { mutableStateOf(notificationsOk(context)) }
+            val permissionLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.RequestMultiplePermissions(),
+            ) {
+                locationGranted = locationOk(context)
+                notificationsGranted = notificationsOk(context)
+            }
             val healthScope = rememberCoroutineScope()
             val healthContract = if (healthAvailable) {
                 runCatching {
@@ -194,6 +207,8 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
             DisposableEffect(lifecycleOwner, healthAvailable) {
                 val obs = LifecycleEventObserver { _, event ->
                     if (event == Lifecycle.Event.ON_RESUME) {
+                        locationGranted = locationOk(context)
+                        notificationsGranted = notificationsOk(context)
                         healthScope.launch {
                             healthGranted = healthAvailable && HealthSync.granted(context)
                         }
@@ -203,6 +218,30 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                 onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
             }
             SettingsCard {
+                PermissionRow(
+                    label = t.location,
+                    granted = locationGranted,
+                    grantLabel = t.grant,
+                    onGrant = {
+                        permissionLauncher.launch(
+                            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                        )
+                    },
+                )
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    CardDivider()
+                    PermissionRow(
+                        label = t.notifications,
+                        granted = notificationsGranted,
+                        grantLabel = t.grant,
+                        onGrant = {
+                            permissionLauncher.launch(
+                                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                            )
+                        },
+                    )
+                }
+                CardDivider()
                 SettingsRow(t.healthConnect) {
                     when {
                         !healthAvailable -> SmallAction(t.download, accent = false) {
@@ -432,6 +471,42 @@ private fun SmallAction(label: String, accent: Boolean, onClick: () -> Unit) {
         )
     }
 }
+
+@Composable
+private fun PermissionRow(
+    label: String,
+    granted: Boolean,
+    grantLabel: String,
+    onGrant: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, color = Palette.text, fontSize = 14.sp, modifier = Modifier.weight(1f))
+        Spacer(Modifier.width(12.dp))
+        if (granted) {
+            Text("✓", color = Palette.accent, fontSize = 16.sp)
+        } else {
+            SmallAction(grantLabel, accent = true, onClick = onGrant)
+        }
+    }
+}
+
+private fun locationOk(context: Context): Boolean =
+    ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.ACCESS_FINE_LOCATION,
+    ) == PackageManager.PERMISSION_GRANTED
+
+private fun notificationsOk(context: Context): Boolean =
+    Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+        ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
 
 @Composable
 private fun LanguageSelector(lang: Lang, onLang: (Lang) -> Unit) {
