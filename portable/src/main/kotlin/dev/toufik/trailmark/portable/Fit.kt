@@ -291,8 +291,8 @@ object Fit {
     private fun readU32(b: ByteArray, at: Int, little: Boolean): Long {
         var v = 0L
         for (k in 0 until 4) {
-            val idx = if (little) at + k else at + 3 - k
-            v = (v shl 8) or (b[idx].toLong() and 0xFF)
+            val shift = if (little) 8 * k else 8 * (3 - k)
+            v = v or ((b[at + k].toLong() and 0xFF) shl shift)
         }
         return v
     }
