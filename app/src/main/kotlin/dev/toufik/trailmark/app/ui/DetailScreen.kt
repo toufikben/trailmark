@@ -10,6 +10,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,7 +19,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -110,6 +111,7 @@ private data class SegLoad(
     val byId: Map<Long, SegmentRow>,
 )
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DetailScreen(activityId: Long, onBack: () -> Unit) {
     val context = LocalContext.current
@@ -258,7 +260,11 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                             WeatherChip(t = t, w = WeatherNow(wTemp, wWind, wDeg.toInt(), wCode.toInt()))
                         }
                     }
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Start,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
                         TextButton(onClick = {
                             shareGpx(context, d.points, d.row.startWallMillis, d.row.id, t.share)
                         }) { Text(t.share, color = Palette.accent) }
@@ -464,7 +470,9 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                         }
                     }
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         FilterChip(
@@ -507,11 +515,8 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                             }
                         }
                     }
-                    LazyColumn(
-                        modifier = Modifier.fillMaxWidth().weight(1f, fill = false).padding(top = 6.dp),
-                    ) {
-                        items(a.splits.size) { i ->
-                            val s = a.splits[i]
+                    Column(modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
+                        a.splits.forEach { s ->
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
