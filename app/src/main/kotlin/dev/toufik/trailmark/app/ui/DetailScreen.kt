@@ -81,6 +81,7 @@ import dev.toufik.trailmark.core.model.WaypointType
 import dev.toufik.trailmark.data.ActivityRow
 import dev.toufik.trailmark.data.EffortRow
 import dev.toufik.trailmark.data.MediaRow
+import dev.toufik.trailmark.data.SegmentRow
 import dev.toufik.trailmark.engine.Sport
 import dev.toufik.trailmark.portable.Fit
 import dev.toufik.trailmark.portable.Gpx
@@ -99,6 +100,13 @@ private data class Detail(
     val elevM: List<Float>,
 )
 
+private data class SegLoad(
+    val efforts: List<EffortRow>,
+    val bests: Map<Long, Long>,
+    val count: Int,
+    val byId: Map<Long, SegmentRow>,
+)
+
 @Composable
 fun DetailScreen(activityId: Long, onBack: () -> Unit) {
     val context = LocalContext.current
@@ -110,6 +118,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
     var viewerMedia by remember { mutableStateOf<MediaRow?>(null) }
     var efforts by remember { mutableStateOf<List<EffortRow>>(emptyList()) }
     var effortBests by remember { mutableStateOf<Map<Long, Long>>(emptyMap()) }
+    var segmentsById by remember { mutableStateOf<Map<Long, SegmentRow>>(emptyMap()) }
     var segmentCount by remember { mutableStateOf(0) }
     var showCreateSegment by remember { mutableStateOf(false) }
     val packPath = remember { dev.toufik.trailmark.app.maps.MapPacks.installedMapPack(context)?.absolutePath }
@@ -147,12 +156,14 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                 val bests = list.map { it.segmentId }.distinct()
                     .mapNotNull { sid -> repo.bestEffortNanos(sid)?.let { sid to it } }
                     .toMap()
-                Triple(list, bests, repo.listSegments().size)
+                val segs = repo.listSegments()
+                SegLoad(list, bests, segs.size, segs.associateBy { it.id })
             }.getOrNull()
         }?.let { seg ->
-            efforts = seg.first
-            effortBests = seg.second
-            segmentCount = seg.third
+            efforts = seg.efforts
+            effortBests = seg.bests
+            segmentCount = seg.count
+            segmentsById = seg.byId
         }
     }
 
@@ -272,7 +283,21 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                                 Text(t.segments, color = Palette.text, fontSize = 14.sp)
                                 efforts.forEach { e ->
                                     val best = effortBests[e.segmentId]
-                                    Column(modifier = Modifier.padding(top = 10.dp)) {
+                                    val seg = segmentsById[e.segmentId]
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .then(
+                                                if (seg != null) {
+                                                    Modifier.clickable {
+                                                        shareSegment(context, seg, best, t.share)
+                                                    }
+                                                } else {
+                                                    Modifier
+                                                },
+                                            )
+                                            .padding(top = 10.dp),
+                                    ) {
                                         Text(e.segmentName, color = Palette.text, fontSize = 14.sp)
                                         Row(modifier = Modifier.fillMaxWidth().padding(top = 2.dp)) {
                                             Text(
@@ -717,6 +742,22 @@ private fun ReplayButton(playing: Boolean, description: String, onClick: () -> U
             }
         }
     }
+}
+
+private fun shareSegment(
+    context: Context,
+    seg: SegmentRow,
+    bestNanos: Long?,
+    chooserTitle: String,
+) {
+    val best = bestNanos?.let { formatDuration(it) } ?: "--:--"
+    val text = "${seg.name} \u00b7 $best\n" +
+        "${seg.startLat}, ${seg.startLon} \u2192 ${seg.endLat}, ${seg.endLon}"
+    val send = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, text)
+    }
+    context.startActivity(Intent.createChooser(send, chooserTitle))
 }
 
 private fun shareGpx(
