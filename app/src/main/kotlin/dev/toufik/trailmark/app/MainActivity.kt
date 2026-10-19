@@ -149,6 +149,7 @@ class MainActivity : ComponentActivity() {
                                     )
                                     Screen.Plan -> PlanScreen(
                                         onRegions = { screen = Screen.Regions },
+                                        onStartRoute = { screen = Screen.Record },
                                     )
                                     Screen.History -> HistoryScreen(
                                         onOpen = { id ->

@@ -10,6 +10,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -69,6 +70,7 @@ import androidx.core.content.ContextCompat
 import dev.toufik.trailmark.analytics.Ghost
 import dev.toufik.trailmark.analytics.ghostDeltaM
 import dev.toufik.trailmark.app.maps.MapPacks
+import dev.toufik.trailmark.app.service.PlanRouteHolder
 import dev.toufik.trailmark.app.service.RecordingHolder
 import dev.toufik.trailmark.app.service.RecordingService
 import dev.toufik.trailmark.app.service.WeatherHolder
@@ -158,6 +160,7 @@ fun RecordingScreen(
     var viewerMedia by remember { mutableStateOf<MediaRow?>(null) }
     var coachLine by remember { mutableStateOf<String?>(null) }
     val weather by WeatherHolder.state.collectAsState()
+    val planRoute by PlanRouteHolder.state.collectAsState()
     var ghost by remember { mutableStateOf<Ghost?>(null) }
     var ghostRoute by remember { mutableStateOf<List<StoredPoint>>(emptyList()) }
     var ghostStartNanos by remember { mutableStateOf(0L) }
@@ -358,6 +361,7 @@ fun RecordingScreen(
                     attributionBottom = barHeightPx,
                     sport = sport,
                     speedMps = state.currentSpeedMps,
+                    planChunks = planRoute,
                     ghostRoute = ghostRoute,
                     ghostCurrent = ghostNow,
                     mediaMarks = media.mapIndexed { i, m -> MediaMark(i, m.lat, m.lon, m.kind) },
@@ -393,6 +397,18 @@ fun RecordingScreen(
                     val w = weather
                     if (w != null && state.phase != Phase.STOPPED) {
                         WeatherChip(t = t, w = w)
+                    }
+                    if (planRoute.isNotEmpty()) {
+                        Text(
+                            text = "${t.routeLabel} ✕",
+                            color = Palette.accent,
+                            fontSize = 12.sp,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Palette.surface.copy(alpha = 0.85f))
+                                .clickable { PlanRouteHolder.clear() }
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                        )
                     }
                 }
                 if (state.isIdle || state.phase == Phase.PAUSED) {

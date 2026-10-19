@@ -24,6 +24,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -67,6 +69,7 @@ import dev.toufik.trailmark.app.geocode.PlaceSearch
 import dev.toufik.trailmark.app.maps.MapPacks
 import dev.toufik.trailmark.app.plan.PlannedRoute
 import dev.toufik.trailmark.app.plan.RoutePlanner
+import dev.toufik.trailmark.app.service.PlanRouteHolder
 import dev.toufik.trailmark.core.geo.ElevPoint
 import dev.toufik.trailmark.core.geo.RouteChunk
 import dev.toufik.trailmark.core.geo.elevationRangeM
@@ -86,7 +89,11 @@ import java.util.Calendar
  * gray flat, green downhill).
  */
 @Composable
-fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
+fun PlanScreen(
+    onRegions: () -> Unit,
+    onStartRoute: () -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     val t = LocalTexts.current
     val prefs = remember { context.getSharedPreferences("trailmark", Context.MODE_PRIVATE) }
@@ -415,6 +422,21 @@ fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
                                     chunks = p.chunks,
                                     modifier = Modifier.fillMaxWidth().height(64.dp).padding(top = 6.dp),
                                 )
+                            }
+                            Spacer(Modifier.height(12.dp))
+                            Button(
+                                onClick = {
+                                    PlanRouteHolder.set(p.chunks)
+                                    onStartRoute()
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Palette.accent,
+                                    contentColor = Palette.bg,
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth().height(44.dp),
+                            ) {
+                                Text(t.startRoute, fontSize = 14.sp)
                             }
                             Row(
                                 modifier = Modifier.fillMaxWidth(),

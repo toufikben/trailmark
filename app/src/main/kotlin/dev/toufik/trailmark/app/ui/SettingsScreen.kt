@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -12,7 +13,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,9 +28,11 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -42,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.TextStyle
@@ -78,12 +81,11 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
         ) {
-            Text(t.tabSettings, color = Palette.text, fontSize = 22.sp)
-            Spacer(Modifier.height(18.dp))
+            Text(t.tabSettings, color = Palette.text, fontSize = 24.sp)
+            Spacer(Modifier.height(20.dp))
 
-            SectionLabel(t.language)
-            LanguageDropdown(lang, onLang)
-            Spacer(Modifier.height(18.dp))
+            LanguageSelector(lang, onLang)
+            Spacer(Modifier.height(20.dp))
 
             SectionLabel(paywallText(lang, "title"))
             val premium = LocalPremium.current
@@ -116,56 +118,55 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
             Spacer(Modifier.height(18.dp))
 
             SettingsCard {
-                CardRow(t.mapTheme) {
-                    Pill {
-                        ThemeButton(t.themeDark, selected = dark) {
+                SettingsRow(t.mapTheme) {
+                    Segmented(
+                        aLabel = t.themeDark,
+                        aSelected = dark,
+                        onA = {
                             dark = true
                             prefs.edit().putBoolean("map_dark", true).apply()
-                        }
-                        ThemeButton(t.themeLight, selected = !dark) {
+                        },
+                        bLabel = t.themeLight,
+                        bSelected = !dark,
+                        onB = {
                             dark = false
                             prefs.edit().putBoolean("map_dark", false).apply()
-                        }
-                    }
+                        },
+                    )
                 }
-                CardRow(t.units) {
-                    Pill {
-                        ThemeButton(t.unitsMetric, selected = !imperial) {
+                CardDivider()
+                SettingsRow(t.units) {
+                    Segmented(
+                        aLabel = t.unitsMetric,
+                        aSelected = !imperial,
+                        onA = {
                             imperial = false
                             Units.set(context, false)
-                        }
-                        ThemeButton(t.unitsImperial, selected = imperial) {
+                        },
+                        bLabel = t.unitsImperial,
+                        bSelected = imperial,
+                        onB = {
                             imperial = true
                             Units.set(context, true)
-                        }
+                        },
+                    )
+                }
+                CardDivider()
+                SettingsRow(t.voiceCoach) {
+                    SettingsSwitch(checked = voice) {
+                        voice = it
+                        prefs.edit().putBoolean("voice_coach", it).apply()
                     }
                 }
-                CardRow(t.voiceCoach) {
-                    Pill {
-                        ThemeButton(t.on, selected = voice) {
-                            voice = true
-                            prefs.edit().putBoolean("voice_coach", true).apply()
-                        }
-                        ThemeButton(t.off, selected = !voice) {
-                            voice = false
-                            prefs.edit().putBoolean("voice_coach", false).apply()
-                        }
-                    }
-                }
-                CardRow(t.autoPause) {
-                    Pill {
-                        ThemeButton(t.on, selected = autoPauseOn) {
-                            autoPauseOn = true
-                            prefs.edit().putBoolean("auto_pause", true).apply()
-                        }
-                        ThemeButton(t.off, selected = !autoPauseOn) {
-                            autoPauseOn = false
-                            prefs.edit().putBoolean("auto_pause", false).apply()
-                        }
+                CardDivider()
+                SettingsRow(t.autoPause) {
+                    SettingsSwitch(checked = autoPauseOn) {
+                        autoPauseOn = it
+                        prefs.edit().putBoolean("auto_pause", it).apply()
                     }
                 }
             }
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(20.dp))
 
             val healthAvailable = remember { HealthSync.available(context) }
             var healthOn by remember { mutableStateOf(prefs.getBoolean("health_sync", true)) }
@@ -201,9 +202,9 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                 onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
             }
             SettingsCard {
-                CardRow(t.healthConnect) {
+                SettingsRow(t.healthConnect) {
                     when {
-                        !healthAvailable -> TextButton(onClick = {
+                        !healthAvailable -> SmallAction(t.download, accent = false) {
                             runCatching {
                                 context.startActivity(
                                     Intent(
@@ -214,9 +215,9 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                                     ),
                                 )
                             }
-                        }) { Text(t.download, color = Palette.textSecondary, fontSize = 13.sp) }
+                        }
 
-                        !healthGranted -> TextButton(onClick = {
+                        !healthGranted -> SmallAction(t.connect, accent = true) {
                             val contract = healthContract
                             if (contract != null) {
                                 runCatching {
@@ -228,25 +229,19 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                                     )
                                 }
                             }
-                        }) { Text(t.connect, color = Palette.accent, fontSize = 13.sp) }
+                        }
 
-                        else -> Pill {
-                            ThemeButton(t.on, selected = healthOn) {
-                                healthOn = true
-                                prefs.edit().putBoolean("health_sync", true).apply()
-                            }
-                            ThemeButton(t.off, selected = !healthOn) {
-                                healthOn = false
-                                prefs.edit().putBoolean("health_sync", false).apply()
-                            }
+                        else -> SettingsSwitch(checked = healthOn) {
+                            healthOn = it
+                            prefs.edit().putBoolean("health_sync", it).apply()
                         }
                     }
                 }
             }
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(20.dp))
 
             SettingsCard {
-                CardRow(t.weight) {
+                SettingsRow(t.weight) {
                     var weightText by remember {
                         mutableStateOf(prefs.getFloat("weight_kg", 70f).toInt().toString())
                     }
@@ -264,7 +259,8 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                         },
                     )
                 }
-                CardRow(t.monthlyGoal) {
+                CardDivider()
+                SettingsRow(t.monthlyGoal) {
                     var goalText by remember { mutableStateOf(prefs.getInt("goal_km", 100).toString()) }
                     NumberField(
                         value = goalText,
@@ -281,7 +277,7 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                     )
                 }
             }
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(20.dp))
 
             SectionLabel(t.about)
             Surface(
@@ -315,7 +311,16 @@ private fun appVersion(context: Context): String = runCatching {
 
 @Composable
 private fun SectionLabel(text: String) {
-    Text(text, color = Palette.textSecondary, fontSize = 12.sp)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(4.dp, 14.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(Palette.accent),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(text, color = Palette.textSecondary, fontSize = 12.sp)
+    }
     Spacer(Modifier.height(8.dp))
 }
 
@@ -326,37 +331,124 @@ private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), content = content)
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp), content = content)
     }
 }
 
 @Composable
-private fun CardRow(label: String, control: @Composable () -> Unit) {
+private fun CardDivider() {
+    HorizontalDivider(color = Palette.textSecondary.copy(alpha = 0.10f), thickness = 1.dp)
+}
+
+@Composable
+private fun SettingsRow(label: String, control: @Composable () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, color = Palette.text, fontSize = 14.sp, modifier = Modifier.weight(1f))
+        Spacer(Modifier.width(12.dp))
         control()
     }
 }
 
+/** Two-option segmented control: the active segment gets an accent-tinted pill. */
 @Composable
-private fun LanguageDropdown(lang: Lang, onLang: (Lang) -> Unit) {
+private fun Segmented(
+    aLabel: String,
+    aSelected: Boolean,
+    onA: () -> Unit,
+    bLabel: String,
+    bSelected: Boolean,
+    onB: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(Palette.bg)
+            .padding(3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SegmentedButton(aLabel, aSelected, onA)
+        SegmentedButton(bLabel, bSelected, onB)
+    }
+}
+
+@Composable
+private fun SegmentedButton(label: String, selected: Boolean, onClick: () -> Unit) {
+    val bg by animateColorAsState(
+        targetValue = if (selected) Palette.accent.copy(alpha = 0.18f) else Color.Transparent,
+        label = "seg-bg",
+    )
+    val fg by animateColorAsState(
+        targetValue = if (selected) Palette.accent else Palette.textSecondary,
+        label = "seg-fg",
+    )
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(9.dp))
+            .background(bg)
+            .clickable(onClick = onClick)
+            .heightIn(min = 36.dp)
+            .padding(horizontal = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, color = fg, fontSize = 13.sp)
+    }
+}
+
+@Composable
+private fun SettingsSwitch(checked: Boolean, onChecked: (Boolean) -> Unit) {
+    Switch(
+        checked = checked,
+        onCheckedChange = onChecked,
+        colors = SwitchDefaults.colors(
+            checkedThumbColor = Palette.bg,
+            checkedTrackColor = Palette.accent,
+            checkedBorderColor = Palette.accent,
+            uncheckedThumbColor = Palette.textSecondary,
+            uncheckedTrackColor = Palette.bg,
+            uncheckedBorderColor = Palette.textSecondary.copy(alpha = 0.40f),
+        ),
+    )
+}
+
+/** Compact accent action used for the Health Connect connect/download states. */
+@Composable
+private fun SmallAction(label: String, accent: Boolean, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        color = if (accent) Palette.accent.copy(alpha = 0.14f) else Palette.bg,
+        shape = RoundedCornerShape(10.dp),
+    ) {
+        Text(
+            label,
+            color = if (accent) Palette.accent else Palette.textSecondary,
+            fontSize = 13.sp,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+        )
+    }
+}
+
+@Composable
+private fun LanguageSelector(lang: Lang, onLang: (Lang) -> Unit) {
     var open by remember { mutableStateOf(false) }
-    Box {
+    Box(modifier = Modifier.fillMaxWidth()) {
         Surface(
             onClick = { open = true },
             color = Palette.surface,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(lang.label, color = Palette.accent, fontSize = 14.sp)
-                Spacer(Modifier.width(8.dp))
-                Text("▾", color = Palette.textSecondary, fontSize = 12.sp)
+                Text(lang.label, color = Palette.text, fontSize = 15.sp)
+                Spacer(Modifier.weight(1f))
+                Text("▾", color = Palette.accent, fontSize = 14.sp)
             }
         }
         DropdownMenu(
@@ -410,27 +502,5 @@ private fun NumberField(
             Spacer(Modifier.width(6.dp))
             Text(unit, color = Palette.textSecondary, fontSize = 13.sp)
         }
-    }
-}
-
-@Composable
-private fun Pill(content: @Composable RowScope.() -> Unit) {
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(24.dp))
-            .background(Palette.bg),
-        verticalAlignment = Alignment.CenterVertically,
-        content = content,
-    )
-}
-
-@Composable
-private fun ThemeButton(label: String, selected: Boolean, onClick: () -> Unit) {
-    TextButton(onClick = onClick, modifier = Modifier.heightIn(min = 44.dp)) {
-        Text(
-            label,
-            color = if (selected) Palette.accent else Palette.textSecondary,
-            fontSize = 13.sp,
-        )
     }
 }
