@@ -82,6 +82,7 @@ import dev.toufik.trailmark.data.ActivityRow
 import dev.toufik.trailmark.data.EffortRow
 import dev.toufik.trailmark.data.MediaRow
 import dev.toufik.trailmark.engine.Sport
+import dev.toufik.trailmark.portable.Fit
 import dev.toufik.trailmark.portable.Gpx
 import java.io.File
 import kotlin.math.roundToInt
