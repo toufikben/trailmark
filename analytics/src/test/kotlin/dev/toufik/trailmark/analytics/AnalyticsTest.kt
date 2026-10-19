@@ -82,4 +82,63 @@ class SegmentMatcherTest {
         val seg = Segment(1, "s", 36.79, 3.18, 36.80, 3.18)
         assertNull(matchEffort(seg, listOf(p(0L, 36.7538), p(1L, 36.7539))))
     }
+
+    private val hill = Segment(1, "Hill", 36.0, 3.0, 36.001, 3.001)
+
+    private fun pt(
+        lat: Double,
+        lon: Double,
+        nanos: Long,
+        type: WaypointType = WaypointType.NORMAL,
+    ) = StoredPoint(lat, lon, nanos, 5.0, type)
+
+    @Test
+    fun fullPassageReturnsElapsedTime() {
+        val track = listOf(
+            pt(36.0, 3.0, 0),
+            pt(36.0005, 3.0005, 5_000_000_000L),
+            pt(36.001, 3.001, 12_000_000_000L),
+        )
+        assertEquals(12_000_000_000L, matchEffort(hill, track))
+    }
+
+    @Test
+    fun startWithoutEndReturnsNull() {
+        val track = listOf(
+            pt(36.0, 3.0, 0),
+            pt(36.0002, 3.0002, 3_000_000_000L),
+        )
+        assertNull(matchEffort(hill, track))
+    }
+
+    @Test
+    fun rejectedPointsDoNotCountAsEntry() {
+        val track = listOf(
+            pt(36.0, 3.0, 0, WaypointType.REJECTED),
+            pt(36.0005, 3.0005, 5_000_000_000L),
+            pt(36.001, 3.001, 10_000_000_000L),
+        )
+        assertNull(matchEffort(hill, track))
+    }
+
+    @Test
+    fun firstPassageWinsOverFasterSecondRun() {
+        val track = listOf(
+            pt(36.0, 3.0, 0),
+            pt(36.001, 3.001, 10_000_000_000L),
+            pt(36.0, 3.0, 20_000_000_000L),
+            pt(36.001, 3.001, 25_000_000_000L),
+        )
+        assertEquals(10_000_000_000L, matchEffort(hill, track))
+    }
+
+    @Test
+    fun endReachedAfterLeavingStartRegionStillMatches() {
+        val track = listOf(
+            pt(36.0, 3.0, 0),
+            pt(36.005, 3.005, 4_000_000_000L),
+            pt(36.001, 3.001, 9_000_000_000L),
+        )
+        assertEquals(9_000_000_000L, matchEffort(hill, track))
+    }
 }

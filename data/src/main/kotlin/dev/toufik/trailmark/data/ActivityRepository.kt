@@ -323,7 +323,7 @@ class ActivityRepository(private val db: TrailmarkDb) {
         q.effortExists(segment_id = segmentId, activity_id = activityId).executeAsOne() > 0L
 
     fun bestEffortNanos(segmentId: Long): Long? =
-        q.bestEffort(segment_id = segmentId).executeAsOneOrNull()
+        q.bestEffort(segment_id = segmentId).executeAsOneOrNull()?.best
 
     fun effortsForActivity(activityId: Long): List<EffortRow> =
         q.effortsForActivity(activity_id = activityId).executeAsList().map {

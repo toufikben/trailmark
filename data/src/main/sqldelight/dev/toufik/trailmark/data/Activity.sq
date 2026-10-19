@@ -153,7 +153,7 @@ effortExists:
 SELECT count(*) FROM segment_effort WHERE segment_id = ? AND activity_id = ?;
 
 bestEffort:
-SELECT min(elapsed_nanos) FROM segment_effort WHERE segment_id = ?;
+SELECT min(elapsed_nanos) AS best FROM segment_effort WHERE segment_id = ?;
 
 effortsForActivity:
 SELECT e.id, e.segment_id, e.elapsed_nanos, s.name
