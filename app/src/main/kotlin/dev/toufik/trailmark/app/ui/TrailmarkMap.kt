@@ -588,7 +588,7 @@ fun TrailmarkMap(
         )
     }
 
-    LaunchedEffect(route, current, style, ghost, ghostCurrent, userFix, frameIndex) {
+    LaunchedEffect(route, ghost, style) {
         val s = style ?: return@LaunchedEffect
         val routeFc = if (route.size >= 2) {
             FeatureCollection.fromFeatures(
@@ -602,14 +602,6 @@ fun TrailmarkMap(
             EMPTY
         }
         s.getSourceAs<GeoJsonSource>("route-source")?.setGeoJson(routeFc)
-        val curFc = current?.let {
-            val f = Feature.fromGeometry(Point.fromLngLat(it.lon, it.lat))
-            f.addNumberProperty("frame", (frameIndex % SPRITE_FRAMES).toDouble())
-            FeatureCollection.fromFeatures(arrayOf(f))
-        } ?: EMPTY
-        s.getSourceAs<GeoJsonSource>("current-source")?.setGeoJson(curFc)
-        current?.bearingDeg?.let { lastBearing = it.toFloat() }
-        s.getLayerAs<SymbolLayer>("current-layer")?.setProperties(iconRotate(lastBearing))
         val ghostFc = if (ghost.size >= 2) {
             FeatureCollection.fromFeatures(
                 arrayOf(
@@ -622,6 +614,18 @@ fun TrailmarkMap(
             EMPTY
         }
         s.getSourceAs<GeoJsonSource>("ghost-source")?.setGeoJson(ghostFc)
+    }
+
+    LaunchedEffect(current, ghostCurrent, userFix, style, frameIndex) {
+        val s = style ?: return@LaunchedEffect
+        val curFc = current?.let {
+            val f = Feature.fromGeometry(Point.fromLngLat(it.lon, it.lat))
+            f.addNumberProperty("frame", (frameIndex % SPRITE_FRAMES).toDouble())
+            FeatureCollection.fromFeatures(arrayOf(f))
+        } ?: EMPTY
+        s.getSourceAs<GeoJsonSource>("current-source")?.setGeoJson(curFc)
+        current?.bearingDeg?.let { lastBearing = it.toFloat() }
+        s.getLayerAs<SymbolLayer>("current-layer")?.setProperties(iconRotate(lastBearing))
         val ghostCurFc = ghostCurrent?.let {
             FeatureCollection.fromFeatures(
                 arrayOf(Feature.fromGeometry(Point.fromLngLat(it.lon, it.lat))),

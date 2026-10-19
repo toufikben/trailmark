@@ -79,6 +79,7 @@ private data class Detail(
     val row: ActivityRow,
     val points: List<StoredPoint>,
     val media: List<MediaRow>,
+    val analysis: dev.toufik.trailmark.analytics.Analysis,
 )
 
 @Composable
@@ -99,7 +100,13 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
         detail = withContext(Dispatchers.IO) {
             val repo = AppGraph.repository(context)
             val a = repo.activityById(activityId) ?: return@withContext null
-            Detail(a, repo.loadPoints(activityId), repo.listMedia(activityId))
+            val pts = repo.loadPoints(activityId)
+            Detail(
+                row = a,
+                points = pts,
+                media = repo.listMedia(activityId),
+                analysis = dev.toufik.trailmark.analytics.analyze(pts, a.elapsedNanos),
+            )
         }
         loading = false
     }
@@ -148,9 +155,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                         )
                         Text("${t.points} ${d.row.fixCount}", color = Palette.text, fontSize = 15.sp)
                     }
-                    val a = remember(d) {
-                        dev.toufik.trailmark.analytics.analyze(d.points, d.row.elapsedNanos)
-                    }
+                    val a = d.analysis
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(top = 6.dp).appearIn(2),
                         horizontalArrangement = Arrangement.SpaceBetween,
