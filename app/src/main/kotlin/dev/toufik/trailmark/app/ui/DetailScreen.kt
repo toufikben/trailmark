@@ -49,6 +49,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
@@ -87,6 +88,8 @@ private data class Detail(
     val points: List<StoredPoint>,
     val media: List<MediaRow>,
     val analysis: dev.toufik.trailmark.analytics.Analysis,
+    val speedKmh: List<Float>,
+    val elevM: List<Float>,
 )
 
 @Composable
@@ -112,11 +115,15 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
             val repo = AppGraph.repository(context)
             val a = repo.activityById(activityId) ?: return@withContext null
             val pts = repo.loadPoints(activityId)
+            val stride = (pts.size / 120).coerceAtLeast(1)
+            val sampled = if (stride == 1) pts else pts.filterIndexed { i, _ -> i % stride == 0 }
             Detail(
                 row = a,
                 points = pts,
                 media = repo.listMedia(activityId),
                 analysis = dev.toufik.trailmark.analytics.analyze(pts, a.elapsedNanos),
+                speedKmh = sampled.mapNotNull { it.speedMps?.let { s -> (s * 3.6).toFloat() } },
+                elevM = sampled.mapNotNull { it.altitudeM?.toFloat() },
             )
         }
         loading = false
@@ -322,6 +329,24 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                         },
                         dark = darkMap,
                     )
+                    if (d.speedKmh.size >= 2 || d.elevM.size >= 2) {
+                        Surface(
+                            color = Palette.surface,
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier.fillMaxWidth().padding(top = 10.dp).appearIn(4),
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                SeriesChart(title = t.speed, values = d.speedKmh, unit = t.kmh, color = Palette.accent)
+                                SeriesChart(
+                                    title = t.elevation,
+                                    values = d.elevM,
+                                    unit = t.metre,
+                                    color = Palette.textSecondary,
+                                    modifier = Modifier.padding(top = 12.dp),
+                                )
+                            }
+                        }
+                    }
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -462,6 +487,52 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
 }
 
 private fun sportOf(name: String): Sport = Sport.entries.firstOrNull { it.name == name } ?: Sport.RUN
+
+/** One sparkline: filled polyline of [values] with the max value labelled. */
+@Composable
+private fun SeriesChart(
+    title: String,
+    values: List<Float>,
+    unit: String,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    if (values.size < 2) return
+    val minV = values.min()
+    val maxV = values.max()
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(title, color = Palette.text, fontSize = 13.sp)
+            Text(
+                "${String.format(java.util.Locale.US, "%.1f", maxV)} $unit",
+                color = Palette.textSecondary,
+                fontSize = 12.sp,
+            )
+        }
+        Canvas(modifier = Modifier.fillMaxWidth().height(64.dp).padding(top = 6.dp)) {
+            val range = (maxV - minV).takeIf { it > 0.0001f } ?: 1f
+            val stepX = size.width / (values.size - 1)
+            val line = Path()
+            val fill = Path()
+            values.forEachIndexed { i, v ->
+                val x = i * stepX
+                val y = size.height - (v - minV) / range * size.height
+                if (i == 0) {
+                    line.moveTo(x, y)
+                    fill.moveTo(x, size.height)
+                    fill.lineTo(x, y)
+                } else {
+                    line.lineTo(x, y)
+                    fill.lineTo(x, y)
+                }
+            }
+            fill.lineTo(size.width, size.height)
+            fill.close()
+            drawPath(fill, color.copy(alpha = 0.15f))
+            drawPath(line, color, style = Stroke(width = 2.dp.toPx()))
+        }
+    }
+}
 
 /** Cumulative distance along the route at each point index, in metres. */
 private fun cumulativeMeters(points: List<StoredPoint>): DoubleArray {
