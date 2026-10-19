@@ -68,4 +68,28 @@ class GeoTest {
         val one = listOf(Pt(36.0, 3.0))
         assertEquals(one, douglasPeucker(one, 1.0, { it.lat }, { it.lon }))
     }
+
+    @Test
+    fun splitRunsBreaksAtMarkersAndDropsShortRuns() {
+        val pts = listOf(
+            Pt(1.0, 1.0),
+            Pt(1.1, 1.0),
+            Pt(9.0, 9.0),
+            Pt(2.0, 2.0),
+            Pt(2.1, 2.0),
+            Pt(2.2, 2.0),
+        )
+        val runs = splitRuns(pts) { it.lat == 9.0 }
+        assertEquals(2, runs.size)
+        assertEquals(listOf(Pt(1.0, 1.0), Pt(1.1, 1.0)), runs[0])
+        assertEquals(3, runs[1].size)
+        assertEquals(Pt(2.0, 2.0), runs[1].first())
+    }
+
+    @Test
+    fun splitRunsWithoutMarkersKeepsOneRun() {
+        val pts = listOf(Pt(1.0, 1.0), Pt(1.1, 1.0), Pt(1.2, 1.0))
+        assertEquals(1, splitRuns(pts) { false }.size)
+        assertEquals(0, splitRuns(pts) { true }.size)
+    }
 }

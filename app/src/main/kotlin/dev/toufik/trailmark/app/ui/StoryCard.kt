@@ -27,6 +27,7 @@ import dev.toufik.trailmark.app.distanceUnit
 import dev.toufik.trailmark.app.elevationUnit
 import dev.toufik.trailmark.app.speedUnit
 import dev.toufik.trailmark.core.geo.douglasPeucker
+import dev.toufik.trailmark.core.geo.splitRuns
 import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.core.model.WaypointType
 import java.io.File
@@ -119,7 +120,9 @@ private fun drawRoute(
 ) {
     val route = points.filter { it.type != WaypointType.REJECTED }
     if (route.size < 2) return
-    val drawRoute = douglasPeucker(route, 6.0, { it.lat }, { it.lon })
+    val runs = splitRuns(route) { it.type == WaypointType.IDLE }
+        .map { douglasPeucker(it, 6.0, { it.lat }, { it.lon }) }
+        .filter { it.size >= 2 }
 
     var minLat = Double.MAX_VALUE
     var maxLat = -Double.MAX_VALUE
@@ -143,11 +146,13 @@ private fun drawRoute(
     )
 
     val path = Path()
-    val (sx, sy) = px(drawRoute.first())
-    path.moveTo(sx, sy)
-    for (i in 1 until drawRoute.size) {
-        val (x, y) = px(drawRoute[i])
-        path.lineTo(x, y)
+    for (run in runs) {
+        val (rx0, ry0) = px(run.first())
+        path.moveTo(rx0, ry0)
+        for (i in 1 until run.size) {
+            val (x, y) = px(run[i])
+            path.lineTo(x, y)
+        }
     }
 
     val line = Paint().apply {
@@ -162,6 +167,7 @@ private fun drawRoute(
 
     val dot = Paint().apply { isAntiAlias = true; style = Paint.Style.FILL }
     dot.color = accent
+    val (sx, sy) = px(runs.firstOrNull()?.first() ?: route.first())
     canvas.drawCircle(sx, sy, 20f, dot)
     val (ex, ey) = px(route.last())
     dot.color = end

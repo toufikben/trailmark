@@ -48,6 +48,7 @@ import dev.toufik.trailmark.app.maps.ONLINE_STYLE_URL
 import dev.toufik.trailmark.app.maps.ONLINE_STYLE_URL_LIGHT
 import dev.toufik.trailmark.core.geo.RouteChunk
 import dev.toufik.trailmark.core.geo.douglasPeucker
+import dev.toufik.trailmark.core.geo.splitRuns
 import dev.toufik.trailmark.core.geo.haversineMeters
 import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.core.model.WaypointType
@@ -589,29 +590,37 @@ fun TrailmarkMap(
         )
     }
 
-    val displayRoute = remember(route) { douglasPeucker(route, 4.0, { it.lat }, { it.lon }) }
-    val displayGhost = remember(ghost) { douglasPeucker(ghost, 4.0, { it.lat }, { it.lon }) }
-    LaunchedEffect(displayRoute, displayGhost, style) {
+    val routeRuns = remember(route) {
+        splitRuns(route) { it.type == WaypointType.IDLE }
+            .map { douglasPeucker(it, 4.0, { it.lat }, { it.lon }) }
+            .filter { it.size >= 2 }
+    }
+    val ghostRuns = remember(ghost) {
+        splitRuns(ghost) { it.type == WaypointType.IDLE }
+            .map { douglasPeucker(it, 4.0, { it.lat }, { it.lon }) }
+            .filter { it.size >= 2 }
+    }
+    LaunchedEffect(routeRuns, ghostRuns, style) {
         val s = style ?: return@LaunchedEffect
-        val routeFc = if (displayRoute.size >= 2) {
+        val routeFc = if (routeRuns.isNotEmpty()) {
             FeatureCollection.fromFeatures(
-                arrayOf(
+                routeRuns.map { run ->
                     Feature.fromGeometry(
-                        LineString.fromLngLats(displayRoute.map { Point.fromLngLat(it.lon, it.lat) }),
-                    ),
-                ),
+                        LineString.fromLngLats(run.map { Point.fromLngLat(it.lon, it.lat) }),
+                    )
+                }.toTypedArray(),
             )
         } else {
             EMPTY
         }
         s.getSourceAs<GeoJsonSource>("route-source")?.setGeoJson(routeFc)
-        val ghostFc = if (displayGhost.size >= 2) {
+        val ghostFc = if (ghostRuns.isNotEmpty()) {
             FeatureCollection.fromFeatures(
-                arrayOf(
+                ghostRuns.map { run ->
                     Feature.fromGeometry(
-                        LineString.fromLngLats(displayGhost.map { Point.fromLngLat(it.lon, it.lat) }),
-                    ),
-                ),
+                        LineString.fromLngLats(run.map { Point.fromLngLat(it.lon, it.lat) }),
+                    )
+                }.toTypedArray(),
             )
         } else {
             EMPTY

@@ -97,3 +97,21 @@ fun <T> douglasPeucker(
     points.forEachIndexed { i, p -> if (keep[i]) out.add(p) }
     return out
 }
+
+/**
+ * Splits a track into contiguous runs, breaking before and after every marker
+ * that matches [isBreak] (and dropping the marker itself). Runs shorter than
+ * two points are dropped — a single point cannot draw a line.
+ */
+fun <T> splitRuns(points: List<T>, isBreak: (T) -> Boolean): List<List<T>> {
+    val out = ArrayList<List<T>>()
+    var start = 0
+    for (i in points.indices) {
+        if (isBreak(points[i])) {
+            if (i - start >= 2) out.add(points.subList(start, i).toList())
+            start = i + 1
+        }
+    }
+    if (points.size - start >= 2) out.add(points.subList(start, points.size).toList())
+    return out
+}
