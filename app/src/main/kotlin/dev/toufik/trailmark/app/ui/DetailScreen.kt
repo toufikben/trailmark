@@ -33,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -56,6 +57,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import dev.toufik.trailmark.analytics.ReplayTrack
 import dev.toufik.trailmark.app.AppGraph
+import dev.toufik.trailmark.app.LocalLang
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.WeatherNow
@@ -70,6 +72,7 @@ import dev.toufik.trailmark.engine.Sport
 import dev.toufik.trailmark.portable.Gpx
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private data class Detail(
@@ -82,6 +85,8 @@ private data class Detail(
 fun DetailScreen(activityId: Long, onBack: () -> Unit) {
     val context = LocalContext.current
     val t = LocalTexts.current
+    val langNow = LocalLang.current
+    val scope = rememberCoroutineScope()
     var detail by remember { mutableStateOf<Detail?>(null) }
     var loading by remember { mutableStateOf(true) }
     var viewerMedia by remember { mutableStateOf<MediaRow?>(null) }
@@ -174,6 +179,25 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                         TextButton(onClick = {
                             shareGpx(context, d.points, d.row.startWallMillis, d.row.id, t.share)
                         }) { Text(t.share, color = Palette.accent) }
+                        TextButton(onClick = {
+                            scope.launch {
+                                val card = withContext(Dispatchers.IO) {
+                                    renderStoryCard(
+                                        distanceM = d.row.distanceM,
+                                        elapsedNanos = d.row.elapsedNanos,
+                                        elevationGainM = a.elevationGainM,
+                                        maxSpeedMps = a.maxSpeedMps,
+                                        fixCount = d.row.fixCount,
+                                        startWallMillis = d.row.startWallMillis,
+                                        points = d.points,
+                                        t = t,
+                                        lang = langNow,
+                                        sport = d.row.sport,
+                                    )
+                                }
+                                shareStoryCardImage(context, card, d.row.id, t.storyCard)
+                            }
+                        }) { Text(t.storyCard, color = Palette.accent) }
                     }
                     val track = remember(d) { ReplayTrack(d.points) }
                     var playing by remember(d) { mutableStateOf(false) }

@@ -150,7 +150,7 @@ private fun LanguagePicker(lang: Lang, onLang: (Lang) -> Unit) {
                 shape = RoundedCornerShape(20.dp),
                 modifier = Modifier
                     .clickable { onLang(l) }
-                    .heightIn(min = 40.dp),
+                    .heightIn(min = 48.dp),
             ) {
                 Box(modifier = Modifier.padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
                     Text(

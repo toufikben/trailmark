@@ -49,6 +49,7 @@ import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.SportPicker
 import dev.toufik.trailmark.app.WeatherNow
 import dev.toufik.trailmark.app.WeatherService
+import dev.toufik.trailmark.app.WeatherWindow
 import dev.toufik.trailmark.app.formatDistance
 import dev.toufik.trailmark.app.formatDuration
 import dev.toufik.trailmark.app.maps.MapPacks
@@ -82,6 +83,7 @@ fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
     var plan by remember { mutableStateOf<PlannedRoute?>(null) }
     var loading by remember { mutableStateOf(false) }
     var destWeather by remember { mutableStateOf<WeatherNow?>(null) }
+    var bestWindow by remember { mutableStateOf<WeatherWindow?>(null) }
     var cardH by remember { mutableStateOf(0.dp) }
     val density = LocalDensity.current
 
@@ -108,9 +110,11 @@ fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
         val d = dest
         if (d == null) {
             destWeather = null
+            bestWindow = null
             return@LaunchedEffect
         }
         destWeather = WeatherService.at(d.first, d.second)
+        bestWindow = WeatherService.bestWindow(d.first, d.second)
     }
 
     Surface(color = Palette.bg, modifier = modifier.fillMaxSize()) {
@@ -231,7 +235,19 @@ fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
                             }
                             destWeather?.let { w ->
                                 Spacer(Modifier.height(10.dp))
-                                WeatherChip(t = t, w = w)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    WeatherChip(t = t, w = w)
+                                    bestWindow?.let { bw ->
+                                        Text(
+                                            "${t.bestWindow} ${bw.label}",
+                                            color = Palette.textSecondary,
+                                            fontSize = 12.sp,
+                                        )
+                                    }
+                                }
                             }
                             if (p.direct) {
                                 Spacer(Modifier.height(10.dp))
