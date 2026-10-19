@@ -48,6 +48,7 @@ val ZH_TEXTS = Texts(
     caption = "说明文字",
     healthConnect = "Health Connect",
     connect = "连接",
+    weight = "体重",
     importGpx = "导入 GPX",
     elevation = "累计爬升",
     maxSpeed = "最高",

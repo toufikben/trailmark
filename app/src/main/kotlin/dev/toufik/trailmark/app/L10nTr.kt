@@ -48,6 +48,7 @@ val TR_TEXTS = Texts(
     caption = "Başlık",
     healthConnect = "Health Connect",
     connect = "Bağlan",
+    weight = "Kilo",
     importGpx = "GPX içe aktar",
     elevation = "Tırmanış",
     maxSpeed = "Maks",

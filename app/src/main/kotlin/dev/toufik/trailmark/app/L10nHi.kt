@@ -48,6 +48,7 @@ val HI_TEXTS = Texts(
     caption = "कैप्शन",
     healthConnect = "Health Connect",
     connect = "कनेक्ट करें",
+    weight = "वज़न",
     importGpx = "GPX आयात करें",
     elevation = "ऊँचाई",
     maxSpeed = "अधिकतम",

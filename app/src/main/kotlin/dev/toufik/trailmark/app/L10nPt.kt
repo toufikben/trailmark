@@ -48,6 +48,7 @@ val PT_TEXTS = Texts(
     caption = "Legenda",
     healthConnect = "Health Connect",
     connect = "Conectar",
+    weight = "Peso",
     importGpx = "Importar GPX",
     elevation = "Elevação",
     maxSpeed = "Máx",

@@ -48,6 +48,7 @@ val JA_TEXTS = Texts(
     caption = "キャプション",
     healthConnect = "Health Connect",
     connect = "接続",
+    weight = "体重",
     importGpx = "GPX をインポート",
     elevation = "獲得標高",
     maxSpeed = "最大",

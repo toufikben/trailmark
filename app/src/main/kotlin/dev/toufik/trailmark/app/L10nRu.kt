@@ -48,6 +48,7 @@ val RU_TEXTS = Texts(
     caption = "Подпись",
     healthConnect = "Health Connect",
     connect = "Подключить",
+    weight = "Вес",
     importGpx = "Импорт GPX",
     elevation = "Набор высоты",
     maxSpeed = "Макс",

@@ -21,8 +21,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -40,6 +43,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.health.connect.client.PermissionController
@@ -220,6 +225,38 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                             prefs.edit().putBoolean("health_sync", false).apply()
                         }
                     }
+                }
+            }
+            Spacer(Modifier.height(24.dp))
+            Text(t.weight, color = Palette.textSecondary, fontSize = 13.sp)
+            Spacer(Modifier.height(8.dp))
+            var weightText by remember {
+                mutableStateOf(prefs.getFloat("weight_kg", 70f).toInt().toString())
+            }
+            Surface(color = Palette.surface, shape = RoundedCornerShape(16.dp)) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    BasicTextField(
+                        value = weightText,
+                        onValueChange = { s ->
+                            val clean = s.filter { it.isDigit() }.take(3)
+                            weightText = clean
+                            clean.toIntOrNull()?.let { v ->
+                                if (v in 30..250) {
+                                    prefs.edit().putFloat("weight_kg", v.toFloat()).apply()
+                                }
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        textStyle = TextStyle(color = Palette.text, fontSize = 16.sp),
+                        singleLine = true,
+                        modifier = Modifier
+                            .width(56.dp)
+                            .heightIn(min = 44.dp),
+                    )
+                    Text("kg", color = Palette.textSecondary, fontSize = 13.sp)
                 }
             }
             Spacer(Modifier.height(24.dp))

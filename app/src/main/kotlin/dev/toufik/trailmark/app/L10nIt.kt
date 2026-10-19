@@ -48,6 +48,7 @@ val IT_TEXTS = Texts(
     caption = "Didascalia",
     healthConnect = "Health Connect",
     connect = "Connetti",
+    weight = "Peso",
     importGpx = "Importa GPX",
     elevation = "Dislivello",
     maxSpeed = "Max",

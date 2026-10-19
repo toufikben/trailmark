@@ -48,6 +48,7 @@ val ES_TEXTS = Texts(
     caption = "Pie de foto",
     healthConnect = "Health Connect",
     connect = "Conectar",
+    weight = "Peso",
     importGpx = "Importar GPX",
     elevation = "Desnivel",
     maxSpeed = "Máx",

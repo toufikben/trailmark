@@ -48,6 +48,7 @@ val NL_TEXTS = Texts(
     caption = "Bijschrift",
     healthConnect = "Health Connect",
     connect = "Verbinden",
+    weight = "Gewicht",
     importGpx = "GPX importeren",
     elevation = "Hoogtemeters",
     maxSpeed = "Max",

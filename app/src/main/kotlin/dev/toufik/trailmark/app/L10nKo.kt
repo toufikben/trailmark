@@ -48,6 +48,7 @@ val KO_TEXTS = Texts(
     caption = "캡션",
     healthConnect = "Health Connect",
     connect = "연결",
+    weight = "체중",
     importGpx = "GPX 가져오기",
     elevation = "고도",
     maxSpeed = "최고",
