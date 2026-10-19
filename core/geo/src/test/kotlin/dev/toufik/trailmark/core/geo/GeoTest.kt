@@ -27,4 +27,45 @@ class GeoTest {
         val d = haversineMeters(36.7538, 3.1856, 36.7538, 3.1856 + dLon)
         assertEquals(1000.0, d, 3.0)
     }
+
+    private data class Pt(val lat: Double, val lon: Double)
+
+    @Test
+    fun simplificationKeepsEndpointsAndDropsCollinearPoints() {
+        val line = (0..10).map { Pt(36.0 + it * 0.0001, 3.0) }
+        val out = douglasPeucker(line, 1.0, { it.lat }, { it.lon })
+        assertEquals(2, out.size)
+        assertEquals(line.first(), out.first())
+        assertEquals(line.last(), out.last())
+    }
+
+    @Test
+    fun simplificationKeepsSharpCorners() {
+        val pts = listOf(
+            Pt(36.0, 3.0),
+            Pt(36.0, 3.0005),
+            Pt(36.0005, 3.0005),
+            Pt(36.0005, 3.001),
+        )
+        val out = douglasPeucker(pts, 1.0, { it.lat }, { it.lon })
+        assertEquals(pts, out)
+    }
+
+    @Test
+    fun simplificationDropsTinyDeviations() {
+        val pts = listOf(
+            Pt(36.0, 3.0),
+            Pt(36.00001, 3.0005),
+            Pt(36.0, 3.001),
+        )
+        val out = douglasPeucker(pts, 5.0, { it.lat }, { it.lon })
+        assertEquals(2, out.size)
+    }
+
+    @Test
+    fun simplificationHandlesShortAndEmptyInput() {
+        assertEquals(emptyList<Pt>(), douglasPeucker(emptyList<Pt>(), 1.0, { it.lat }, { it.lon }))
+        val one = listOf(Pt(36.0, 3.0))
+        assertEquals(one, douglasPeucker(one, 1.0, { it.lat }, { it.lon }))
+    }
 }

@@ -21,6 +21,7 @@ import dev.toufik.trailmark.app.formatDate
 import dev.toufik.trailmark.app.formatDistance
 import dev.toufik.trailmark.app.formatDuration
 import dev.toufik.trailmark.app.formatPace
+import dev.toufik.trailmark.core.geo.douglasPeucker
 import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.core.model.WaypointType
 import java.io.File
@@ -114,6 +115,7 @@ private fun drawRoute(
 ) {
     val route = points.filter { it.type != WaypointType.REJECTED }
     if (route.size < 2) return
+    val drawRoute = douglasPeucker(route, 6.0, { it.lat }, { it.lon })
 
     var minLat = Double.MAX_VALUE
     var maxLat = -Double.MAX_VALUE
@@ -137,10 +139,10 @@ private fun drawRoute(
     )
 
     val path = Path()
-    val (sx, sy) = px(route.first())
+    val (sx, sy) = px(drawRoute.first())
     path.moveTo(sx, sy)
-    for (i in 1 until route.size) {
-        val (x, y) = px(route[i])
+    for (i in 1 until drawRoute.size) {
+        val (x, y) = px(drawRoute[i])
         path.lineTo(x, y)
     }
 

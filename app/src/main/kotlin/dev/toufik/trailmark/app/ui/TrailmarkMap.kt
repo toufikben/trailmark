@@ -47,6 +47,7 @@ import dev.toufik.trailmark.app.maps.GlyphStore
 import dev.toufik.trailmark.app.maps.ONLINE_STYLE_URL
 import dev.toufik.trailmark.app.maps.ONLINE_STYLE_URL_LIGHT
 import dev.toufik.trailmark.core.geo.RouteChunk
+import dev.toufik.trailmark.core.geo.douglasPeucker
 import dev.toufik.trailmark.core.geo.haversineMeters
 import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.core.model.WaypointType
@@ -588,13 +589,15 @@ fun TrailmarkMap(
         )
     }
 
-    LaunchedEffect(route, ghost, style) {
+    val displayRoute = remember(route) { douglasPeucker(route, 4.0, { it.lat }, { it.lon }) }
+    val displayGhost = remember(ghost) { douglasPeucker(ghost, 4.0, { it.lat }, { it.lon }) }
+    LaunchedEffect(displayRoute, displayGhost, style) {
         val s = style ?: return@LaunchedEffect
-        val routeFc = if (route.size >= 2) {
+        val routeFc = if (displayRoute.size >= 2) {
             FeatureCollection.fromFeatures(
                 arrayOf(
                     Feature.fromGeometry(
-                        LineString.fromLngLats(route.map { Point.fromLngLat(it.lon, it.lat) }),
+                        LineString.fromLngLats(displayRoute.map { Point.fromLngLat(it.lon, it.lat) }),
                     ),
                 ),
             )
@@ -602,11 +605,11 @@ fun TrailmarkMap(
             EMPTY
         }
         s.getSourceAs<GeoJsonSource>("route-source")?.setGeoJson(routeFc)
-        val ghostFc = if (ghost.size >= 2) {
+        val ghostFc = if (displayGhost.size >= 2) {
             FeatureCollection.fromFeatures(
                 arrayOf(
                     Feature.fromGeometry(
-                        LineString.fromLngLats(ghost.map { Point.fromLngLat(it.lon, it.lat) }),
+                        LineString.fromLngLats(displayGhost.map { Point.fromLngLat(it.lon, it.lat) }),
                     ),
                 ),
             )
