@@ -54,6 +54,7 @@ val ES_TEXTS = Texts(
     exportAll = "Exportar todo",
     elevation = "Desnivel",
     maxSpeed = "Máx",
+    gapPace = "Ritmo ajustado",
     time = "Tiempo",
     pace = "Ritmo",
     speed = "Velocidad",

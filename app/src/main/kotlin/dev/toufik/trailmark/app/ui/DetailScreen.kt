@@ -97,6 +97,7 @@ private data class Detail(
     val points: List<StoredPoint>,
     val media: List<MediaRow>,
     val analysis: dev.toufik.trailmark.analytics.Analysis,
+    val gapPaceSecPerKm: Double?,
     val speedKmh: List<Float>,
     val elevM: List<Float>,
 )
@@ -142,6 +143,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                 points = pts,
                 media = repo.listMedia(activityId),
                 analysis = dev.toufik.trailmark.analytics.analyze(pts, a.elapsedNanos),
+                gapPaceSecPerKm = dev.toufik.trailmark.engine.Gap.gapPaceSecPerKm(pts),
                 speedKmh = sampled.mapNotNull {
                     it.speedMps?.let { s -> (s * (if (Units.imperial) 2.2369362920544 else 3.6)).toFloat() }
                 },
@@ -229,6 +231,15 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                             "${t.maxSpeed} ${formatSpeed(a.maxSpeedMps)} ${speedUnit(t)}",
                             color = Palette.textSecondary,
                             fontSize = 14.sp,
+                        )
+                    }
+                    val gapPace = d.gapPaceSecPerKm
+                    if (gapPace != null) {
+                        Text(
+                            "${t.gapPace} ${formatPace(gapPace)}",
+                            color = Palette.textSecondary,
+                            fontSize = 14.sp,
+                            modifier = Modifier.padding(top = 6.dp).appearIn(2),
                         )
                     }
                     val wTemp = d.row.weatherTempC

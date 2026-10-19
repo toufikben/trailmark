@@ -54,6 +54,7 @@ val HI_TEXTS = Texts(
     exportAll = "सभी निर्यात करें",
     elevation = "ऊँचाई",
     maxSpeed = "अधिकतम",
+    gapPace = "समायोजित गति",
     time = "समय",
     pace = "गति-दर",
     speed = "रफ़्तार",

@@ -54,6 +54,7 @@ val KO_TEXTS = Texts(
     exportAll = "모두 내보내기",
     elevation = "고도",
     maxSpeed = "최고",
+    gapPace = "보정 페이스",
     time = "시간",
     pace = "페이스",
     speed = "속도",

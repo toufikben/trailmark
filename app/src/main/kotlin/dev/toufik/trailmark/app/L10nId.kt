@@ -54,6 +54,7 @@ val ID_TEXTS = Texts(
     exportAll = "Ekspor semua",
     elevation = "Elevasi",
     maxSpeed = "Maks",
+    gapPace = "Pace disesuaikan",
     time = "Waktu",
     pace = "Pace",
     speed = "Kecepatan",

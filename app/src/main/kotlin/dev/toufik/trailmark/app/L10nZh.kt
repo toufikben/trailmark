@@ -54,6 +54,7 @@ val ZH_TEXTS = Texts(
     exportAll = "导出全部",
     elevation = "累计爬升",
     maxSpeed = "最高",
+    gapPace = "调整配速",
     time = "时间",
     pace = "配速",
     speed = "速度",

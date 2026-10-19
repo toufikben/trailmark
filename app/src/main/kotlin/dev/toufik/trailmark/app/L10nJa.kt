@@ -54,6 +54,7 @@ val JA_TEXTS = Texts(
     exportAll = "すべてエクスポート",
     elevation = "獲得標高",
     maxSpeed = "最大",
+    gapPace = "補正ペース",
     time = "時間",
     pace = "ペース",
     speed = "スピード",

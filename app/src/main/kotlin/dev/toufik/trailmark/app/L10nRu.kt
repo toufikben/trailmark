@@ -54,6 +54,7 @@ val RU_TEXTS = Texts(
     exportAll = "Экспорт всех",
     elevation = "Набор высоты",
     maxSpeed = "Макс",
+    gapPace = "Скорректированный темп",
     time = "Время",
     pace = "Темп",
     speed = "Скорость",

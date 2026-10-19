@@ -54,6 +54,7 @@ val DE_TEXTS = Texts(
     exportAll = "Alle exportieren",
     elevation = "Höhenmeter",
     maxSpeed = "Max",
+    gapPace = "GAP-Pace",
     time = "Zeit",
     pace = "Pace",
     speed = "Tempo",

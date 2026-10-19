@@ -54,6 +54,7 @@ val IT_TEXTS = Texts(
     exportAll = "Esporta tutto",
     elevation = "Dislivello",
     maxSpeed = "Max",
+    gapPace = "Passo adattato",
     time = "Tempo",
     pace = "Passo",
     speed = "Velocità",

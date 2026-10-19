@@ -54,6 +54,7 @@ val TR_TEXTS = Texts(
     exportAll = "Tümünü dışa aktar",
     elevation = "Tırmanış",
     maxSpeed = "Maks",
+    gapPace = "Düzeltilmiş tempo",
     time = "Süre",
     pace = "Tempo",
     speed = "Hız",
