@@ -40,6 +40,7 @@ val RU_TEXTS = Texts(
     miles = "мили",
     mph = "миль/ч",
     feet = "фут",
+    attempts = "Попытки",
     importGpx = "Импорт GPX",
     elevation = "Набор высоты",
     maxSpeed = "Макс",

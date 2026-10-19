@@ -61,6 +61,7 @@ import dev.toufik.trailmark.app.distanceUnit
 import dev.toufik.trailmark.app.formatDistance
 import dev.toufik.trailmark.app.formatDuration
 import dev.toufik.trailmark.data.ActivityRow
+import dev.toufik.trailmark.data.SegmentStat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Calendar
@@ -81,6 +82,7 @@ fun ProgressScreen() {
     val t = LocalTexts.current
     var rows by remember { mutableStateOf<List<ActivityRow>?>(null) }
     var records by remember { mutableStateOf<PersonalRecords?>(null) }
+    var segments by remember { mutableStateOf<List<SegmentStat>>(emptyList()) }
     var sport by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
@@ -95,6 +97,7 @@ fun ProgressScreen() {
                 .map { repo.loadPoints(it.id) }
             personalRecords(routes)
         }
+        segments = withContext(Dispatchers.IO) { AppGraph.repository(context).segmentStats() }
     }
 
     Surface(color = Palette.bg, modifier = Modifier.fillMaxSize()) {
@@ -141,6 +144,7 @@ fun ProgressScreen() {
                             WeeklyCard(t, filtered)
                             if (sport == null) {
                                 records?.let { RecordsCard(t, it) }
+                                if (segments.isNotEmpty()) SegmentsCard(t, segments)
                                 SportSplitCard(t, list)
                             }
                             AchievementsCard(t, list)
@@ -271,6 +275,44 @@ private fun RecordsCard(t: Texts, records: PersonalRecords) {
                             )
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SegmentsCard(t: Texts, segments: List<SegmentStat>) {
+    Surface(
+        color = Palette.surface,
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp)
+            .appearIn(4),
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Text(t.segments, color = Palette.text, fontSize = 14.sp)
+            segments.forEach { s ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(s.name, color = Palette.text, fontSize = 14.sp, maxLines = 1)
+                        Text(
+                            "${s.attempts} ${t.attempts}",
+                            color = Palette.textSecondary,
+                            fontSize = 12.sp,
+                        )
+                    }
+                    Text(
+                        s.bestNanos?.let { formatDuration(it) } ?: "--:--",
+                        color = Palette.accent,
+                        fontSize = 14.sp,
+                    )
                 }
             }
         }

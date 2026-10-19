@@ -67,6 +67,14 @@ class EffortRow(
     val elapsedNanos: Long,
 )
 
+/** Aggregate per segment: attempt count and the best elapsed time, if any. */
+class SegmentStat(
+    val id: Long,
+    val name: String,
+    val attempts: Long,
+    val bestNanos: Long?,
+)
+
 /**
  * The write/read boundary. Every point is durable before the next arrives; the
  * checkpoint maps the unmeasured 1σ to SQL NULL and back to the sentinel, so a
@@ -328,6 +336,11 @@ class ActivityRepository(private val db: TrailmarkDb) {
     fun effortsForActivity(activityId: Long): List<EffortRow> =
         q.effortsForActivity(activity_id = activityId).executeAsList().map {
             EffortRow(it.id, it.segment_id, it.name, it.elapsed_nanos)
+        }
+
+    fun segmentStats(): List<SegmentStat> =
+        q.segmentStats().executeAsList().map {
+            SegmentStat(it.segment_id, it.name, it.attempts, it.best_nanos)
         }
 
     fun flag(key: String, default: Boolean = false): Boolean =

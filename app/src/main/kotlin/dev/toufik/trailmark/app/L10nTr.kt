@@ -40,6 +40,7 @@ val TR_TEXTS = Texts(
     miles = "mil",
     mph = "mil/sa",
     feet = "fit",
+    attempts = "Denemeler",
     importGpx = "GPX içe aktar",
     elevation = "Tırmanış",
     maxSpeed = "Maks",

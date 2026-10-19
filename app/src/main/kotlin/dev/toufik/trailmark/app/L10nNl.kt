@@ -40,6 +40,7 @@ val NL_TEXTS = Texts(
     miles = "mi",
     mph = "mph",
     feet = "voet",
+    attempts = "Pogingen",
     importGpx = "GPX importeren",
     elevation = "Hoogtemeters",
     maxSpeed = "Max",

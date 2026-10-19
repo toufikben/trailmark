@@ -40,6 +40,7 @@ val ID_TEXTS = Texts(
     miles = "mil",
     mph = "mph",
     feet = "kaki",
+    attempts = "Percobaan",
     importGpx = "Impor GPX",
     elevation = "Elevasi",
     maxSpeed = "Maks",

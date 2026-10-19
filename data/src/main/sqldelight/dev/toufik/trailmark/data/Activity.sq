@@ -159,3 +159,9 @@ effortsForActivity:
 SELECT e.id, e.segment_id, e.elapsed_nanos, s.name
 FROM segment_effort e JOIN segment s ON s.id = e.segment_id
 WHERE e.activity_id = ? ORDER BY e.id ASC;
+
+segmentStats:
+SELECT s.id AS segment_id, s.name AS name, count(e.id) AS attempts, min(e.elapsed_nanos) AS best_nanos
+FROM segment s LEFT JOIN segment_effort e ON e.segment_id = s.id
+GROUP BY s.id, s.name
+ORDER BY s.id ASC;

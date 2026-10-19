@@ -40,6 +40,7 @@ val ZH_TEXTS = Texts(
     miles = "英里",
     mph = "英里/时",
     feet = "英尺",
+    attempts = "尝试次数",
     importGpx = "导入 GPX",
     elevation = "累计爬升",
     maxSpeed = "最高",
