@@ -2,6 +2,7 @@ package dev.toufik.trailmark.app.ui
 
 import android.Manifest
 import android.content.Context
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
@@ -15,14 +16,19 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -52,10 +58,12 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import dev.toufik.trailmark.app.LocalLang
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.SportPicker
+import dev.toufik.trailmark.app.Texts
 import dev.toufik.trailmark.app.WeatherNow
 import dev.toufik.trailmark.app.WeatherService
 import dev.toufik.trailmark.app.WeatherWindow
@@ -67,6 +75,8 @@ import dev.toufik.trailmark.app.formatElevation
 import dev.toufik.trailmark.app.geocode.PlaceResult
 import dev.toufik.trailmark.app.geocode.PlaceSearch
 import dev.toufik.trailmark.app.maps.MapPacks
+import dev.toufik.trailmark.app.maps.SavedRoute
+import dev.toufik.trailmark.app.maps.SavedRoutes
 import dev.toufik.trailmark.app.plan.PlannedRoute
 import dev.toufik.trailmark.app.plan.RoutePlanner
 import dev.toufik.trailmark.app.service.PlanRouteHolder
@@ -102,6 +112,10 @@ fun PlanScreen(
     var stops by remember { mutableStateOf<List<Pair<Double, Double>>>(emptyList()) }
     var drafting by remember { mutableStateOf(false) }
     var anchor by remember { mutableStateOf<StoredPoint?>(null) }
+    var useAnchor by remember { mutableStateOf(true) }
+    var showSaved by remember { mutableStateOf(false) }
+    var savedVersion by remember { mutableStateOf(0) }
+    val savedRoutes = remember(savedVersion) { SavedRoutes(context).all() }
     val packPath = remember(anchor, stops) {
         val lat = anchor?.lat ?: stops.firstOrNull()?.first
         val lon = anchor?.lon ?: stops.firstOrNull()?.second
@@ -122,10 +136,10 @@ fun PlanScreen(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { }
 
-    LaunchedEffect(stops, sport, anchor) {
+    LaunchedEffect(stops, sport, anchor, useAnchor) {
         val a = anchor
         val waypoints = buildList {
-            if (a != null) add(a.lat to a.lon)
+            if (useAnchor && a != null) add(a.lat to a.lon)
             addAll(stops)
         }
         if (waypoints.size < 2) {
@@ -164,8 +178,102 @@ fun PlanScreen(
         searching = false
     }
 
+    val saveCurrent: () -> Unit = {
+        val p = plan
+        if (p != null) {
+            val pts = buildList {
+                if (useAnchor) anchor?.let { add(it.lat to it.lon) }
+                addAll(stops)
+            }
+            if (pts.size >= 2) {
+                val name = sportLabel(t, sport) + " · " + formatDistance(p.distanceM) + " " + distanceUnit(t)
+                SavedRoutes(context).save(
+                    SavedRoute(
+                        id = System.currentTimeMillis(),
+                        name = name,
+                        sport = sport.name,
+                        stops = pts,
+                        distanceKm = p.distanceM / 1000.0,
+                        climbM = p.ascentM.toInt(),
+                    ),
+                )
+                savedVersion += 1
+                Toast.makeText(context, t.routeSaved, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    val loadSaved: (SavedRoute) -> Unit = { r ->
+        useAnchor = false
+        anchor = null
+        stops = r.stops
+        sport = runCatching { Sport.valueOf(r.sport) }.getOrDefault(Sport.RUN)
+        drafting = false
+        showSaved = false
+    }
+
     Surface(color = Palette.bg, modifier = modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize().statusBarsPadding()) {
+            if (showSaved) {
+                Dialog(onDismissRequest = { showSaved = false }) {
+                    Surface(
+                        color = Palette.surface,
+                        shape = RoundedCornerShape(18.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(Modifier.padding(16.dp)) {
+                            Text(t.savedRoutes, color = Palette.text, fontSize = 18.sp)
+                            Spacer(Modifier.height(8.dp))
+                            if (savedRoutes.isEmpty()) {
+                                Text(t.noSavedRoutes, color = Palette.textSecondary, fontSize = 13.sp)
+                            } else {
+                                Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+                                    savedRoutes.forEach { r ->
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            Column(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .clip(RoundedCornerShape(10.dp))
+                                                    .clickable { loadSaved(r) }
+                                                    .padding(vertical = 10.dp),
+                                            ) {
+                                                Text(
+                                                    r.name,
+                                                    color = Palette.text,
+                                                    fontSize = 14.sp,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                                Text(
+                                                    sportLabel(
+                                                        t,
+                                                        runCatching { Sport.valueOf(r.sport) }.getOrDefault(Sport.RUN),
+                                                    ) + " · " +
+                                                        String.format(java.util.Locale.US, "%.1f", r.distanceKm),
+                                                    color = Palette.textSecondary,
+                                                    fontSize = 12.sp,
+                                                )
+                                            }
+                                            IconButton(onClick = {
+                                                SavedRoutes(context).delete(r.id)
+                                                savedVersion += 1
+                                            }) {
+                                                Icon(
+                                                    Icons.Filled.Delete,
+                                                    contentDescription = t.delete,
+                                                    tint = Palette.textSecondary,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             Box(
                 Modifier
                     .fillMaxSize()
@@ -181,7 +289,7 @@ fun PlanScreen(
                         stops = stops + (lat to lon)
                         drafting = true
                     },
-                    onUserFix = { sp -> if (anchor == null) anchor = sp },
+                    onUserFix = { sp -> if (useAnchor && anchor == null) anchor = sp },
                     onNeedPermission = {
                         locateLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION))
                     },
@@ -211,6 +319,15 @@ fun PlanScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(Palette.surface.copy(alpha = 0.85f)),
+                        ) {
+                            IconButton(onClick = { showSaved = true }, modifier = Modifier.size(48.dp)) {
+                                Icon(Icons.Filled.List, contentDescription = t.savedRoutes, tint = Palette.text)
+                            }
+                        }
                         Row(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(24.dp))
@@ -332,11 +449,19 @@ fun PlanScreen(
             ) {
                 Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp)) {
                     when {
-                        stops.isEmpty() -> Text(
-                            t.pickDestination,
-                            color = Palette.textSecondary,
-                            fontSize = 13.sp,
-                        )
+                        stops.isEmpty() -> Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                t.pickDestination,
+                                color = Palette.textSecondary,
+                                fontSize = 13.sp,
+                                modifier = Modifier.weight(1f),
+                            )
+                            if (savedRoutes.isNotEmpty()) {
+                                TextButton(onClick = { showSaved = true }) {
+                                    Text("${t.savedRoutes} (${savedRoutes.size})", color = Palette.accent, fontSize = 12.sp)
+                                }
+                            }
+                        }
                         drafting -> Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 "${t.points} ${stops.size}",
@@ -346,7 +471,10 @@ fun PlanScreen(
                             Spacer(Modifier.weight(1f))
                             TextButton(onClick = {
                                 stops = stops.dropLast(1)
-                                if (stops.isEmpty()) drafting = false
+                                if (stops.isEmpty()) {
+                                    drafting = false
+                                    useAnchor = true
+                                }
                             }) {
                                 Text("↶", color = Palette.accent, fontSize = 18.sp)
                             }
@@ -354,6 +482,7 @@ fun PlanScreen(
                                 stops = emptyList()
                                 plan = null
                                 drafting = false
+                                useAnchor = true
                             }) {
                                 Text(t.clear, color = Palette.accent)
                             }
@@ -462,19 +591,28 @@ fun PlanScreen(
                                 )
                             }
                             Spacer(Modifier.height(12.dp))
-                            Button(
-                                onClick = {
-                                    PlanRouteHolder.set(p.chunks)
-                                    onStartRoute()
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Palette.accent,
-                                    contentColor = Palette.bg,
-                                ),
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth().height(44.dp),
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text(t.startRoute, fontSize = 14.sp)
+                                Button(
+                                    onClick = {
+                                        PlanRouteHolder.set(p.chunks)
+                                        onStartRoute()
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Palette.accent,
+                                        contentColor = Palette.bg,
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.weight(1f).height(44.dp),
+                                ) {
+                                    Text(t.startRoute, fontSize = 14.sp)
+                                }
+                                Spacer(Modifier.width(8.dp))
+                                TextButton(onClick = { saveCurrent() }) {
+                                    Text(t.saveRoute, color = Palette.accent, fontSize = 13.sp)
+                                }
                             }
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -492,6 +630,7 @@ fun PlanScreen(
                                 TextButton(onClick = {
                                     stops = emptyList()
                                     plan = null
+                                    useAnchor = true
                                 }) {
                                     Text(t.clear, color = Palette.accent)
                                 }
@@ -510,6 +649,13 @@ private fun PlanStat(value: String, label: String, accent: Boolean = false) {
         Text(value, color = if (accent) Palette.accent else Palette.text, fontSize = 16.sp)
         Text(label, color = Palette.textSecondary, fontSize = 11.sp)
     }
+}
+
+private fun sportLabel(t: Texts, sport: Sport): String = when (sport) {
+    Sport.WALK -> t.walk
+    Sport.RUN -> t.run
+    Sport.BIKE -> t.bike
+    Sport.HIKE -> t.hike
 }
 
 /** Mini elevation profile; each segment uses the same grade color as the route line. */
