@@ -13,6 +13,7 @@ sealed interface CoachEvent {
     data class Overtook(val metres: Int) : CoachEvent
     data class GotOvertaken(val metres: Int) : CoachEvent
     data class Milestone(val km: Int) : CoachEvent
+    data class SegmentStart(val name: String) : CoachEvent
     data class Finish(val distanceM: Double, val seconds: Long, val isRecord: Boolean) : CoachEvent
 }
 
@@ -55,6 +56,7 @@ object Coach {
             is CoachEvent.Overtook -> fill(pick, "m" to event.metres.toString())
             is CoachEvent.GotOvertaken -> fill(pick, "m" to event.metres.toString())
             is CoachEvent.Milestone -> fill(pick, "km" to event.km.toString())
+            is CoachEvent.SegmentStart -> fill(pick, "name" to event.name)
             is CoachEvent.Finish -> fill(
                 pick,
                 "km" to km(event.distanceM),
@@ -112,6 +114,11 @@ object Coach {
             Locale.AR -> listOf("{km} كم! استمر", "تجاوزت {km} كم — أحسنت.")
             Locale.FR -> listOf("{km} km ! Continue", "{km} km passés — bien joué.")
             Locale.EN -> listOf("{km} km down! Keep going", "{km} km in — nice work.")
+        }
+        is CoachEvent.SegmentStart -> when (locale) {
+            Locale.AR -> listOf("بداية المقطع: {name} — ركّز!", "مقطع {name} يبدأ الآن.")
+            Locale.FR -> listOf("Début du segment : {name} — concentre-toi !", "Segment {name} — c'est parti.")
+            Locale.EN -> listOf("Segment start: {name} — focus!", "Segment {name} begins now.")
         }
         is CoachEvent.Finish -> when (locale) {
             Locale.AR -> listOf(

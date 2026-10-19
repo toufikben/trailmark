@@ -43,4 +43,11 @@ class CoachTest {
     fun behindIncludesSeconds() {
         assertEquals(true, Coach.message(CoachEvent.Behind(8), Locale.EN, 0).contains("8"))
     }
+
+    @Test
+    fun segmentStartNamesTheSegment() {
+        assertTrue(Coach.message(CoachEvent.SegmentStart("Mont Bouzareah"), Locale.EN, 0).contains("Mont Bouzareah"))
+        assertTrue(Coach.message(CoachEvent.SegmentStart("Mont Bouzareah"), Locale.AR, 0).contains("Mont Bouzareah"))
+        assertTrue(Coach.message(CoachEvent.SegmentStart("Mont Bouzareah"), Locale.FR, 1).contains("Mont Bouzareah"))
+    }
 }

@@ -51,6 +51,8 @@ class RecordingService : Service() {
     private var weatherJob: Job? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var tts: TextToSpeech? = null
+    private var segStarts: List<dev.toufik.trailmark.data.SegmentRow> = emptyList()
+    private val alertedSegments = mutableSetOf<Long>()
 
     @Volatile
     private var ttsReady = false
@@ -116,6 +118,12 @@ class RecordingService : Service() {
             sport = sport,
         )
         controller = c
+        scope.launch {
+            runCatching {
+                segStarts = dev.toufik.trailmark.app.AppGraph.repository(this@RecordingService)
+                    .listSegments()
+            }
+        }
         stateJob = scope.launch { c.state.collect { RecordingHolder.update(it) } }
         notifJob = scope.launch {
             val mgr = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -167,6 +175,29 @@ class RecordingService : Service() {
                                 null,
                                 "milestone-$km",
                             )
+                        }
+                        val la = st.currentLat
+                        val lo = st.currentLon
+                        if (la != null && lo != null) {
+                            for (s in segStarts) {
+                                if (s.id in alertedSegments) continue
+                                val near = dev.toufik.trailmark.core.geo.haversineMeters(
+                                    la, lo, s.startLat, s.startLon,
+                                ) < 30.0
+                                if (near) {
+                                    alertedSegments.add(s.id)
+                                    tts?.speak(
+                                        Coach.message(
+                                            CoachEvent.SegmentStart(s.name),
+                                            coachLocale(currentLang()),
+                                            s.name.hashCode(),
+                                        ),
+                                        TextToSpeech.QUEUE_ADD,
+                                        null,
+                                        "segment-${s.id}",
+                                    )
+                                }
+                            }
                         }
                     }
                     delay(2_000L)
@@ -226,6 +257,8 @@ class RecordingService : Service() {
             tts?.shutdown()
             tts = null
             ttsReady = false
+            segStarts = emptyList()
+            alertedSegments.clear()
             controller = null
             releaseWakeLock()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
