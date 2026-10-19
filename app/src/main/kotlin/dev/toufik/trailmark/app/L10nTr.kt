@@ -51,6 +51,7 @@ val TR_TEXTS = Texts(
     weight = "Kilo",
     monthlyGoal = "Aylık hedef",
     importGpx = "GPX içe aktar",
+    exportAll = "Tümünü dışa aktar",
     elevation = "Tırmanış",
     maxSpeed = "Maks",
     time = "Süre",

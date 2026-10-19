@@ -51,6 +51,7 @@ val HI_TEXTS = Texts(
     weight = "वज़न",
     monthlyGoal = "मासिक लक्ष्य",
     importGpx = "GPX आयात करें",
+    exportAll = "सभी निर्यात करें",
     elevation = "ऊँचाई",
     maxSpeed = "अधिकतम",
     time = "समय",

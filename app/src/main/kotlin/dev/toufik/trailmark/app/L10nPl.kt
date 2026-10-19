@@ -51,6 +51,7 @@ val PL_TEXTS = Texts(
     weight = "Waga",
     monthlyGoal = "Cel miesięczny",
     importGpx = "Importuj GPX",
+    exportAll = "Eksportuj wszystko",
     elevation = "Przewyższenie",
     maxSpeed = "Maks",
     time = "Czas",

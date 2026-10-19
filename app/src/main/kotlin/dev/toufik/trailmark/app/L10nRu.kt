@@ -51,6 +51,7 @@ val RU_TEXTS = Texts(
     weight = "Вес",
     monthlyGoal = "Цель месяца",
     importGpx = "Импорт GPX",
+    exportAll = "Экспорт всех",
     elevation = "Набор высоты",
     maxSpeed = "Макс",
     time = "Время",

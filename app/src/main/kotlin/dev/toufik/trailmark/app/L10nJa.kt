@@ -51,6 +51,7 @@ val JA_TEXTS = Texts(
     weight = "体重",
     monthlyGoal = "月間目標",
     importGpx = "GPX をインポート",
+    exportAll = "すべてエクスポート",
     elevation = "獲得標高",
     maxSpeed = "最大",
     time = "時間",

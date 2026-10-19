@@ -79,6 +79,30 @@ fun HistoryScreen(onOpen: (Long) -> Unit) {
             reload()
         }
     }
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip"),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            withContext(Dispatchers.IO) {
+                val repo = AppGraph.repository(context)
+                val rows = repo.listActivities().filter { !it.isOpen }
+                if (rows.isEmpty()) return@withContext
+                val out = context.contentResolver.openOutputStream(uri) ?: return@withContext
+                val fmt = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US)
+                java.util.zip.ZipOutputStream(out.buffered()).use { zip ->
+                    rows.forEach { row ->
+                        val points = repo.loadPoints(row.id)
+                        if (points.size < 2) return@forEach
+                        val name = "trailmark-${fmt.format(java.util.Date(row.startWallMillis))}-${row.id}.gpx"
+                        zip.putNextEntry(java.util.zip.ZipEntry(name))
+                        zip.write(Gpx.write(points, row.startWallMillis).toByteArray(Charsets.UTF_8))
+                        zip.closeEntry()
+                    }
+                }
+            }
+        }
+    }
     LaunchedEffect(Unit) {
         items = withContext(Dispatchers.IO) { AppGraph.repository(context).listActivities() }
     }
@@ -91,6 +115,9 @@ fun HistoryScreen(onOpen: (Long) -> Unit) {
             ) {
                 Text(t.history, color = Palette.text, fontSize = 22.sp)
                 Spacer(Modifier.weight(1f))
+                TextButton(onClick = {
+                    exportLauncher.launch("trailmark-tracks.zip")
+                }) { Text(t.exportAll, color = Palette.textSecondary) }
                 TextButton(onClick = {
                     importLauncher.launch(
                         arrayOf(

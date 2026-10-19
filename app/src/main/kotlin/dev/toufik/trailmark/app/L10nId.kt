@@ -51,6 +51,7 @@ val ID_TEXTS = Texts(
     weight = "Berat",
     monthlyGoal = "Target bulanan",
     importGpx = "Impor GPX",
+    exportAll = "Ekspor semua",
     elevation = "Elevasi",
     maxSpeed = "Maks",
     time = "Waktu",

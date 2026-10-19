@@ -51,6 +51,7 @@ val ZH_TEXTS = Texts(
     weight = "体重",
     monthlyGoal = "月度目标",
     importGpx = "导入 GPX",
+    exportAll = "导出全部",
     elevation = "累计爬升",
     maxSpeed = "最高",
     time = "时间",

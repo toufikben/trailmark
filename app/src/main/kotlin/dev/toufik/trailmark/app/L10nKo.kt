@@ -51,6 +51,7 @@ val KO_TEXTS = Texts(
     weight = "체중",
     monthlyGoal = "월간 목표",
     importGpx = "GPX 가져오기",
+    exportAll = "모두 내보내기",
     elevation = "고도",
     maxSpeed = "최고",
     time = "시간",
