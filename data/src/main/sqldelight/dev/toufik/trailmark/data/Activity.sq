@@ -85,6 +85,9 @@ SELECT * FROM activity WHERE id = ? LIMIT 1;
 selectPoints:
 SELECT * FROM track_point WHERE activity_id = ? ORDER BY id ASC;
 
+pointsAfter:
+SELECT * FROM track_point WHERE activity_id = ? AND id > ? ORDER BY id ASC;
+
 listActivities:
 SELECT * FROM activity WHERE is_deleted = 0 ORDER BY start_wall_millis DESC, id DESC;
 

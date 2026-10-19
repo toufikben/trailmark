@@ -168,9 +168,18 @@ fun RecordingScreen(
             media = emptyList()
             return@LaunchedEffect
         }
+        route = emptyList()
+        var cursor = 0L
         while (true) {
-            route = withContext(Dispatchers.IO) { AppGraph.repository(context).loadPoints(id) }
-            media = withContext(Dispatchers.IO) { AppGraph.repository(context).listMedia(id) }
+            val repo = AppGraph.repository(context)
+            val (chunk, mediaRows) = withContext(Dispatchers.IO) {
+                repo.pointsAfter(id, cursor) to repo.listMedia(id)
+            }
+            if (chunk.isNotEmpty()) {
+                route = route + chunk.map { it.second }
+                cursor = chunk.last().first
+            }
+            media = mediaRows
             delay(1500)
         }
     }

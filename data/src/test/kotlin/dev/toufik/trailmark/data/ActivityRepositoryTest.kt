@@ -134,6 +134,21 @@ class ActivityRepositoryTest {
     }
 
     @Test
+    fun pointsAfterReturnsOnlyNewerIdsInOrder() {
+        val id = repo.insertActivity("u5", "RUN", 1000)
+        val other = repo.insertActivity("u6", "RUN", 1001)
+        repo.appendPoints(id, listOf(p(20), p(10), p(30)))
+        repo.appendPoints(other, listOf(p(99)))
+        val all = repo.pointsAfter(id, 0L)
+        assertEquals(listOf(20L, 10L, 30L), all.map { it.second.timeNanos })
+        val cursor = all[1].first
+        val newer = repo.pointsAfter(id, cursor)
+        assertEquals(listOf(30L), newer.map { it.second.timeNanos })
+        assertTrue(newer.all { it.first > cursor })
+        assertTrue(repo.pointsAfter(id, all.last().first).isEmpty())
+    }
+
+    @Test
     fun weatherSnapshotRoundTrips() {
         val id = repo.insertActivity("w1", "RUN", 1)
         assertNull(repo.listActivities().single().weatherTempC)

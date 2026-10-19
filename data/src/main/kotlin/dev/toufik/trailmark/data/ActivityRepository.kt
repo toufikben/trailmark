@@ -203,6 +203,21 @@ class ActivityRepository(private val db: TrailmarkDb) {
             )
         }
 
+    /** Points whose track-point id is greater than [afterId], paired with their ids. */
+    fun pointsAfter(activityId: Long, afterId: Long): List<Pair<Long, StoredPoint>> =
+        q.pointsAfter(activity_id = activityId, id = afterId).executeAsList().map { p ->
+            p.id to StoredPoint(
+                lat = p.lat,
+                lon = p.lon,
+                timeNanos = p.time_nanos,
+                accuracyM = p.accuracy_m ?: UNMEASURED_ACCURACY_M,
+                type = parseType(p.waypoint_type),
+                altitudeM = p.alt_gnss,
+                speedMps = p.speed_mps,
+                bearingDeg = p.bearing_deg,
+            )
+        }
+
     fun insertMedia(
         activityId: Long,
         kind: String,
