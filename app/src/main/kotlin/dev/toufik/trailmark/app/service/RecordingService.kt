@@ -11,6 +11,7 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.speech.tts.TextToSpeech
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import dev.toufik.trailmark.R
@@ -20,6 +21,9 @@ import dev.toufik.trailmark.app.WeatherService
 import dev.toufik.trailmark.app.gps.AndroidLocationFixSource
 import dev.toufik.trailmark.app.gps.SyntheticFixSource
 import dev.toufik.trailmark.app.textsFor
+import dev.toufik.trailmark.coach.Coach
+import dev.toufik.trailmark.coach.CoachEvent
+import dev.toufik.trailmark.coach.Locale as CoachLocale
 import dev.toufik.trailmark.engine.FixSource
 import dev.toufik.trailmark.engine.Sport
 import dev.toufik.trailmark.recording.Phase
@@ -43,8 +47,13 @@ class RecordingService : Service() {
     private var controller: RecordingController? = null
     private var stateJob: Job? = null
     private var notifJob: Job? = null
+    private var voiceJob: Job? = null
     private var weatherJob: Job? = null
     private var wakeLock: PowerManager.WakeLock? = null
+    private var tts: TextToSpeech? = null
+
+    @Volatile
+    private var ttsReady = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -62,6 +71,18 @@ class RecordingService : Service() {
     private fun currentLang(): Lang {
         val code = getSharedPreferences("trailmark", MODE_PRIVATE).getString("lang_code", null)
         return Lang.entries.firstOrNull { it.code == code } ?: Lang.AR
+    }
+
+    private fun coachLocale(lang: Lang): CoachLocale = when (lang) {
+        Lang.FR -> CoachLocale.FR
+        Lang.AR -> CoachLocale.AR
+        else -> CoachLocale.EN
+    }
+
+    private fun speechLocale(lang: Lang): java.util.Locale = when (coachLocale(lang)) {
+        CoachLocale.AR -> java.util.Locale("ar")
+        CoachLocale.FR -> java.util.Locale.FRENCH
+        CoachLocale.EN -> java.util.Locale.ENGLISH
     }
 
     private fun startRecording(intent: Intent) {
@@ -121,6 +142,37 @@ class RecordingService : Service() {
                 }
             }
         }
+        if (getSharedPreferences("trailmark", MODE_PRIVATE).getBoolean("voice_coach", true)) {
+            tts = TextToSpeech(this) { status ->
+                if (status == TextToSpeech.SUCCESS) {
+                    runCatching { tts?.language = speechLocale(currentLang()) }
+                    ttsReady = true
+                }
+            }
+            voiceJob = scope.launch {
+                var lastKm = 0
+                while (isActive) {
+                    val st = c.state.value
+                    if (ttsReady && st.phase == Phase.RECORDING) {
+                        val km = (st.distanceM / 1000.0).toInt()
+                        if (km > lastKm) {
+                            lastKm = km
+                            tts?.speak(
+                                Coach.message(
+                                    CoachEvent.Milestone(km),
+                                    coachLocale(currentLang()),
+                                    km,
+                                ),
+                                TextToSpeech.QUEUE_FLUSH,
+                                null,
+                                "milestone-$km",
+                            )
+                        }
+                    }
+                    delay(2_000L)
+                }
+            }
+        }
         scope.launch { c.start() }
     }
 
@@ -155,6 +207,12 @@ class RecordingService : Service() {
             notifJob = null
             weatherJob?.cancel()
             weatherJob = null
+            voiceJob?.cancel()
+            voiceJob = null
+            tts?.stop()
+            tts?.shutdown()
+            tts = null
+            ttsReady = false
             controller = null
             releaseWakeLock()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {

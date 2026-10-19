@@ -119,6 +119,20 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                 }
             }
             Spacer(Modifier.height(24.dp))
+            Text(t.voiceCoach, color = Palette.textSecondary, fontSize = 13.sp)
+            Spacer(Modifier.height(8.dp))
+            var voice by remember { mutableStateOf(prefs.getBoolean("voice_coach", true)) }
+            Pill {
+                ThemeButton(t.on, selected = voice) {
+                    voice = true
+                    prefs.edit().putBoolean("voice_coach", true).apply()
+                }
+                ThemeButton(t.off, selected = !voice) {
+                    voice = false
+                    prefs.edit().putBoolean("voice_coach", false).apply()
+                }
+            }
+            Spacer(Modifier.height(24.dp))
             Text(t.about, color = Palette.textSecondary, fontSize = 13.sp)
             Spacer(Modifier.height(8.dp))
             Surface(
