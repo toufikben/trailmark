@@ -73,6 +73,7 @@ import dev.toufik.trailmark.app.maps.MapPacks
 import dev.toufik.trailmark.app.service.PlanRouteHolder
 import dev.toufik.trailmark.app.service.RecordingHolder
 import dev.toufik.trailmark.app.service.RecordingService
+import dev.toufik.trailmark.app.service.RouteNavHolder
 import dev.toufik.trailmark.app.service.WeatherHolder
 import dev.toufik.trailmark.app.ui.MediaMark
 import dev.toufik.trailmark.app.ui.Motion
@@ -83,6 +84,7 @@ import dev.toufik.trailmark.app.ui.openVideoPlayer
 import dev.toufik.trailmark.coach.Coach
 import dev.toufik.trailmark.coach.CoachEvent
 import dev.toufik.trailmark.coach.Locale
+import dev.toufik.trailmark.core.geo.TurnKind
 import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.core.model.WaypointType
 import dev.toufik.trailmark.data.MediaRow
@@ -161,6 +163,7 @@ fun RecordingScreen(
     var coachLine by remember { mutableStateOf<String?>(null) }
     val weather by WeatherHolder.state.collectAsState()
     val planRoute by PlanRouteHolder.state.collectAsState()
+    val nav by RouteNavHolder.state.collectAsState()
     var ghost by remember { mutableStateOf<Ghost?>(null) }
     var ghostRoute by remember { mutableStateOf<List<StoredPoint>>(emptyList()) }
     var ghostStartNanos by remember { mutableStateOf(0L) }
@@ -407,6 +410,37 @@ fun RecordingScreen(
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(Palette.surface.copy(alpha = 0.85f))
                                 .clickable { PlanRouteHolder.clear() }
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                        )
+                    }
+                    val n = nav
+                    if (n != null && state.phase != Phase.STOPPED) {
+                        val arrow = when (n.nextTurn) {
+                            TurnKind.LEFT,
+                            TurnKind.SLIGHT_LEFT,
+                            TurnKind.SHARP_LEFT -> "↰"
+                            TurnKind.RIGHT,
+                            TurnKind.SLIGHT_RIGHT,
+                            TurnKind.SHARP_RIGHT -> "↱"
+                            TurnKind.UTURN -> "↶"
+                            null -> null
+                        }
+                        val label = when {
+                            n.offRoute -> "⚠"
+                            arrow != null -> if (n.turnInM >= 1000.0) {
+                                "$arrow ${formatDistance(n.turnInM)} ${distanceUnit(t)}"
+                            } else {
+                                "$arrow ${formatElevation(n.turnInM)} ${elevationUnit(t)}"
+                            }
+                            else -> "${formatDistance(n.remainingM)} ${distanceUnit(t)}"
+                        }
+                        Text(
+                            text = label,
+                            color = if (n.offRoute) Color(0xFFE5484D) else Palette.accent,
+                            fontSize = 12.sp,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Palette.surface.copy(alpha = 0.85f))
                                 .padding(horizontal = 10.dp, vertical = 6.dp),
                         )
                     }

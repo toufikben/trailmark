@@ -32,6 +32,7 @@ import dev.toufik.trailmark.core.geo.TurnCue
 import dev.toufik.trailmark.core.geo.TurnKind
 import dev.toufik.trailmark.core.geo.flattenChunks
 import dev.toufik.trailmark.core.geo.matchToRoute
+import dev.toufik.trailmark.core.geo.polylineLengthMeters
 import dev.toufik.trailmark.core.geo.turnCues
 import dev.toufik.trailmark.engine.FixSource
 import dev.toufik.trailmark.engine.Sport
@@ -57,6 +58,7 @@ class RecordingService : Service() {
     private var stateJob: Job? = null
     private var notifJob: Job? = null
     private var voiceJob: Job? = null
+    private var navJob: Job? = null
     private var weatherJob: Job? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var tts: TextToSpeech? = null
@@ -65,9 +67,12 @@ class RecordingService : Service() {
     private val segmentStartedNanos = mutableMapOf<Long, Long>()
     private var planPoints: List<ElevPoint> = emptyList()
     private var navCues: List<TurnCue> = emptyList()
+    private var planTotalM = 0.0
+    private var navChunksRef: List<dev.toufik.trailmark.core.geo.RouteChunk> = emptyList()
     private val announcedCues = mutableSetOf<Int>()
     private var offRouteSinceNanos = 0L
     private var lastOffRouteNanos = 0L
+    private var joinedRoute = false
 
     @Volatile
     private var sportName: String = "RUN"
@@ -147,11 +152,15 @@ class RecordingService : Service() {
             sport = sport,
         )
         controller = c
-        planPoints = flattenChunks(PlanRouteHolder.state.value)
+        navChunksRef = PlanRouteHolder.state.value
+        planPoints = flattenChunks(navChunksRef)
         navCues = if (planPoints.size >= 2) turnCues(planPoints) else emptyList()
+        planTotalM = if (planPoints.size >= 2) polylineLengthMeters(planPoints) else 0.0
         announcedCues.clear()
         offRouteSinceNanos = 0L
         lastOffRouteNanos = 0L
+        joinedRoute = false
+        RouteNavHolder.update(null)
         c.setAutoPause(
             getSharedPreferences("trailmark", MODE_PRIVATE).getBoolean("auto_pause", true),
         )
@@ -265,74 +274,108 @@ class RecordingService : Service() {
                                 }
                                 buzz(longArrayOf(0, 120, 80, 120, 80, 120))
                             }
-                            if (planPoints.size >= 2) {
-                                val match = matchToRoute(planPoints, la, lo)
-                                if (match != null) {
-                                    val nowNanos = System.nanoTime()
-                                    if (match.offRouteM > 60.0) {
-                                        if (offRouteSinceNanos == 0L) {
-                                            offRouteSinceNanos = nowNanos
-                                        }
-                                        val offFor = nowNanos - offRouteSinceNanos
-                                        val sinceAlert = nowNanos - lastOffRouteNanos
-                                        if (offFor > 20_000_000_000L &&
-                                            sinceAlert > 120_000_000_000L
-                                        ) {
-                                            lastOffRouteNanos = nowNanos
-                                            if (ttsReady) {
-                                                tts?.speak(
-                                                    Coach.message(
-                                                        CoachEvent.OffRoute,
-                                                        coachLocale(currentLang()),
-                                                        (nowNanos / 1_000_000_000L).toInt(),
-                                                    ),
-                                                    TextToSpeech.QUEUE_ADD,
-                                                    null,
-                                                    "off-route-$nowNanos",
-                                                )
-                                            }
-                                            buzz(longArrayOf(0, 200, 120, 200))
-                                        }
-                                    } else {
-                                        offRouteSinceNanos = 0L
-                                        val speed = st.currentSpeedMps ?: 0.0
-                                        val aheadM = (speed * 12.0).coerceIn(45.0, 120.0)
-                                        val idx = navCues.withIndex().firstOrNull { (i, cue) ->
-                                            val remaining = cue.distanceAlongM - match.distanceAlongM
-                                            i !in announcedCues && remaining in 5.0..aheadM
-                                        }?.index ?: -1
-                                        if (idx >= 0 && announcedCues.add(idx)) {
-                                            val cue = navCues[idx]
-                                            val remaining = cue.distanceAlongM - match.distanceAlongM
-                                            val metres =
-                                                ((remaining / 10.0).toInt() * 10).coerceAtLeast(10)
-                                            if (ttsReady) {
-                                                tts?.speak(
-                                                    Coach.message(
-                                                        CoachEvent.Turn(
-                                                            coachDirection(cue.kind),
-                                                            metres,
-                                                        ),
-                                                        coachLocale(currentLang()),
-                                                        idx,
-                                                    ),
-                                                    TextToSpeech.QUEUE_ADD,
-                                                    null,
-                                                    "turn-$idx",
-                                                )
-                                            }
-                                            buzz(longArrayOf(0, 120, 90, 120))
-                                        }
-                                    }
-                                }
-                            }
                         }
                     }
                     delay(2_000L)
                 }
             }
         }
+        val voiceOn = getSharedPreferences("trailmark", MODE_PRIVATE)
+            .getBoolean("voice_coach", true)
+        navJob = scope.launch {
+            while (isActive) {
+                val st = c.state.value
+                if (st.phase == Phase.RECORDING) evaluateNavigation(st, voiceOn)
+                delay(2_000L)
+            }
+        }
         scope.launch { c.start() }
+    }
+
+    private fun evaluateNavigation(st: RecordingState, voiceOn: Boolean) {
+        val chunks = PlanRouteHolder.state.value
+        if (chunks !== navChunksRef) {
+            navChunksRef = chunks
+            planPoints = flattenChunks(chunks)
+            navCues = if (planPoints.size >= 2) turnCues(planPoints) else emptyList()
+            planTotalM = if (planPoints.size >= 2) polylineLengthMeters(planPoints) else 0.0
+            announcedCues.clear()
+            offRouteSinceNanos = 0L
+            joinedRoute = false
+        }
+        if (planPoints.size < 2) {
+            RouteNavHolder.update(null)
+            return
+        }
+        val la = st.currentLat ?: return
+        val lo = st.currentLon ?: return
+        val match = matchToRoute(planPoints, la, lo) ?: return
+        val nowNanos = System.nanoTime()
+        if (match.offRouteM <= 40.0) joinedRoute = true
+        val offRoute = match.offRouteM > 60.0
+        if (offRoute) {
+            if (offRouteSinceNanos == 0L) offRouteSinceNanos = nowNanos
+            val offFor = nowNanos - offRouteSinceNanos
+            val sinceAlert = nowNanos - lastOffRouteNanos
+            if (voiceOn && joinedRoute &&
+                offFor > 20_000_000_000L && sinceAlert > 120_000_000_000L
+            ) {
+                lastOffRouteNanos = nowNanos
+                if (ttsReady) {
+                    tts?.speak(
+                        Coach.message(
+                            CoachEvent.OffRoute,
+                            coachLocale(currentLang()),
+                            (nowNanos / 1_000_000_000L).toInt(),
+                        ),
+                        TextToSpeech.QUEUE_ADD,
+                        null,
+                        "off-route-$nowNanos",
+                    )
+                }
+                buzz(longArrayOf(0, 200, 120, 200))
+            }
+        } else {
+            offRouteSinceNanos = 0L
+            if (voiceOn && joinedRoute) {
+                val speed = st.currentSpeedMps ?: 0.0
+                val aheadM = (speed * 12.0).coerceIn(45.0, 120.0)
+                val idx = navCues.withIndex().firstOrNull { (i, cue) ->
+                    val remaining = cue.distanceAlongM - match.distanceAlongM
+                    i !in announcedCues && remaining in 5.0..aheadM
+                }?.index ?: -1
+                if (idx >= 0 && announcedCues.add(idx)) {
+                    val cue = navCues[idx]
+                    val remaining = cue.distanceAlongM - match.distanceAlongM
+                    val metres = ((remaining / 10.0).toInt() * 10).coerceAtLeast(10)
+                    if (ttsReady) {
+                        tts?.speak(
+                            Coach.message(
+                                CoachEvent.Turn(coachDirection(cue.kind), metres),
+                                coachLocale(currentLang()),
+                                idx,
+                            ),
+                            TextToSpeech.QUEUE_ADD,
+                            null,
+                            "turn-$idx",
+                        )
+                    }
+                    buzz(longArrayOf(0, 120, 90, 120))
+                }
+            }
+        }
+        val nextIdx = navCues.indexOfFirst { it.distanceAlongM - match.distanceAlongM > 0.0 }
+        val next = navCues.getOrNull(nextIdx)
+        RouteNavHolder.update(
+            RouteNav(
+                nextTurn = next?.kind,
+                turnInM = next?.let {
+                    (it.distanceAlongM - match.distanceAlongM).coerceAtLeast(0.0)
+                } ?: 0.0,
+                remainingM = (planTotalM - match.distanceAlongM).coerceAtLeast(0.0),
+                offRoute = offRoute,
+            ),
+        )
     }
 
     private fun stopRecording() {
@@ -391,6 +434,9 @@ class RecordingService : Service() {
             weatherJob = null
             voiceJob?.cancel()
             voiceJob = null
+            navJob?.cancel()
+            navJob = null
+            RouteNavHolder.update(null)
             tts?.stop()
             tts?.shutdown()
             tts = null
@@ -400,9 +446,12 @@ class RecordingService : Service() {
             segmentStartedNanos.clear()
             planPoints = emptyList()
             navCues = emptyList()
+            planTotalM = 0.0
+            navChunksRef = emptyList()
             announcedCues.clear()
             offRouteSinceNanos = 0L
             lastOffRouteNanos = 0L
+            joinedRoute = false
             controller = null
             releaseWakeLock()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
