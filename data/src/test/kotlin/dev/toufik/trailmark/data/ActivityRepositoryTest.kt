@@ -149,6 +149,26 @@ class ActivityRepositoryTest {
     }
 
     @Test
+    fun segmentsAndEffortsRoundTrip() {
+        val activity = repo.insertActivity("s1", "RUN", 1000)
+        repo.finishActivity(activity, 10, 5000.0, 1, 0, false)
+        val seg = repo.insertSegment("Hill", 36.0, 3.0, 36.01, 3.01)
+        assertFalse(repo.effortExists(seg, activity))
+        assertNull(repo.bestEffortNanos(seg))
+        repo.insertEffort(seg, activity, 300_000_000_000L)
+        assertTrue(repo.effortExists(seg, activity))
+        assertEquals(300_000_000_000L, repo.bestEffortNanos(seg))
+        val row = repo.listSegments().single()
+        assertEquals("Hill", row.name)
+        assertEquals(36.01, row.endLat, 1e-9)
+        val efforts = repo.effortsForActivity(activity)
+        assertEquals(1, efforts.size)
+        assertEquals("Hill", efforts.single().segmentName)
+        assertEquals(300_000_000_000L, efforts.single().elapsedNanos)
+        assertTrue(repo.effortsForActivity(activity + 5).isEmpty())
+    }
+
+    @Test
     fun weatherSnapshotRoundTrips() {
         val id = repo.insertActivity("w1", "RUN", 1)
         assertNull(repo.listActivities().single().weatherTempC)

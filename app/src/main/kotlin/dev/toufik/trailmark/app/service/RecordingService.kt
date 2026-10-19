@@ -130,6 +130,12 @@ class RecordingService : Service() {
                 }
             }
             WeatherHolder.update(null)
+            if (finished != null) {
+                runCatching {
+                    val points = repo.loadPoints(finished)
+                    dev.toufik.trailmark.app.matchSegments(repo, finished, points)
+                }
+            }
             RecordingHolder.update(RecordingState(phase = Phase.STOPPED, lastActivityId = finished))
             stateJob?.cancel()
             weatherJob?.cancel()

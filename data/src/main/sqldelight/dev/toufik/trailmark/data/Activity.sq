@@ -63,6 +63,24 @@ CREATE TABLE media (
   caption TEXT
 );
 
+CREATE TABLE segment (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  start_lat REAL NOT NULL,
+  start_lon REAL NOT NULL,
+  end_lat REAL NOT NULL,
+  end_lon REAL NOT NULL,
+  created_wall_millis INTEGER NOT NULL
+);
+
+CREATE TABLE segment_effort (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  segment_id INTEGER NOT NULL REFERENCES segment(id),
+  activity_id INTEGER NOT NULL REFERENCES activity(id),
+  elapsed_nanos INTEGER NOT NULL,
+  created_wall_millis INTEGER NOT NULL
+);
+
 insertActivity:
 INSERT INTO activity(uuid, sport, start_wall_millis) VALUES (?, ?, ?);
 
@@ -119,3 +137,25 @@ DELETE FROM media WHERE id = ?;
 
 setWeather:
 UPDATE activity SET weather_temp_c = ?, weather_wind_kmh = ?, weather_wind_deg = ?, weather_code = ? WHERE id = ?;
+
+insertSegment:
+INSERT INTO segment(name, start_lat, start_lon, end_lat, end_lon, created_wall_millis)
+VALUES (?, ?, ?, ?, ?, ?);
+
+listSegments:
+SELECT * FROM segment ORDER BY id ASC;
+
+insertEffort:
+INSERT INTO segment_effort(segment_id, activity_id, elapsed_nanos, created_wall_millis)
+VALUES (?, ?, ?, ?);
+
+effortExists:
+SELECT count(*) FROM segment_effort WHERE segment_id = ? AND activity_id = ?;
+
+bestEffort:
+SELECT min(elapsed_nanos) FROM segment_effort WHERE segment_id = ?;
+
+effortsForActivity:
+SELECT e.id, e.segment_id, e.elapsed_nanos, s.name
+FROM segment_effort e JOIN segment s ON s.id = e.segment_id
+WHERE e.activity_id = ? ORDER BY e.id ASC;

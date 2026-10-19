@@ -1,0 +1,17 @@
+CREATE TABLE segment (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  start_lat REAL NOT NULL,
+  start_lon REAL NOT NULL,
+  end_lat REAL NOT NULL,
+  end_lon REAL NOT NULL,
+  created_wall_millis INTEGER NOT NULL
+);
+
+CREATE TABLE segment_effort (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  segment_id INTEGER NOT NULL REFERENCES segment(id),
+  activity_id INTEGER NOT NULL REFERENCES activity(id),
+  elapsed_nanos INTEGER NOT NULL,
+  created_wall_millis INTEGER NOT NULL
+);

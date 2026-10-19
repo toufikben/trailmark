@@ -49,6 +49,24 @@ class MediaRow(
     val caption: String?,
 )
 
+/** One saved local segment with its start/end match anchors. */
+class SegmentRow(
+    val id: Long,
+    val name: String,
+    val startLat: Double,
+    val startLon: Double,
+    val endLat: Double,
+    val endLon: Double,
+)
+
+/** One matched effort on an activity, carrying the segment name for display. */
+class EffortRow(
+    val id: Long,
+    val segmentId: Long,
+    val segmentName: String,
+    val elapsedNanos: Long,
+)
+
 /**
  * The write/read boundary. Every point is durable before the next arrives; the
  * checkpoint maps the unmeasured 1σ to SQL NULL and back to the sentinel, so a
@@ -268,6 +286,49 @@ class ActivityRepository(private val db: TrailmarkDb) {
     fun deleteMedia(id: Long) {
         q.deleteMedia(id = id)
     }
+
+    fun insertSegment(
+        name: String,
+        startLat: Double,
+        startLon: Double,
+        endLat: Double,
+        endLon: Double,
+    ): Long {
+        q.insertSegment(
+            name = name,
+            start_lat = startLat,
+            start_lon = startLon,
+            end_lat = endLat,
+            end_lon = endLon,
+            created_wall_millis = System.currentTimeMillis(),
+        )
+        return q.lastId().executeAsOne()
+    }
+
+    fun listSegments(): List<SegmentRow> =
+        q.listSegments().executeAsList().map {
+            SegmentRow(it.id, it.name, it.start_lat, it.start_lon, it.end_lat, it.end_lon)
+        }
+
+    fun insertEffort(segmentId: Long, activityId: Long, elapsedNanos: Long) {
+        q.insertEffort(
+            segment_id = segmentId,
+            activity_id = activityId,
+            elapsed_nanos = elapsedNanos,
+            created_wall_millis = System.currentTimeMillis(),
+        )
+    }
+
+    fun effortExists(segmentId: Long, activityId: Long): Boolean =
+        q.effortExists(segment_id = segmentId, activity_id = activityId).executeAsOne() > 0L
+
+    fun bestEffortNanos(segmentId: Long): Long? =
+        q.bestEffort(segment_id = segmentId).executeAsOneOrNull()
+
+    fun effortsForActivity(activityId: Long): List<EffortRow> =
+        q.effortsForActivity(activity_id = activityId).executeAsList().map {
+            EffortRow(it.id, it.segment_id, it.name, it.elapsed_nanos)
+        }
 
     fun flag(key: String, default: Boolean = false): Boolean =
         (q.getFlag(key).executeAsOneOrNull())?.let { it != 0L } ?: default

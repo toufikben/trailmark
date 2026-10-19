@@ -21,8 +21,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -61,16 +63,21 @@ import dev.toufik.trailmark.app.LocalLang
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.WeatherNow
+import dev.toufik.trailmark.app.backfillSegment
 import dev.toufik.trailmark.app.formatDistance
 import dev.toufik.trailmark.app.formatDuration
 import dev.toufik.trailmark.app.formatPace
+import dev.toufik.trailmark.app.matchSegments
+import dev.toufik.trailmark.core.geo.haversineMeters
 import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.core.model.WaypointType
 import dev.toufik.trailmark.data.ActivityRow
+import dev.toufik.trailmark.data.EffortRow
 import dev.toufik.trailmark.data.MediaRow
 import dev.toufik.trailmark.engine.Sport
 import dev.toufik.trailmark.portable.Gpx
 import java.io.File
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -91,6 +98,10 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
     var detail by remember { mutableStateOf<Detail?>(null) }
     var loading by remember { mutableStateOf(true) }
     var viewerMedia by remember { mutableStateOf<MediaRow?>(null) }
+    var efforts by remember { mutableStateOf<List<EffortRow>>(emptyList()) }
+    var effortBests by remember { mutableStateOf<Map<Long, Long>>(emptyMap()) }
+    var segmentCount by remember { mutableStateOf(0) }
+    var showCreateSegment by remember { mutableStateOf(false) }
     val packPath = remember { dev.toufik.trailmark.app.maps.MapPacks.installedMapPack(context)?.absolutePath }
     val darkMap = remember {
         context.getSharedPreferences("trailmark", Context.MODE_PRIVATE).getBoolean("map_dark", true)
@@ -109,6 +120,22 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
             )
         }
         loading = false
+        val loaded = detail ?: return@LaunchedEffect
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val repo = AppGraph.repository(context)
+                matchSegments(repo, activityId, loaded.points)
+                val list = repo.effortsForActivity(activityId)
+                val bests = list.map { it.segmentId }.distinct()
+                    .mapNotNull { sid -> repo.bestEffortNanos(sid)?.let { sid to it } }
+                    .toMap()
+                Triple(list, bests, repo.listSegments().size)
+            }.getOrNull()
+        }?.let { seg ->
+            efforts = seg.first
+            effortBests = seg.second
+            segmentCount = seg.third
+        }
     }
 
     Surface(color = Palette.bg, modifier = Modifier.fillMaxSize()) {
@@ -203,6 +230,43 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                                 shareStoryCardImage(context, card, d.row.id, t.storyCard)
                             }
                         }) { Text(t.storyCard, color = Palette.accent) }
+                        TextButton(onClick = { showCreateSegment = true }) {
+                            Text(t.createSegment, color = Palette.accent)
+                        }
+                    }
+                    if (efforts.isNotEmpty()) {
+                        Surface(
+                            color = Palette.surface,
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp).appearIn(3),
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Text(t.segments, color = Palette.text, fontSize = 14.sp)
+                                efforts.forEach { e ->
+                                    val best = effortBests[e.segmentId]
+                                    Column(modifier = Modifier.padding(top = 10.dp)) {
+                                        Text(e.segmentName, color = Palette.text, fontSize = 14.sp)
+                                        Row(modifier = Modifier.fillMaxWidth().padding(top = 2.dp)) {
+                                            Text(
+                                                "${t.yourTime} ${formatDuration(e.elapsedNanos)}",
+                                                color = Palette.textSecondary,
+                                                fontSize = 12.sp,
+                                            )
+                                            if (best != null) {
+                                                Text(
+                                                    "   ${t.bestTime} ${formatDuration(best)}",
+                                                    color = Palette.accent,
+                                                    fontSize = 12.sp,
+                                                )
+                                            }
+                                        }
+                                        if (best != null && best == e.elapsedNanos) {
+                                            Text(t.newRecord, color = Palette.accent, fontSize = 12.sp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                     val track = remember(d) { ReplayTrack(d.points) }
                     var playing by remember(d) { mutableStateOf(false) }
@@ -353,10 +417,114 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                 PhotoViewer(media = m, description = t.photo) { viewerMedia = null }
             }
         }
+        val dd = detail
+        if (showCreateSegment && dd != null && dd.points.size > 1) {
+            SegmentCreateDialog(
+                points = dd.points,
+                defaultName = "${t.segmentSingular} ${segmentCount + 1}",
+                onDismiss = { showCreateSegment = false },
+                onCreate = { name, startIdx, endIdx ->
+                    showCreateSegment = false
+                    val pts = dd.points
+                    scope.launch {
+                        val segId = withContext(Dispatchers.IO) {
+                            val repo = AppGraph.repository(context)
+                            repo.insertSegment(
+                                name = name,
+                                startLat = pts[startIdx].lat,
+                                startLon = pts[startIdx].lon,
+                                endLat = pts[endIdx].lat,
+                                endLon = pts[endIdx].lon,
+                            )
+                        }
+                        val res = withContext(Dispatchers.IO) {
+                            val repo = AppGraph.repository(context)
+                            matchSegments(repo, dd.row.id, pts)
+                            val list = repo.effortsForActivity(dd.row.id)
+                            val bests = list.map { it.segmentId }.distinct()
+                                .mapNotNull { sid -> repo.bestEffortNanos(sid)?.let { sid to it } }
+                                .toMap()
+                            list to bests
+                        }
+                        efforts = res.first
+                        effortBests = res.second
+                        segmentCount += 1
+                        AppGraph.appScope.launch {
+                            runCatching {
+                                backfillSegment(AppGraph.repository(context), segId)
+                            }
+                        }
+                    }
+                },
+            )
+        }
     }
 }
 
 private fun sportOf(name: String): Sport = Sport.entries.firstOrNull { it.name == name } ?: Sport.RUN
+
+/** Cumulative distance along the route at each point index, in metres. */
+private fun cumulativeMeters(points: List<StoredPoint>): DoubleArray {
+    val out = DoubleArray(points.size)
+    for (i in 1 until points.size) {
+        val prev = points[i - 1]
+        val cur = points[i]
+        out[i] = out[i - 1] + haversineMeters(prev.lat, prev.lon, cur.lat, cur.lon)
+    }
+    return out
+}
+
+/** Picks a segment start/end along this route with two sliders and names it. */
+@Composable
+private fun SegmentCreateDialog(
+    points: List<StoredPoint>,
+    defaultName: String,
+    onDismiss: () -> Unit,
+    onCreate: (name: String, startIdx: Int, endIdx: Int) -> Unit,
+) {
+    val t = LocalTexts.current
+    var name by remember { mutableStateOf(defaultName) }
+    var startF by remember { mutableStateOf(0f) }
+    var endF by remember { mutableStateOf(1f) }
+    val cum = remember(points) { cumulativeMeters(points) }
+    val lastIndex = (points.size - 1).coerceAtLeast(0)
+    val startIdx = (startF * lastIndex).roundToInt().coerceIn(0, lastIndex)
+    val endIdx = (endF * lastIndex).roundToInt().coerceIn(0, lastIndex)
+    val valid = endIdx > startIdx && name.isNotBlank()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Palette.surface,
+        title = { Text(t.createSegment, color = Palette.text) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(t.segmentName) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    "${t.segStart} ${formatDistance(cum[startIdx])}",
+                    color = Palette.textSecondary,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(top = 14.dp),
+                )
+                Slider(value = startF, onValueChange = { startF = it })
+                Text("${t.segEnd} ${formatDistance(cum[endIdx])}", color = Palette.textSecondary, fontSize = 13.sp)
+                Slider(value = endF, onValueChange = { endF = it })
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = valid, onClick = { onCreate(name.trim(), startIdx, endIdx) }) {
+                Text(t.createSegment, color = if (valid) Palette.accent else Palette.textSecondary)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(t.cancel, color = Palette.textSecondary) }
+        },
+    )
+}
 
 /** One gallery cell: a downsampled photo or a play badge for a video. */
 @Composable
