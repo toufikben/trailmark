@@ -11,6 +11,8 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.speech.tts.TextToSpeech
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
@@ -164,20 +166,23 @@ class RecordingService : Service() {
                 var lastKm = 0
                 while (isActive) {
                     val st = c.state.value
-                    if (ttsReady && st.phase == Phase.RECORDING) {
+                    if (st.phase == Phase.RECORDING) {
                         val km = (st.distanceM / 1000.0).toInt()
                         if (km > lastKm) {
                             lastKm = km
-                            tts?.speak(
-                                Coach.message(
-                                    CoachEvent.Milestone(km),
-                                    coachLocale(currentLang()),
-                                    km,
-                                ),
-                                TextToSpeech.QUEUE_FLUSH,
-                                null,
-                                "milestone-$km",
-                            )
+                            if (ttsReady) {
+                                tts?.speak(
+                                    Coach.message(
+                                        CoachEvent.Milestone(km),
+                                        coachLocale(currentLang()),
+                                        km,
+                                    ),
+                                    TextToSpeech.QUEUE_FLUSH,
+                                    null,
+                                    "milestone-$km",
+                                )
+                            }
+                            buzz(longArrayOf(0, 120))
                         }
                         val la = st.currentLat
                         val lo = st.currentLon
@@ -189,16 +194,19 @@ class RecordingService : Service() {
                                 ) < 30.0
                                 if (near) {
                                     alertedSegments.add(s.id)
-                                    tts?.speak(
-                                        Coach.message(
-                                            CoachEvent.SegmentStart(s.name),
-                                            coachLocale(currentLang()),
-                                            s.name.hashCode(),
-                                        ),
-                                        TextToSpeech.QUEUE_ADD,
-                                        null,
-                                        "segment-${s.id}",
-                                    )
+                                    if (ttsReady) {
+                                        tts?.speak(
+                                            Coach.message(
+                                                CoachEvent.SegmentStart(s.name),
+                                                coachLocale(currentLang()),
+                                                s.name.hashCode(),
+                                            ),
+                                            TextToSpeech.QUEUE_ADD,
+                                            null,
+                                            "segment-${s.id}",
+                                        )
+                                    }
+                                    buzz(longArrayOf(0, 120, 100, 120))
                                 }
                             }
                         }
@@ -230,6 +238,7 @@ class RecordingService : Service() {
             }
             WeatherHolder.update(null)
             if (finished != null) {
+                buzz(longArrayOf(0, 200, 120, 200))
                 runCatching {
                     val points = repo.loadPoints(finished)
                     dev.toufik.trailmark.app.matchSegments(repo, finished, points)
@@ -291,6 +300,13 @@ class RecordingService : Service() {
     private fun releaseWakeLock() {
         wakeLock?.let { if (it.isHeld) it.release() }
         wakeLock = null
+    }
+
+    private fun buzz(timings: LongArray) {
+        runCatching {
+            val v = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator ?: return
+            v.vibrate(VibrationEffect.createWaveform(timings, -1))
+        }
     }
 
     private fun createChannel() {
