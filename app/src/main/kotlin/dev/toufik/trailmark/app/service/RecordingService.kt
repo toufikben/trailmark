@@ -42,6 +42,7 @@ class RecordingService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var controller: RecordingController? = null
     private var stateJob: Job? = null
+    private var notifJob: Job? = null
     private var weatherJob: Job? = null
     private var wakeLock: PowerManager.WakeLock? = null
 
@@ -95,6 +96,18 @@ class RecordingService : Service() {
         )
         controller = c
         stateJob = scope.launch { c.state.collect { RecordingHolder.update(it) } }
+        notifJob = scope.launch {
+            val mgr = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            while (isActive) {
+                val st = c.state.value
+                if (st.phase == Phase.RECORDING || st.phase == Phase.PAUSED) {
+                    mgr.notify(NOTIF_ID, buildNotification(st))
+                    delay(5_000L)
+                } else {
+                    delay(2_000L)
+                }
+            }
+        }
         weatherJob = scope.launch {
             while (isActive) {
                 val st = c.state.value
@@ -138,6 +151,8 @@ class RecordingService : Service() {
             }
             RecordingHolder.update(RecordingState(phase = Phase.STOPPED, lastActivityId = finished))
             stateJob?.cancel()
+            notifJob?.cancel()
+            notifJob = null
             weatherJob?.cancel()
             weatherJob = null
             controller = null
@@ -181,7 +196,7 @@ class RecordingService : Service() {
         )
     }
 
-    private fun buildNotification(): Notification {
+    private fun buildNotification(state: RecordingState? = null): Notification {
         val t = textsFor(currentLang())
         val open = PendingIntent.getActivity(
             this,
@@ -189,10 +204,18 @@ class RecordingService : Service() {
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE,
         )
+        val live = state?.takeIf { it.phase == Phase.RECORDING || it.phase == Phase.PAUSED }
+        val text = if (live == null) {
+            t.recordingNow
+        } else {
+            val prefix = if (live.phase == Phase.PAUSED) "\u23f8 " else ""
+            "$prefix${dev.toufik.trailmark.app.formatDistance(live.distanceM)} " +
+                "${dev.toufik.trailmark.app.distanceUnit(t)} \u00b7 ${dev.toufik.trailmark.app.formatDuration(live.elapsedNanos)}"
+        }
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_track)
             .setContentTitle("Trailmark")
-            .setContentText(t.recordingNow)
+            .setContentText(text)
             .setOngoing(true)
             .setContentIntent(open)
             .build()
