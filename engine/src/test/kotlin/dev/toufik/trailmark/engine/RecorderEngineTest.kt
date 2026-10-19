@@ -1,6 +1,7 @@
 package dev.toufik.trailmark.engine
 
 import dev.toufik.trailmark.core.model.RawFix
+import dev.toufik.trailmark.core.model.UNMEASURED_ACCURACY_M
 import dev.toufik.trailmark.core.model.WaypointType
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse

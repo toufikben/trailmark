@@ -17,7 +17,6 @@ sqldelight {
 
 dependencies {
     implementation(project(":core:model"))
-    implementation(project(":engine"))
     implementation(libs.sqldelight.runtime)
     testImplementation(libs.sqldelight.sqlite.driver)
     testImplementation(libs.junit.jupiter)

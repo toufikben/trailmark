@@ -2,8 +2,8 @@ package dev.toufik.trailmark.data
 
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import dev.toufik.trailmark.core.model.StoredPoint
+import dev.toufik.trailmark.core.model.UNMEASURED_ACCURACY_M
 import dev.toufik.trailmark.core.model.WaypointType
-import dev.toufik.trailmark.engine.UNMEASURED_ACCURACY_M
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull

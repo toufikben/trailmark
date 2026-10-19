@@ -1,9 +1,9 @@
 package dev.toufik.trailmark.data
 
 import dev.toufik.trailmark.core.model.StoredPoint
+import dev.toufik.trailmark.core.model.UNMEASURED_ACCURACY_M
 import dev.toufik.trailmark.core.model.WaypointType
 import dev.toufik.trailmark.data.db.TrailmarkDb
-import dev.toufik.trailmark.engine.UNMEASURED_ACCURACY_M
 
 /** R86: durable "has this install been onboarded" flag. */
 const val ONBOARDED_FLAG = "onboarded"

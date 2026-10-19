@@ -20,9 +20,6 @@ object GpsQualityX {
 /** ر7: a fix may open the start gate only at or below this 1σ radius. */
 fun isFixGoodEnough(fix: RawFix): Boolean = fix.accuracyM <= GpsQualityX.goodEnoughM
 
-/** An UNMEASURED 1σ maps to this worst-case sentinel; never a fake number. */
-const val UNMEASURED_ACCURACY_M: Double = Double.POSITIVE_INFINITY
-
 /** ر8: this long without any fix and the signal counts as lost. */
 const val GPS_LOST_AFTER_NANOS: Long = 20L * 1_000_000_000L
 

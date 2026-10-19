@@ -8,7 +8,7 @@ import android.os.Build
 import android.os.Looper
 import dev.toufik.trailmark.core.model.RawFix
 import dev.toufik.trailmark.engine.FixSource
-import dev.toufik.trailmark.engine.UNMEASURED_ACCURACY_M
+import dev.toufik.trailmark.core.model.UNMEASURED_ACCURACY_M
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
