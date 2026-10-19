@@ -55,6 +55,7 @@ class RecordingService : Service() {
     private var tts: TextToSpeech? = null
     private var segStarts: List<dev.toufik.trailmark.data.SegmentRow> = emptyList()
     private val alertedSegments = mutableSetOf<Long>()
+    private val segmentStartedNanos = mutableMapOf<Long, Long>()
 
     @Volatile
     private var ttsReady = false
@@ -194,6 +195,7 @@ class RecordingService : Service() {
                                 ) < 30.0
                                 if (near) {
                                     alertedSegments.add(s.id)
+                                    segmentStartedNanos[s.id] = st.elapsedNanos
                                     if (ttsReady) {
                                         tts?.speak(
                                             Coach.message(
@@ -208,6 +210,29 @@ class RecordingService : Service() {
                                     }
                                     buzz(longArrayOf(0, 120, 100, 120))
                                 }
+                            }
+                            for (s in segStarts) {
+                                val startedAt = segmentStartedNanos[s.id] ?: continue
+                                val nearEnd = dev.toufik.trailmark.core.geo.haversineMeters(
+                                    la, lo, s.endLat, s.endLon,
+                                ) < 30.0
+                                if (!nearEnd) continue
+                                segmentStartedNanos.remove(s.id)
+                                val seconds =
+                                    ((st.elapsedNanos - startedAt) / 1_000_000_000L).coerceAtLeast(0L)
+                                if (ttsReady) {
+                                    tts?.speak(
+                                        Coach.message(
+                                            CoachEvent.SegmentFinish(s.name, seconds),
+                                            coachLocale(currentLang()),
+                                            s.name.hashCode(),
+                                        ),
+                                        TextToSpeech.QUEUE_ADD,
+                                        null,
+                                        "segment-finish-${s.id}",
+                                    )
+                                }
+                                buzz(longArrayOf(0, 120, 80, 120, 80, 120))
                             }
                         }
                     }
@@ -271,6 +296,7 @@ class RecordingService : Service() {
             ttsReady = false
             segStarts = emptyList()
             alertedSegments.clear()
+            segmentStartedNanos.clear()
             controller = null
             releaseWakeLock()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {

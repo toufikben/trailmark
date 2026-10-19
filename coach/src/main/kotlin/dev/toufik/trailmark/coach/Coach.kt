@@ -14,6 +14,7 @@ sealed interface CoachEvent {
     data class GotOvertaken(val metres: Int) : CoachEvent
     data class Milestone(val km: Int) : CoachEvent
     data class SegmentStart(val name: String) : CoachEvent
+    data class SegmentFinish(val name: String, val seconds: Long) : CoachEvent
     data class Finish(val distanceM: Double, val seconds: Long, val isRecord: Boolean) : CoachEvent
 }
 
@@ -57,6 +58,11 @@ object Coach {
             is CoachEvent.GotOvertaken -> fill(pick, "m" to event.metres.toString())
             is CoachEvent.Milestone -> fill(pick, "km" to event.km.toString())
             is CoachEvent.SegmentStart -> fill(pick, "name" to event.name)
+            is CoachEvent.SegmentFinish -> fill(
+                pick,
+                "name" to event.name,
+                "time" to clock(event.seconds),
+            )
             is CoachEvent.Finish -> fill(
                 pick,
                 "km" to km(event.distanceM),
@@ -119,6 +125,11 @@ object Coach {
             Locale.AR -> listOf("بداية المقطع: {name} — ركّز!", "مقطع {name} يبدأ الآن.")
             Locale.FR -> listOf("Début du segment : {name} — concentre-toi !", "Segment {name} — c'est parti.")
             Locale.EN -> listOf("Segment start: {name} — focus!", "Segment {name} begins now.")
+        }
+        is CoachEvent.SegmentFinish -> when (locale) {
+            Locale.AR -> listOf("أنهيت مقطع {name} في {time} — أحسنت!", "نهاية {name}: {time}. عمل رائع.")
+            Locale.FR -> listOf("Segment {name} terminé en {time} !", "Fin du segment {name} — {time}.")
+            Locale.EN -> listOf("Segment {name} done in {time}!", "Finished {name} — {time}.")
         }
         is CoachEvent.Finish -> when (locale) {
             Locale.AR -> listOf(

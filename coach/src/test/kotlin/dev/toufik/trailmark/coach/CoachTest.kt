@@ -50,4 +50,14 @@ class CoachTest {
         assertTrue(Coach.message(CoachEvent.SegmentStart("Mont Bouzareah"), Locale.AR, 0).contains("Mont Bouzareah"))
         assertTrue(Coach.message(CoachEvent.SegmentStart("Mont Bouzareah"), Locale.FR, 1).contains("Mont Bouzareah"))
     }
+
+    @Test
+    fun segmentFinishNamesSegmentAndTime() {
+        val en = Coach.message(CoachEvent.SegmentFinish("Mont Bouzareah", 754), Locale.EN, 0)
+        assertTrue(en.contains("Mont Bouzareah"))
+        assertTrue(en.contains("12:34"))
+        val ar = Coach.message(CoachEvent.SegmentFinish("Mont Bouzareah", 65), Locale.AR, 0)
+        assertTrue(ar.contains("Mont Bouzareah"))
+        assertTrue(ar.contains("1:05"))
+    }
 }
