@@ -38,6 +38,7 @@ import dev.toufik.trailmark.app.Lang
 import dev.toufik.trailmark.app.LocalPremium
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
+import dev.toufik.trailmark.app.Units
 
 /** Language, subscription, map theme and app info. */
 @Composable
@@ -101,6 +102,20 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                 ThemeButton(t.themeLight, selected = !dark) {
                     dark = false
                     prefs.edit().putBoolean("map_dark", false).apply()
+                }
+            }
+            Spacer(Modifier.height(24.dp))
+            Text(t.units, color = Palette.textSecondary, fontSize = 13.sp)
+            Spacer(Modifier.height(8.dp))
+            var imperial by remember { mutableStateOf(Units.imperial) }
+            Pill {
+                ThemeButton(t.unitsMetric, selected = !imperial) {
+                    imperial = false
+                    Units.set(context, false)
+                }
+                ThemeButton(t.unitsImperial, selected = imperial) {
+                    imperial = true
+                    Units.set(context, true)
                 }
             }
             Spacer(Modifier.height(24.dp))

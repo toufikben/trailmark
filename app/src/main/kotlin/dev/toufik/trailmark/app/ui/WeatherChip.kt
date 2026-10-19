@@ -21,6 +21,8 @@ import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.Texts
 import dev.toufik.trailmark.app.WeatherCondition
 import dev.toufik.trailmark.app.WeatherNow
+import dev.toufik.trailmark.app.formatSpeed
+import dev.toufik.trailmark.app.speedUnit
 import kotlin.math.roundToInt
 
 /** Weather pill: temperature, wind arrow (points where the wind blows TO), speed and sky. */
@@ -66,7 +68,7 @@ fun WeatherChip(t: Texts, w: WeatherNow, modifier: Modifier = Modifier) {
                 )
             }
             Spacer(Modifier.width(4.dp))
-            Text("${w.windKmh.roundToInt()} ${t.kmh}", color = Palette.textSecondary, fontSize = 12.sp)
+            Text("${formatSpeed(w.windKmh / 3.6)} ${speedUnit(t)}", color = Palette.textSecondary, fontSize = 12.sp)
             Spacer(Modifier.width(6.dp))
             Text(conditionLabel(t, w.condition), color = Palette.textSecondary, fontSize = 12.sp)
         }

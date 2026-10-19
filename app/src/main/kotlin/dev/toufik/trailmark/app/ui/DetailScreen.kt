@@ -64,11 +64,17 @@ import dev.toufik.trailmark.app.LocalLang
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.WeatherNow
+import dev.toufik.trailmark.app.Units
 import dev.toufik.trailmark.app.backfillSegment
+import dev.toufik.trailmark.app.distanceUnit
+import dev.toufik.trailmark.app.elevationUnit
 import dev.toufik.trailmark.app.formatDistance
 import dev.toufik.trailmark.app.formatDuration
+import dev.toufik.trailmark.app.formatElevation
 import dev.toufik.trailmark.app.formatPace
+import dev.toufik.trailmark.app.formatSpeed
 import dev.toufik.trailmark.app.matchSegments
+import dev.toufik.trailmark.app.speedUnit
 import dev.toufik.trailmark.core.geo.haversineMeters
 import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.core.model.WaypointType
@@ -122,8 +128,12 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                 points = pts,
                 media = repo.listMedia(activityId),
                 analysis = dev.toufik.trailmark.analytics.analyze(pts, a.elapsedNanos),
-                speedKmh = sampled.mapNotNull { it.speedMps?.let { s -> (s * 3.6).toFloat() } },
-                elevM = sampled.mapNotNull { it.altitudeM?.toFloat() },
+                speedKmh = sampled.mapNotNull {
+                    it.speedMps?.let { s -> (s * (if (Units.imperial) 2.2369362920544 else 3.6)).toFloat() }
+                },
+                elevM = sampled.mapNotNull {
+                    it.altitudeM?.let { alt -> (alt * (if (Units.imperial) 3.2808398950131 else 1.0)).toFloat() }
+                },
             )
         }
         loading = false
@@ -195,12 +205,12 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text(
-                            "${t.elevation} ${a.elevationGainM.toInt()} ${t.metre}",
+                            "${t.elevation} ${formatElevation(a.elevationGainM)} ${elevationUnit(t)}",
                             color = Palette.textSecondary,
                             fontSize = 14.sp,
                         )
                         Text(
-                            "${t.maxSpeed} ${String.format(java.util.Locale.US, "%.1f", a.maxSpeedMps * 3.6)} ${t.kmh}",
+                            "${t.maxSpeed} ${formatSpeed(a.maxSpeedMps)} ${speedUnit(t)}",
                             color = Palette.textSecondary,
                             fontSize = 14.sp,
                         )
@@ -336,11 +346,11 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                             modifier = Modifier.fillMaxWidth().padding(top = 10.dp).appearIn(4),
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
-                                SeriesChart(title = t.speed, values = d.speedKmh, unit = t.kmh, color = Palette.accent)
+                                SeriesChart(title = t.speed, values = d.speedKmh, unit = speedUnit(t), color = Palette.accent)
                                 SeriesChart(
                                     title = t.elevation,
                                     values = d.elevM,
-                                    unit = t.metre,
+                                    unit = elevationUnit(t),
                                     color = Palette.textSecondary,
                                     modifier = Modifier.padding(top = 12.dp),
                                 )
@@ -372,7 +382,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                         )
                         Column(horizontalAlignment = Alignment.End) {
                             Text(
-                                "${formatDistance(sample?.distanceM ?: 0.0)} ${t.km}",
+                                "${formatDistance(sample?.distanceM ?: 0.0)} ${distanceUnit(t)}",
                                 color = Palette.accent,
                                 fontSize = 13.sp,
                             )
@@ -576,13 +586,13 @@ private fun SegmentCreateDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(
-                    "${t.segStart} ${formatDistance(cum[startIdx])}",
+                    "${t.segStart} ${formatDistance(cum[startIdx])} ${distanceUnit(t)}",
                     color = Palette.textSecondary,
                     fontSize = 13.sp,
                     modifier = Modifier.padding(top = 14.dp),
                 )
                 Slider(value = startF, onValueChange = { startF = it })
-                Text("${t.segEnd} ${formatDistance(cum[endIdx])}", color = Palette.textSecondary, fontSize = 13.sp)
+                Text("${t.segEnd} ${formatDistance(cum[endIdx])} ${distanceUnit(t)}", color = Palette.textSecondary, fontSize = 13.sp)
                 Slider(value = endF, onValueChange = { endF = it })
             }
         },

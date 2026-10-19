@@ -57,6 +57,7 @@ import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.Texts
 import dev.toufik.trailmark.app.achievementTitle
+import dev.toufik.trailmark.app.distanceUnit
 import dev.toufik.trailmark.app.formatDistance
 import dev.toufik.trailmark.app.formatDuration
 import dev.toufik.trailmark.data.ActivityRow
@@ -205,7 +206,7 @@ private fun StatCard(t: Texts, label: String, totals: Totals, modifier: Modifier
         Column(modifier = Modifier.padding(12.dp)) {
             Text(label, color = Palette.textSecondary, fontSize = 11.sp, maxLines = 1)
             Text(
-                "${formatDistance(totals.distanceM)} ${t.km}",
+                "${formatDistance(totals.distanceM)} ${distanceUnit(t)}",
                 color = Palette.accent,
                 fontSize = 15.sp,
                 maxLines = 1,
@@ -332,7 +333,7 @@ private fun WeeklyCard(t: Texts, rows: List<ActivityRow>) {
                 }
             }
             Text(
-                "${t.progressBestWeek}: ${formatDistance(sums.max())} ${t.km}",
+                "${t.progressBestWeek}: ${formatDistance(sums.max())} ${distanceUnit(t)}",
                 color = Palette.textSecondary,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(top = 8.dp),
@@ -540,7 +541,7 @@ private fun AchievementCell(
 
 private fun achievementProgress(t: Texts, st: AchievementState): String =
     if (st.id.startsWith("dist_") || st.id.startsWith("single_")) {
-        "${(st.current / 1000).toInt()}/${(st.target / 1000).toInt()} ${t.km}"
+        "${formatDistance(st.current)}/${formatDistance(st.target)} ${distanceUnit(t)}"
     } else {
         "${st.current.toInt()}/${st.target.toInt()}"
     }

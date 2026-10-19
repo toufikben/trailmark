@@ -50,8 +50,11 @@ import dev.toufik.trailmark.app.SportPicker
 import dev.toufik.trailmark.app.WeatherNow
 import dev.toufik.trailmark.app.WeatherService
 import dev.toufik.trailmark.app.WeatherWindow
+import dev.toufik.trailmark.app.distanceUnit
+import dev.toufik.trailmark.app.elevationUnit
 import dev.toufik.trailmark.app.formatDistance
 import dev.toufik.trailmark.app.formatDuration
+import dev.toufik.trailmark.app.formatElevation
 import dev.toufik.trailmark.app.maps.MapPacks
 import dev.toufik.trailmark.app.plan.PlannedRoute
 import dev.toufik.trailmark.app.plan.RoutePlanner
@@ -217,7 +220,7 @@ fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
-                                PlanStat(formatDistance(p.distanceM), t.km)
+                                PlanStat(formatDistance(p.distanceM), distanceUnit(t))
                                 PlanStat(formatDuration(secs * 1_000_000_000L), t.estimatedTime, accent = true)
                                 PlanStat(arrivalClock(secs), t.estimatedArrival)
                             }
@@ -226,8 +229,8 @@ fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
-                                PlanStat("↑ ${p.ascentM.toInt()} ${t.metre}", t.elevation)
-                                PlanStat("↓ ${p.descentM.toInt()} ${t.metre}", t.descent)
+                                PlanStat("↑ ${formatElevation(p.ascentM)} ${elevationUnit(t)}", t.elevation)
+                                PlanStat("↓ ${formatElevation(p.descentM)} ${elevationUnit(t)}", t.descent)
                                 PlanStat(
                                     String.format(java.util.Locale.US, "%.0f%%", maxAbsGradePercent(p.chunks)),
                                     t.maxGrade,

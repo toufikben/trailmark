@@ -2,11 +2,16 @@ package dev.toufik.trailmark.app
 
 import java.util.Calendar
 
-/** Metres of accumulated distance as `km,ss`. */
+private const val METRES_PER_MILE = 1609.344
+private const val KM_PER_MILE = 1.609344
+private const val MPS_TO_MPH = 2.2369362920544
+private const val METRES_TO_FEET = 3.2808398950131
+
+/** Distance in metres as `w,ff` in the active unit (kilometres or miles). */
 fun formatDistance(metres: Double): String {
-    val km = metres / 1000.0
-    val whole = km.toLong()
-    val frac = Math.round((km - whole) * 100)
+    val value = if (Units.imperial) metres / METRES_PER_MILE else metres / 1000.0
+    val whole = value.toLong()
+    val frac = Math.round((value - whole) * 100)
     val f = if (frac == 100L) 0L else frac
     val w = if (frac == 100L) whole + 1 else whole
     return "$w,${f.toString().padStart(2, '0')}"
@@ -22,12 +27,34 @@ fun formatDuration(nanos: Long): String {
     return if (h == 0L) "${p(m)}:${p(sec)}" else "${p(h)}:${p(m)}:${p(sec)}"
 }
 
-/** Seconds-per-kilometre as `m:ss`; out-of-range renders `--:--`. */
+/** Seconds per kilometre as `m:ss` in the active unit (per km or per mile); out-of-range renders `--:--`. */
 fun formatPace(secPerKm: Double): String {
     if (secPerKm.isNaN() || secPerKm <= 0.0 || secPerKm > 3600.0) return "--:--"
-    val s = secPerKm.toLong()
+    val perUnit = if (Units.imperial) secPerKm * KM_PER_MILE else secPerKm
+    val s = perUnit.toLong()
     return "${s / 60}:${(s % 60).toString().padStart(2, '0')}"
 }
+
+/** Speed in m/s as `w.d` in the active unit (km/h or mph). */
+fun formatSpeed(mps: Double): String {
+    val value = mps * (if (Units.imperial) MPS_TO_MPH else 3.6)
+    return String.format(java.util.Locale.US, "%.1f", value)
+}
+
+/** Elevation in metres as a whole number in the active unit (m or ft). */
+fun formatElevation(metres: Double): String {
+    val value = if (Units.imperial) metres * METRES_TO_FEET else metres
+    return Math.round(value).toString()
+}
+
+/** Distance unit label for the active system. */
+fun distanceUnit(t: Texts): String = if (Units.imperial) t.miles else t.km
+
+/** Speed unit label for the active system. */
+fun speedUnit(t: Texts): String = if (Units.imperial) t.mph else t.kmh
+
+/** Elevation unit label for the active system. */
+fun elevationUnit(t: Texts): String = if (Units.imperial) t.feet else t.metre
 
 private val TODAY_WORDS: Map<Lang, String> = mapOf(
     Lang.AR to "اليوم", Lang.FR to "Aujourd'hui", Lang.EN to "Today",

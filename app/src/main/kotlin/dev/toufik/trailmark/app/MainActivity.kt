@@ -93,6 +93,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         org.maplibre.android.MapLibre.getInstance(this)
         val prefs = getSharedPreferences("trailmark", Context.MODE_PRIVATE)
+        dev.toufik.trailmark.app.Units.init(this)
         val entitlements = Entitlements(this)
         val billing = BillingManager(this, entitlements)
         billing.connect()

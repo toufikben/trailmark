@@ -56,4 +56,26 @@ class FormatTest {
         val old = at(2026, Calendar.SEPTEMBER, 3, 8, 7)
         assertEquals("3 September 2026 · 08:07", formatDate(old, Lang.EN, now))
     }
+
+    @Test
+    fun imperialSwitchesDistancePaceSpeedAndElevation() {
+        try {
+            Units.imperial = true
+            assertEquals("1,00", formatDistance(1609.344))
+            assertEquals("3,11", formatDistance(5000.0))
+            assertEquals("5:30", formatPace(205.2))
+            assertEquals("10.0", formatSpeed(4.4704))
+            assertEquals("328", formatElevation(100.0))
+            val t = textsFor(Lang.EN)
+            assertEquals("mi", distanceUnit(t))
+            assertEquals("mph", speedUnit(t))
+            assertEquals("ft", elevationUnit(t))
+        } finally {
+            Units.imperial = false
+        }
+        assertEquals("1,61", formatDistance(1609.344))
+        assertEquals("3:25", formatPace(205.2))
+        assertEquals("16.1", formatSpeed(4.4704))
+        assertEquals("100", formatElevation(100.0))
+    }
 }

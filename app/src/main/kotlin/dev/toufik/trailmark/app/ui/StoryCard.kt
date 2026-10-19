@@ -20,12 +20,16 @@ import dev.toufik.trailmark.app.Texts
 import dev.toufik.trailmark.app.formatDate
 import dev.toufik.trailmark.app.formatDistance
 import dev.toufik.trailmark.app.formatDuration
+import dev.toufik.trailmark.app.formatElevation
 import dev.toufik.trailmark.app.formatPace
+import dev.toufik.trailmark.app.formatSpeed
+import dev.toufik.trailmark.app.distanceUnit
+import dev.toufik.trailmark.app.elevationUnit
+import dev.toufik.trailmark.app.speedUnit
 import dev.toufik.trailmark.core.geo.douglasPeucker
 import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.core.model.WaypointType
 import java.io.File
-import java.util.Locale
 
 private const val W = 1080
 private const val H = 1920
@@ -70,7 +74,7 @@ internal fun renderStoryCard(
     drawText(canvas, formatDate(startWallMillis, lang), 36f, secondary, 224f, align)
 
     val distText = formatDistance(distanceM)
-    val bigLine = SpannableString("$distText ${t.km}")
+    val bigLine = SpannableString("$distText ${distanceUnit(t)}")
     bigLine.setSpan(AbsoluteSizeSpan(168, true), 0, distText.length, 0)
     bigLine.setSpan(AbsoluteSizeSpan(52, true), distText.length, bigLine.length, 0)
     drawText(canvas, bigLine, 168f, accent, 330f, align, bold = true)
@@ -79,7 +83,7 @@ internal fun renderStoryCard(
     val stats = listOf(
         t.time to formatDuration(elapsedNanos),
         t.pace to (pace?.let { formatPace(it) } ?: "--:--"),
-        t.elevation to "${elevationGainM.toInt()} ${t.metre}",
+        t.elevation to "${formatElevation(elevationGainM)} ${elevationUnit(t)}",
     )
     val colW = CONTENT_W / 3
     stats.forEachIndexed { i, (label, value) ->
@@ -92,7 +96,7 @@ internal fun renderStoryCard(
     drawRoute(canvas, points, top = 830f, height = 620f, accent = accent, end = textColor)
 
     val speedPart = if (maxSpeedMps.isFinite() && maxSpeedMps < 1000.0) {
-        "   ·   ${t.maxSpeed} ${String.format(Locale.US, "%.1f", maxSpeedMps * 3.6)} ${t.kmh}"
+        "   ·   ${t.maxSpeed} ${formatSpeed(maxSpeedMps)} ${speedUnit(t)}"
     } else {
         ""
     }

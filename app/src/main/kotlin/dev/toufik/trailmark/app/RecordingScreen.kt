@@ -453,7 +453,7 @@ fun RecordingScreen(
                 val paceText = if (distAnim < 50) "--:--"
                 else formatPace(elapsedAnim.toDouble() / (distAnim / 1000.0))
                 val speedText = if (state.currentSpeedMps == null) "--"
-                else String.format(java.util.Locale.US, "%.1f", speedAnim * 3.6)
+                else formatSpeed(speedAnim.toDouble())
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -465,9 +465,9 @@ fun RecordingScreen(
                         StatCell(formatDuration((elapsedAnim * 1e9).toLong()), t.time)
                         StatCell(
                             formatDistance(distAnim.toDouble()),
-                            t.km,
+                            distanceUnit(t),
                             accent = true,
-                            desc = "${formatDistance(distAnim.toDouble())} ${t.km}",
+                            desc = "${formatDistance(distAnim.toDouble())} ${distanceUnit(t)}",
                         )
                     }
                     val startAction = {
