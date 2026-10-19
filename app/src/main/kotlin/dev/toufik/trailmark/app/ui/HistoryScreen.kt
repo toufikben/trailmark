@@ -46,6 +46,7 @@ import dev.toufik.trailmark.data.ActivityRow
 import dev.toufik.trailmark.core.geo.haversineMeters
 import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.core.model.WaypointType
+import dev.toufik.trailmark.portable.Fit
 import dev.toufik.trailmark.portable.Gpx
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -70,9 +71,12 @@ fun HistoryScreen(onOpen: (Long) -> Unit) {
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
             withContext(Dispatchers.IO) {
-                val text = context.contentResolver.openInputStream(uri)
-                    ?.bufferedReader()?.use { it.readText() } ?: return@withContext
-                val imported = Gpx.read(text)
+                val bytes = context.contentResolver.openInputStream(uri)
+                    ?.use { it.readBytes() } ?: return@withContext
+                val isFit = bytes.size >= 12 &&
+                    bytes[8] == '.'.code.toByte() && bytes[9] == 'F'.code.toByte() &&
+                    bytes[10] == 'I'.code.toByte() && bytes[11] == 'T'.code.toByte()
+                val imported = if (isFit) Fit.read(bytes) else Gpx.read(bytes.toString(Charsets.UTF_8))
                 if (imported.size < 2) return@withContext
                 val t0 = imported.first().timeMillis ?: System.currentTimeMillis()
                 var dist = 0.0

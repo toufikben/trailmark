@@ -114,4 +114,28 @@ class FitTest {
         assertEquals(3, records)
         assertEquals(bytes.size - 2, i)
     }
+
+    @Test
+    fun roundTripsThroughReader() {
+        val pts = listOf(
+            p(36.7538, 3.1856, 0L, alt = 10.0),
+            p(36.7548, 3.2856, 1_000_000_000L, alt = 12.5),
+            p(36.7558, 3.3856, 2_000_000_000L, alt = 15.0),
+        )
+        val start = 1_700_000_000_000L
+        val back = Fit.read(Fit.write(pts, startWallMillis = start))
+        assertEquals(3, back.size)
+        assertEquals(36.7538, back[0].lat, 1e-6)
+        assertEquals(3.1856, back[0].lon, 1e-6)
+        assertEquals(10.0, back[0].altitudeM!!, 0.2)
+        assertEquals(start, back[0].timeMillis!!)
+        assertEquals(start + 1_000L, back[1].timeMillis!!)
+        assertEquals(start + 2_000L, back[2].timeMillis!!)
+    }
+
+    @Test
+    fun readerRejectsForeignBytes() {
+        assertEquals(0, Fit.read(ByteArray(20)).size)
+        assertEquals(0, Fit.read("not a fit file at all".toByteArray()).size)
+    }
 }

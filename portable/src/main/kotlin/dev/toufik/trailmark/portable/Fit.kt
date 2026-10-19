@@ -187,6 +187,119 @@ object Fit {
     private fun fitSeconds(unixMillis: Long): Long =
         (unixMillis / 1000L - FIT_EPOCH_OFFSET_S).coerceIn(0L, 0xFFFFFFFFL)
 
+    /**
+     * Reads the record messages of a FIT file (little- or big-endian, plain or
+     * compressed timestamp headers). Unknown messages are skipped by size.
+     */
+    fun read(bytes: ByteArray): List<ImportedPoint> {
+        if (bytes.size < 14) return emptyList()
+        val headerSize = bytes[0].toInt() and 0xFF
+        if (headerSize < 12 || bytes.size < headerSize) return emptyList()
+        if (
+            bytes[8] != '.'.code.toByte() || bytes[9] != 'F'.code.toByte() ||
+            bytes[10] != 'I'.code.toByte() || bytes[11] != 'T'.code.toByte()
+        ) {
+            return emptyList()
+        }
+        val dataSize = le32(bytes, 4).toInt()
+        val end = minOf(bytes.size, headerSize + dataSize)
+        val defs = HashMap<Int, MsgDef>()
+        val out = ArrayList<ImportedPoint>()
+        var lastTimestamp = 0L
+        var i = headerSize
+        while (i < end) {
+            val h = bytes[i].toInt() and 0xFF
+            i++
+            val compressed = h and 0x80 != 0
+            val local = if (compressed) (h ushr 5) and 0x03 else h and 0x0F
+            if (!compressed && h and 0x40 != 0) {
+                if (i + 5 > end) break
+                val arch = bytes[i + 1].toInt() and 0xFF
+                val little = arch == 0
+                val global = if (little) le16(bytes, i + 2) else be16(bytes, i + 2)
+                val n = bytes[i + 4].toInt() and 0xFF
+                i += 5
+                val fields = ArrayList<FieldDef>(n)
+                repeat(n) {
+                    if (i + 3 <= end) {
+                        fields.add(
+                            FieldDef(
+                                bytes[i].toInt() and 0xFF,
+                                bytes[i + 1].toInt() and 0xFF,
+                                bytes[i + 2].toInt() and 0xFF,
+                            ),
+                        )
+                    }
+                    i += 3
+                }
+                defs[local] = MsgDef(global, fields, little)
+            } else {
+                val def = defs[local] ?: break
+                val size = def.fields.sumOf { it.size }
+                if (i + size > end) break
+                if (def.global == 20) {
+                    var off = i
+                    var lat: Double? = null
+                    var lon: Double? = null
+                    var alt: Double? = null
+                    for (f in def.fields) {
+                        val at = off
+                        off += f.size
+                        if (compressed && f.num == 253) continue
+                        when (f.num) {
+                            0 -> if (f.size == 4) lat = deg(readSint32(bytes, at, def.little))
+                            1 -> if (f.size == 4) lon = deg(readSint32(bytes, at, def.little))
+                            2 -> if (f.size == 2) alt = readU16(bytes, at, def.little) / 5.0 - 500.0
+                            253 -> if (f.size == 4) lastTimestamp = readU32(bytes, at, def.little)
+                        }
+                    }
+                    if (compressed) lastTimestamp = (lastTimestamp + (h and 0x1F)) and 0xFFFFFFFFL
+                    if (lat != null && lon != null) {
+                        out.add(
+                            ImportedPoint(
+                                lat,
+                                lon,
+                                alt,
+                                (lastTimestamp + FIT_EPOCH_OFFSET_S) * 1000L,
+                            ),
+                        )
+                    }
+                }
+                i += size
+            }
+        }
+        return out
+    }
+
+    private class FieldDef(val num: Int, val size: Int, val type: Int)
+    private class MsgDef(val global: Int, val fields: List<FieldDef>, val little: Boolean)
+
+    private fun deg(semicircles: Int): Double = semicircles * (180.0 / Int.MAX_VALUE.toDouble())
+
+    private fun le16(b: ByteArray, at: Int): Int =
+        (b[at].toInt() and 0xFF) or ((b[at + 1].toInt() and 0xFF) shl 8)
+
+    private fun be16(b: ByteArray, at: Int): Int =
+        ((b[at].toInt() and 0xFF) shl 8) or (b[at + 1].toInt() and 0xFF)
+
+    private fun le32(b: ByteArray, at: Int): Long =
+        (0 until 4).sumOf { i -> (b[at + i].toLong() and 0xFF) shl (8 * i) }
+
+    private fun readU16(b: ByteArray, at: Int, little: Boolean): Int =
+        if (little) le16(b, at) else be16(b, at)
+
+    private fun readU32(b: ByteArray, at: Int, little: Boolean): Long {
+        var v = 0L
+        for (k in 0 until 4) {
+            val idx = if (little) at + k else at + 3 - k
+            v = (v shl 8) or (b[idx].toLong() and 0xFF)
+        }
+        return v
+    }
+
+    private fun readSint32(b: ByteArray, at: Int, little: Boolean): Int =
+        readU32(b, at, little).toInt()
+
     private fun sportId(sport: String): Int = when (sport.lowercase()) {
         "running", "run" -> 1
         "cycling", "biking", "ride" -> 2
