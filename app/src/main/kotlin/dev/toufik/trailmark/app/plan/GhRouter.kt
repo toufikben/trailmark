@@ -5,7 +5,7 @@ import com.graphhopper.GHRequest
 import com.graphhopper.GraphHopper
 import com.graphhopper.config.CHProfile
 import com.graphhopper.config.Profile
-import com.graphhopper.util.CustomModel
+import com.graphhopper.util.GHUtility
 import com.graphhopper.util.shapes.GHPoint
 import dev.toufik.trailmark.core.geo.ElevPoint
 import dev.toufik.trailmark.engine.Sport
@@ -21,6 +21,10 @@ import java.util.Locale
  * and the caller runs this on a background dispatcher.
  */
 object GhRouter {
+
+    private const val ENCODED_VALUES =
+        "foot_access, foot_priority, foot_average_speed, hike_rating, mtb_rating, " +
+            "bike_access, bike_priority, bike_average_speed, roundabout"
 
     private var hopper: GraphHopper? = null
     private var loadedDir: File? = null
@@ -64,10 +68,10 @@ object GhRouter {
         runCatching { hopper?.close() }
         val h = GraphHopper()
         h.setGraphHopperLocation(dir.absolutePath)
-        h.setEncodedValuesString("foot_access, foot_average_speed, bike_access, bike_average_speed")
+        h.setEncodedValuesString(ENCODED_VALUES)
         h.setProfiles(
-            Profile("foot").setVehicle("foot").setCustomModel(CustomModel()),
-            Profile("bike").setVehicle("bike").setCustomModel(CustomModel()),
+            Profile("foot").setCustomModel(GHUtility.loadCustomModelFromJar("foot.json")),
+            Profile("bike").setCustomModel(GHUtility.loadCustomModelFromJar("bike.json")),
         )
         h.chPreparationHandler.setCHProfiles(CHProfile("foot"), CHProfile("bike"))
         val loaded = runCatching { h.importOrLoad() }.isSuccess
