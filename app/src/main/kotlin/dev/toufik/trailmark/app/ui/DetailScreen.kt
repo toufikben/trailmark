@@ -493,9 +493,18 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Text("${s.kmIndex} ${t.km}", color = Palette.text, fontSize = 13.sp)
                                 Text(formatPace(s.paceSecPerKm), color = Palette.accent, fontSize = 13.sp)
+                                val gap = s.gapPaceSecPerKm
+                                if (gap != null) {
+                                    Text(
+                                        formatPace(gap),
+                                        color = Palette.accent.copy(alpha = 0.55f),
+                                        fontSize = 13.sp,
+                                    )
+                                }
                                 Text(
                                     formatDuration(s.elapsedNanos),
                                     color = Palette.textSecondary,

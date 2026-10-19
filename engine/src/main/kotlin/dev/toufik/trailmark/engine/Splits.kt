@@ -11,12 +11,14 @@ data class Split(
     val distanceM: Double,
     val elapsedNanos: Long,
     val paceSecPerKm: Double,
+    val gapPaceSecPerKm: Double? = null,
 )
 
 /**
  * Interpolates the exact position/time at each 1000 m crossing along the stored
  * polyline. Rejected points are raw archive entries, not path, and are skipped.
- * Never extrapolates beyond the last point.
+ * Never extrapolates beyond the last point. Each split also carries its grade
+ * adjusted pace when enough of its points hold altitude.
  */
 fun computeSplits(points: List<StoredPoint>): List<Split> {
     val out = ArrayList<Split>()
@@ -24,6 +26,7 @@ fun computeSplits(points: List<StoredPoint>): List<Split> {
     var km = 1
     var prev: StoredPoint? = null
     val startNanos = if (points.isNotEmpty()) points.first().timeNanos else 0L
+    var window = ArrayList<StoredPoint>()
 
     for (p in points) {
         if (p.type == WaypointType.REJECTED) continue
@@ -39,20 +42,36 @@ fun computeSplits(points: List<StoredPoint>): List<Split> {
                 val nanosAt = a.timeNanos + (segTime * frac).roundToLong()
                 val prevNanosAbs =
                     if (out.isEmpty()) startNanos else startNanos + out.last().elapsedNanos
+                val crossing = StoredPoint(
+                    lat = a.lat + (p.lat - a.lat) * frac,
+                    lon = a.lon + (p.lon - a.lon) * frac,
+                    timeNanos = nanosAt,
+                    accuracyM = p.accuracyM,
+                    type = WaypointType.NORMAL,
+                    altitudeM = if (a.altitudeM != null && p.altitudeM != null) {
+                        a.altitudeM + (p.altitudeM - a.altitudeM) * frac
+                    } else {
+                        null
+                    },
+                )
+                window.add(crossing)
                 out.add(
                     Split(
                         kmIndex = km,
                         distanceM = km * 1000.0,
                         elapsedNanos = nanosAt - startNanos,
                         paceSecPerKm = (nanosAt - prevNanosAbs) / 1e9,
+                        gapPaceSecPerKm = Gap.gapPaceSecPerKm(window),
                     ),
                 )
+                window = arrayListOf(crossing)
                 travelled += need
                 remaining -= need
                 km++
             }
             travelled += remaining
         }
+        window.add(p)
         prev = p
     }
     return out

@@ -86,4 +86,32 @@ class EngineBehaviorTest {
         assertTrue(computeSplits(emptyList()).isEmpty())
         assertTrue(computeSplits(listOf(sp(0.0, 0, WaypointType.NORMAL))).isEmpty())
     }
+
+    @Test
+    fun splitCarriesSlowerGapPaceOnAClimb() {
+        val pts = ArrayList<StoredPoint>()
+        var i = 0
+        while (i * 5.0 <= 1000.0) {
+            val d = i * 5.0
+            pts.add(
+                StoredPoint(
+                    lat = 36.7538 + d / 111111.0,
+                    lon = 3.1856,
+                    timeNanos = i * 4_000_000_000L,
+                    accuracyM = 3.0,
+                    type = WaypointType.NORMAL,
+                    altitudeM = 100.0 + d * 0.1,
+                ),
+            )
+            i++
+        }
+        val splits = computeSplits(pts)
+        assertEquals(1, splits.size)
+        val gap = splits.single().gapPaceSecPerKm
+        assertTrue(gap != null)
+        assertTrue(
+            gap!! > splits.single().paceSecPerKm,
+            "a 10% climb must price a slower flat-equivalent pace",
+        )
+    }
 }
