@@ -703,6 +703,7 @@ fun TrailmarkMap(
 
     LaunchedEffect(flyover) {
         tiltDeg = if (flyover) 55.0 else 0.0
+        if (flyover) following = true
     }
 
     LaunchedEffect(route.size, current, following, userFix, tiltDeg, flyover) {
