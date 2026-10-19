@@ -31,37 +31,43 @@ class OfflineRegions(private val context: Context) {
         manager.listOfflineRegions(object : OfflineManager.ListOfflineRegionsCallback {
             override fun onList(regions: Array<OfflineRegion>?) {
                 if (regions.isNullOrEmpty()) {
-                    cont.resume(emptyList())
+                    if (cont.isActive) cont.resume(emptyList())
                     return
                 }
                 val out = ArrayList<SavedRegion>(regions.size)
                 var remaining = regions.size
                 regions.forEach { region ->
-                    region.getStatus(object : OfflineRegion.OfflineRegionStatusCallback {
-                        override fun onStatus(status: OfflineRegionStatus?) {
-                            out.add(
-                                SavedRegion(
-                                    region.id,
-                                    nameOf(region),
-                                    status?.completedResourceCount ?: 0L,
-                                    status?.completedResourceSize ?: 0L,
-                                ),
-                            )
-                            remaining -= 1
-                            if (remaining == 0) cont.resume(out)
-                        }
+                    try {
+                        region.getStatus(object : OfflineRegion.OfflineRegionStatusCallback {
+                            override fun onStatus(status: OfflineRegionStatus?) {
+                                out.add(
+                                    SavedRegion(
+                                        region.id,
+                                        nameOf(region),
+                                        status?.completedResourceCount ?: 0L,
+                                        status?.completedResourceSize ?: 0L,
+                                    ),
+                                )
+                                remaining -= 1
+                                if (remaining == 0 && cont.isActive) cont.resume(out)
+                            }
 
-                        override fun onError(error: String?) {
-                            out.add(SavedRegion(region.id, nameOf(region), 0, 0))
-                            remaining -= 1
-                            if (remaining == 0) cont.resume(out)
-                        }
-                    })
+                            override fun onError(error: String?) {
+                                out.add(SavedRegion(region.id, nameOf(region), 0, 0))
+                                remaining -= 1
+                                if (remaining == 0 && cont.isActive) cont.resume(out)
+                            }
+                        })
+                    } catch (_: Throwable) {
+                        out.add(SavedRegion(region.id, nameOf(region), 0, 0))
+                        remaining -= 1
+                        if (remaining == 0 && cont.isActive) cont.resume(out)
+                    }
                 }
             }
 
             override fun onError(error: String) {
-                cont.resume(emptyList())
+                if (cont.isActive) cont.resume(emptyList())
             }
         })
     }
@@ -85,6 +91,12 @@ class OfflineRegions(private val context: Context) {
             metadata,
             object : OfflineManager.CreateOfflineRegionCallback {
                 override fun onCreate(region: OfflineRegion) {
+                    cont.invokeOnCancellation {
+                        runCatching {
+                            region.setDownloadState(OfflineRegion.STATE_INACTIVE)
+                            region.setObserver(null)
+                        }
+                    }
                     region.setObserver(object : OfflineRegion.OfflineRegionObserver {
                         override fun onStatusChanged(status: OfflineRegionStatus) {
                             val pct = if (status.requiredResourceCount > 0) {
@@ -93,17 +105,22 @@ class OfflineRegions(private val context: Context) {
                                 0
                             }
                             onProgress(pct)
-                            if (status.isComplete && cont.isActive) cont.resume(Unit)
+                            if (status.isComplete && cont.isActive) {
+                                runCatching { region.setObserver(null) }
+                                cont.resume(Unit)
+                            }
                         }
 
                         override fun onError(error: OfflineRegionError) {
                             if (cont.isActive) {
+                                runCatching { region.setDownloadState(OfflineRegion.STATE_INACTIVE) }
                                 cont.resumeWithException(IllegalStateException(error.message))
                             }
                         }
 
                         override fun mapboxTileCountLimitExceeded(limit: Long) {
                             if (cont.isActive) {
+                                runCatching { region.setDownloadState(OfflineRegion.STATE_INACTIVE) }
                                 cont.resumeWithException(
                                     IllegalStateException("tile limit exceeded: $limit"),
                                 )

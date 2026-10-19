@@ -8,6 +8,7 @@ val JA_TEXTS = Texts(
     cancel = "キャンセル",
     points = "ポイント",
     searching = "測位中…",
+    recordingNow = "ルートを記録中…",
     active = "記録中",
     weak = "電波弱",
     lost = "測位喪失",

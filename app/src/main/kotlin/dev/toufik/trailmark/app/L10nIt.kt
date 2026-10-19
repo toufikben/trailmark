@@ -8,6 +8,7 @@ val IT_TEXTS = Texts(
     cancel = "Annulla",
     points = "Punti",
     searching = "Ricerca del segnale…",
+    recordingNow = "Registrazione del percorso…",
     active = "Registrazione attiva",
     weak = "Segnale debole",
     lost = "Segnale perso",

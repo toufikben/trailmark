@@ -1,8 +1,6 @@
 package dev.toufik.trailmark.app.ui
 
 import android.app.Activity
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,12 +18,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -35,6 +35,7 @@ import dev.toufik.trailmark.app.LocalPremium
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.PremiumProducts
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /** Monthly / yearly subscription and a lifetime purchase, with a 15-day full trial. */
@@ -47,7 +48,15 @@ fun PaywallScreen(onBack: () -> Unit) {
     val billing = LocalBilling.current
     val emptyPrices = remember { MutableStateFlow(emptyMap<String, String>()) }
     val prices by (billing?.prices ?: emptyPrices).collectAsState()
-    val now = remember { System.currentTimeMillis() }
+    val emptyError = remember { MutableStateFlow<String?>(null) }
+    val billingError by (billing?.lastError ?: emptyError).collectAsState()
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            now = System.currentTimeMillis()
+            delay(60_000L)
+        }
+    }
 
     fun pw(key: String): String = paywallText(lang, key)
 
@@ -80,28 +89,34 @@ fun PaywallScreen(onBack: () -> Unit) {
             Spacer(Modifier.padding(top = 14.dp))
             PlanCard(
                 label = pw("monthly"),
-                price = (prices[PremiumProducts.MONTHLY] ?: "") + pw("perMonth"),
+                price = prices[PremiumProducts.MONTHLY]?.let { it + pw("perMonth") },
                 badge = null,
                 buyLabel = pw("buy"),
                 onClick = { buy(context, billing, PremiumProducts.MONTHLY) },
             )
             PlanCard(
                 label = pw("yearly"),
-                price = (prices[PremiumProducts.YEARLY] ?: "") + pw("perYear"),
+                price = prices[PremiumProducts.YEARLY]?.let { it + pw("perYear") },
                 badge = pw("best"),
                 buyLabel = pw("buy"),
                 onClick = { buy(context, billing, PremiumProducts.YEARLY) },
             )
             PlanCard(
                 label = pw("lifetime"),
-                price = (prices[PremiumProducts.LIFETIME] ?: "") + " · " + pw("once"),
+                price = prices[PremiumProducts.LIFETIME]?.let { it + " · " + pw("once") },
                 badge = null,
                 buyLabel = pw("buy"),
                 onClick = { buy(context, billing, PremiumProducts.LIFETIME) },
             )
             Spacer(Modifier.padding(top = 8.dp))
-            TextButton(onClick = { billing?.refreshPurchases() }) {
+            TextButton(onClick = {
+                billing?.clearError()
+                billing?.refreshPurchases()
+            }) {
                 Text(pw("restore"), color = Palette.textSecondary)
+            }
+            if (billingError != null) {
+                Text(t.loadFailed, color = Palette.dangerText, fontSize = 12.sp)
             }
             Text(pw("onlyPro"), color = Palette.textSecondary, fontSize = 12.sp)
         }
@@ -119,7 +134,7 @@ private fun buy(
 @Composable
 private fun PlanCard(
     label: String,
-    price: String,
+    price: String?,
     badge: String?,
     buyLabel: String,
     onClick: () -> Unit,
@@ -129,9 +144,7 @@ private fun PlanCard(
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 10.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick),
+            .padding(top = 10.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -144,10 +157,11 @@ private fun PlanCard(
                 }
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text(price, color = Palette.text, fontSize = 15.sp)
+                Text(price ?: "…", color = Palette.text, fontSize = 15.sp)
                 Spacer(Modifier.padding(top = 4.dp))
                 Button(
                     onClick = onClick,
+                    enabled = price != null,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Palette.accent,
                         contentColor = Palette.onAccent,

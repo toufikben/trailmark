@@ -5,6 +5,8 @@ import android.location.Location
 import android.location.LocationManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -30,6 +32,7 @@ import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.Texts
 import dev.toufik.trailmark.app.maps.OfflineRegions
 import dev.toufik.trailmark.regions.TileMath
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -41,6 +44,7 @@ private val MAX_ZOOM_CHOICES = listOf(13, 14, 15)
 private const val TILE_BUDGET = 3_000L
 private const val AVG_TILE_BYTES = 22_000.0
 /** Downloads the area around the current position from the global basemap. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun OfflineAreaCard(
     onCompleted: () -> Unit,
@@ -76,14 +80,16 @@ fun OfflineAreaCard(
             c == null -> Text(t.needsLocation, color = Palette.textSecondary, fontSize = 13.sp)
             else -> {
                 Text(
-                    "${t.aroundYou} · ${"%.5f".format(c.first)}, ${"%.5f".format(c.second)}",
+                    "${t.aroundYou} · ${String.format(Locale.US, "%.5f", c.first)}, ${
+                        String.format(Locale.US, "%.5f", c.second)
+                    }",
                     color = Palette.textSecondary,
                     fontSize = 12.sp,
                 )
-                Row(
+                FlowRow(
                     modifier = Modifier.padding(top = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Text(t.radius, color = Palette.textSecondary, fontSize = 13.sp)
                     RADIUS_CHOICES.forEach { r ->
@@ -94,10 +100,10 @@ fun OfflineAreaCard(
                         )
                     }
                 }
-                Row(
+                FlowRow(
                     modifier = Modifier.padding(top = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Text(t.detail, color = Palette.textSecondary, fontSize = 13.sp)
                     MAX_ZOOM_CHOICES.forEach { z ->
@@ -109,7 +115,9 @@ fun OfflineAreaCard(
                     }
                 }
                 Text(
-                    "${t.approx} $tiles ${t.tiles} · ${"%.1f".format(sizeMb)} MB",
+                    "${t.approx} $tiles ${t.tiles} · ${
+                        String.format(Locale.US, "%.1f", sizeMb)
+                    } MB",
                     color = if (tooBig) Palette.accent else Palette.textSecondary,
                     fontSize = 13.sp,
                     modifier = Modifier.padding(top = 8.dp),
@@ -117,7 +125,7 @@ fun OfflineAreaCard(
                 if (tooBig) {
                     Text(t.tooManyTiles, color = Palette.accent, fontSize = 12.sp)
                 }
-                error?.let { Text(it, color = Palette.accent, fontSize = 12.sp) }
+                error?.let { Text(it, color = Palette.dangerText, fontSize = 12.sp) }
                 Row(
                     modifier = Modifier.padding(top = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,

@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
@@ -67,8 +68,6 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import dev.toufik.trailmark.analytics.Ghost
 import dev.toufik.trailmark.analytics.ghostDeltaM
-import dev.toufik.trailmark.app.WeatherNow
-import dev.toufik.trailmark.app.WeatherService
 import dev.toufik.trailmark.app.maps.MapPacks
 import dev.toufik.trailmark.app.service.RecordingHolder
 import dev.toufik.trailmark.app.service.RecordingService
@@ -128,6 +127,12 @@ private fun qualityLabel(t: Texts, q: GpsQuality): String = when (q) {
     GpsQuality.LOST -> t.lost
 }
 
+private fun coachLocale(lang: Lang): Locale = when (lang) {
+    Lang.AR -> Locale.AR
+    Lang.FR -> Locale.FR
+    else -> Locale.EN
+}
+
 @Composable
 fun RecordingScreen(
     onOpenDetail: (Long) -> Unit,
@@ -136,6 +141,7 @@ fun RecordingScreen(
     val prefs = remember { context.getSharedPreferences("trailmark", Context.MODE_PRIVATE) }
     val darkMap = remember { prefs.getBoolean("map_dark", true) }
     val t = LocalTexts.current
+    val langRef = rememberUpdatedState(LocalLang.current)
     val state by RecordingHolder.state.collectAsState()
     val packPath = remember { MapPacks.installedMapPack(context)?.absolutePath }
     val scope = rememberCoroutineScope()
@@ -149,7 +155,7 @@ fun RecordingScreen(
     var media by remember { mutableStateOf<List<MediaRow>>(emptyList()) }
     var viewerMedia by remember { mutableStateOf<MediaRow?>(null) }
     var coachLine by remember { mutableStateOf<String?>(null) }
-    var weather by remember { mutableStateOf<WeatherNow?>(null) }
+    val weather by WeatherHolder.state.collectAsState()
     var ghost by remember { mutableStateOf<Ghost?>(null) }
     var ghostRoute by remember { mutableStateOf<List<StoredPoint>>(emptyList()) }
     var ghostStartNanos by remember { mutableStateOf(0L) }
@@ -169,34 +175,12 @@ fun RecordingScreen(
         }
     }
 
-    val recRef = rememberUpdatedState(state)
-    LaunchedEffect(state.phase) {
-        if (state.phase != Phase.RECORDING) {
-            weather = null
-            return@LaunchedEffect
-        }
-        while (true) {
-            val cur = recRef.value
-            val la = cur.currentLat
-            val lo = cur.currentLon
-            if (la != null && lo != null) {
-                WeatherService.at(la, lo)?.let {
-                    weather = it
-                    WeatherHolder.update(it)
-                }
-                delay(5 * 60 * 1000L)
-            } else {
-                delay(30_000L)
-            }
-        }
-    }
-
     LaunchedEffect(Unit) {
         val loaded = withContext(Dispatchers.IO) {
             val repo = AppGraph.repository(context)
             val last = repo.listActivities().firstOrNull { !it.isOpen && it.distanceM > 0 }
                 ?: return@withContext null
-            last to repo.loadPoints(last.id)
+            last to repo.loadPoints(last.id).filter { it.type != WaypointType.REJECTED }
         }
         if (loaded != null) {
             val (row, points) = loaded
@@ -206,7 +190,7 @@ fun RecordingScreen(
                     seconds = row.elapsedNanos / 1_000_000_000L,
                     targetM = row.distanceM,
                 ),
-                Locale.AR,
+                coachLocale(langRef.value),
             )
             if (points.size >= 2) {
                 ghost = Ghost(points, points.first().timeNanos)
@@ -258,9 +242,9 @@ fun RecordingScreen(
         if (prev != null && prev != ahead) {
             val seed = (state.elapsedNanos / 60_000_000_000L).toInt()
             overtakeFlash = if (ahead) {
-                Coach.message(CoachEvent.Overtook(Math.abs(d)), Locale.AR, seed)
+                Coach.message(CoachEvent.Overtook(Math.abs(d)), coachLocale(langRef.value), seed)
             } else {
-                Coach.message(CoachEvent.GotOvertaken(Math.abs(d)), Locale.AR, seed)
+                Coach.message(CoachEvent.GotOvertaken(Math.abs(d)), coachLocale(langRef.value), seed)
             }
             delay(5000)
             overtakeFlash = null
@@ -402,7 +386,7 @@ fun RecordingScreen(
                 }
                 if (state.isIdle || state.phase == Phase.PAUSED) {
                     Text(
-                        text = if (state.phase == Phase.PAUSED) t.pause else t.paused,
+                        text = if (state.phase == Phase.PAUSED) t.paused else t.pause,
                         color = Palette.accent,
                         fontSize = 12.sp,
                         modifier = Modifier
@@ -459,7 +443,8 @@ fun RecordingScreen(
                 )
                 val paceText = if (distAnim < 50) "--:--"
                 else formatPace(elapsedAnim.toDouble() / (distAnim / 1000.0))
-                val speedText = if (state.currentSpeedMps == null) "--" else "%.1f".format(speedAnim * 3.6)
+                val speedText = if (state.currentSpeedMps == null) "--"
+                else String.format(java.util.Locale.US, "%.1f", speedAnim * 3.6)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -525,14 +510,14 @@ fun RecordingScreen(
                 if (ghost != null && state.phase == Phase.RECORDING && liveDelta != null) {
                     val seed = (state.elapsedNanos / 20_000_000_000L).toInt()
                     val line = overtakeFlash ?: if (liveDelta >= 0) {
-                        Coach.message(CoachEvent.GhostBehind(Math.abs(liveDelta)), Locale.AR, seed)
+                        Coach.message(CoachEvent.GhostBehind(Math.abs(liveDelta)), coachLocale(langRef.value), seed)
                     } else {
-                        Coach.message(CoachEvent.GhostAhead(Math.abs(liveDelta)), Locale.AR, seed)
+                        Coach.message(CoachEvent.GhostAhead(Math.abs(liveDelta)), coachLocale(langRef.value), seed)
                     }
                     Text(text = line, color = Palette.accent, fontSize = 12.sp)
                 }
                 state.storageError?.let {
-                    Text(text = t.loadFailed, color = Palette.danger, fontSize = 12.sp)
+                    Text(text = t.loadFailed, color = Palette.dangerText, fontSize = 12.sp)
                 }
 
                 val lastId = state.lastActivityId
@@ -566,6 +551,7 @@ fun RecordingScreen(
 
             viewerMedia?.let { m ->
                 if (m.kind == "PHOTO") {
+                    BackHandler { viewerMedia = null }
                     PhotoViewer(media = m, description = t.photo) { viewerMedia = null }
                 }
             }

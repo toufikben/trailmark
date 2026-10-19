@@ -8,6 +8,7 @@ val RU_TEXTS = Texts(
     cancel = "Отмена",
     points = "Точки",
     searching = "Поиск сигнала…",
+    recordingNow = "Запись маршрута…",
     active = "Запись активна",
     weak = "Слабый сигнал",
     lost = "Сигнал потерян",

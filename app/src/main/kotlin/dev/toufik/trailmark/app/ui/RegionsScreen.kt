@@ -38,6 +38,7 @@ import dev.toufik.trailmark.app.maps.SavedRegion
 import dev.toufik.trailmark.regions.RegionManifest
 import dev.toufik.trailmark.regions.RegionPack
 import dev.toufik.trailmark.regions.parseManifest
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -48,7 +49,7 @@ fun RegionsScreen(onBack: () -> Unit, onPaywall: () -> Unit) {
     val t = LocalTexts.current
     val scope = rememberCoroutineScope()
     val premium = LocalPremium.current
-    val pro = premium == null || premium.isPro(System.currentTimeMillis())
+    val pro = premium?.isPro(System.currentTimeMillis()) == true
     var manifest by remember { mutableStateOf<RegionManifest?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var installing by remember { mutableStateOf<String?>(null) }
@@ -56,6 +57,7 @@ fun RegionsScreen(onBack: () -> Unit, onPaywall: () -> Unit) {
     var savedAreas by remember { mutableStateOf(listOf<SavedRegion>()) }
     val manager = remember { MapPacks.manager(context) }
     val regions = remember { OfflineRegions(context) }
+    val packBlocked = !pro && savedAreas.size + installed.size >= FREE_OFFLINE_AREAS
 
     fun refreshInstalled(packs: List<RegionPack>) {
         installed = packs.filter { manager.isInstalled(it) }.map { it.id }.toSet()
@@ -70,8 +72,8 @@ fun RegionsScreen(onBack: () -> Unit, onPaywall: () -> Unit) {
             val m = parseManifest(text)
             manifest = m
             refreshInstalled(m.packs)
-        } catch (e: Throwable) {
-            error = e.message ?: t.loadFailed
+        } catch (_: Throwable) {
+            error = t.loadFailed
         }
     }
 
@@ -113,7 +115,7 @@ fun RegionsScreen(onBack: () -> Unit, onPaywall: () -> Unit) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(r.name, color = Palette.text, fontSize = 15.sp)
                                 Text(
-                                    "${"%.1f".format(r.bytes / 1_048_576.0)} MB · ${r.tiles} ${t.tiles}",
+                                    "${String.format(Locale.US, "%.1f", r.bytes / 1_048_576.0)} MB · ${r.tiles} ${t.tiles}",
                                     color = Palette.textSecondary,
                                     fontSize = 12.sp,
                                 )
@@ -147,7 +149,7 @@ fun RegionsScreen(onBack: () -> Unit, onPaywall: () -> Unit) {
                         Column(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
                             Text(pack.name, color = Palette.text, fontSize = 16.sp)
                             Text(
-                                "${pack.kind} · ${"%.1f".format(pack.sizeBytes / 1_048_576.0)} MB",
+                                "${pack.kind} · ${String.format(Locale.US, "%.1f", pack.sizeBytes / 1_048_576.0)} MB",
                                 color = Palette.textSecondary,
                                 fontSize = 12.sp,
                             )
@@ -167,13 +169,17 @@ fun RegionsScreen(onBack: () -> Unit, onPaywall: () -> Unit) {
                                     Button(
                                         enabled = installing == null,
                                         onClick = {
+                                            if (packBlocked) {
+                                                onPaywall()
+                                                return@Button
+                                            }
                                             scope.launch {
                                                 installing = pack.id
                                                 try {
                                                     withContext(Dispatchers.IO) { manager.install(pack) }
                                                     refreshInstalled(m.packs)
-                                                } catch (e: Throwable) {
-                                                    error = "${t.loadFailed}: ${e.message}"
+                                                } catch (_: Throwable) {
+                                                    error = t.loadFailed
                                                 } finally {
                                                     installing = null
                                                 }

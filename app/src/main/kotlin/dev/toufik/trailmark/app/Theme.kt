@@ -14,6 +14,7 @@ object Palette {
     val accent = Color(0xFFC6FF3D)
     val onAccent = Color(0xFF0E1113)
     val danger = Color(0xFFB42318)
+    val dangerText = Color(0xFFFF8A80)
 }
 
 @Composable

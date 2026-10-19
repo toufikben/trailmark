@@ -172,7 +172,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                         TextButton(onClick = {
-                            shareGpx(context, d.points, d.row.startWallMillis, d.row.id)
+                            shareGpx(context, d.points, d.row.startWallMillis, d.row.id, t.share)
                         }) { Text(t.share, color = Palette.accent) }
                     }
                     val track = remember(d) { ReplayTrack(d.points) }
@@ -412,7 +412,13 @@ private fun ReplayButton(playing: Boolean, description: String, onClick: () -> U
     }
 }
 
-private fun shareGpx(context: Context, points: List<StoredPoint>, startWallMillis: Long, id: Long) {
+private fun shareGpx(
+    context: Context,
+    points: List<StoredPoint>,
+    startWallMillis: Long,
+    id: Long,
+    chooserTitle: String,
+) {
     val dir = File(context.cacheDir, "exports").apply { mkdirs() }
     val file = File(dir, "trailmark-$id.gpx")
     file.writeText(Gpx.write(points, startWallMillis))
@@ -422,5 +428,5 @@ private fun shareGpx(context: Context, points: List<StoredPoint>, startWallMilli
         putExtra(Intent.EXTRA_STREAM, uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
-    context.startActivity(Intent.createChooser(send, "مشاركة GPX"))
+    context.startActivity(Intent.createChooser(send, chooserTitle))
 }

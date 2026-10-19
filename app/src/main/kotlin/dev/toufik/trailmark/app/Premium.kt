@@ -25,7 +25,7 @@ data class PremiumState(
         val end = trialStartedAt + TRIAL_DAYS * 86_400_000L
         val left = end - now
         if (left <= 0) return 0
-        return ((left + 86_399_999L) / 86_400_000L).toInt()
+        return ((left + 86_399_999L) / 86_400_000L).toInt().coerceAtMost(TRIAL_DAYS)
     }
 
     fun inTrial(now: Long): Boolean = trialDaysLeft(now) > 0
@@ -50,8 +50,28 @@ class Entitlements(context: Context) {
     }
 
     fun onPurchase(productId: String) {
-        prefs.edit().putString("pro_product", productId).apply()
-        _state.value = _state.value.copy(purchasedProduct = productId)
+        val current = _state.value.purchasedProduct
+        val keep = when {
+            current == PremiumProducts.LIFETIME || productId == PremiumProducts.LIFETIME ->
+                PremiumProducts.LIFETIME
+            else -> productId
+        }
+        prefs.edit().putString("pro_product", keep).apply()
+        _state.value = _state.value.copy(purchasedProduct = keep)
+    }
+
+    /** Reconciles the stored entitlement with what the store reports; revokes when nothing is active. */
+    fun syncFromStore(activeProducts: Set<String>) {
+        val best = when {
+            PremiumProducts.LIFETIME in activeProducts -> PremiumProducts.LIFETIME
+            PremiumProducts.YEARLY in activeProducts -> PremiumProducts.YEARLY
+            PremiumProducts.MONTHLY in activeProducts -> PremiumProducts.MONTHLY
+            else -> null
+        }
+        if (best == _state.value.purchasedProduct) return
+        if (best == null) prefs.edit().remove("pro_product").apply()
+        else prefs.edit().putString("pro_product", best).apply()
+        _state.value = _state.value.copy(purchasedProduct = best)
     }
 }
 

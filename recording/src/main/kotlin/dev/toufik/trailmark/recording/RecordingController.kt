@@ -68,6 +68,9 @@ class RecordingController(
     private var pausedFixCount = 0
     private var pausedRejected = 0
     private var pausedMock = false
+    private var cumFixCount = 0
+    private var cumRejected = 0
+    private var cumMock = false
     private val writeMutex = Mutex()
 
     suspend fun start() {
@@ -85,6 +88,9 @@ class RecordingController(
         pausedFixCount = 0
         pausedRejected = 0
         pausedMock = false
+        cumFixCount = 0
+        cumRejected = 0
+        cumMock = false
         _state.value = RecordingState(phase = Phase.STARTING, quality = GpsQuality.NONE)
 
         job = scope.launch { source.fixes().collect { onFix(it) } }
@@ -148,11 +154,13 @@ class RecordingController(
         if (q != _state.value.quality) _state.value = _state.value.copy(quality = q)
     }
     private suspend fun persist(e: RecorderEngine) {
+        if (!sessionActive) return
         if (e.storedCount <= segmentWritten) return
         writeMutex.withLock {
             val written = segmentWritten
+            if (!sessionActive) return@withLock
             if (e.storedCount <= written) return@withLock
-            val slice = e.storedPoints.subList(written, e.storedCount)
+            val slice = e.storedSlice(written, e.storedCount)
             try {
                 val id = activityId ?: repo.insertActivity(newUuid(), sport.name, wallMillis())
                     .also { activityId = it; _state.value = _state.value.copy(activityId = it) }
@@ -207,14 +215,21 @@ class RecordingController(
     }
 
     private fun pauseReportedStats(e: RecorderEngine) {
+        cumFixCount += e.stats.fixCount
+        cumRejected += e.stats.rejectedCount
+        cumMock = cumMock || e.stats.mockFixCount > 0
         pausedFixCount = e.stats.fixCount
         pausedRejected = e.stats.rejectedCount
         pausedMock = e.stats.mockFixCount > 0
     }
 
     suspend fun stop() {
-        job?.cancel(); job = null
-        tickJob?.cancel(); tickJob = null
+        job?.cancel()
+        job?.join()
+        job = null
+        tickJob?.cancel()
+        tickJob?.join()
+        tickJob = null
         sessionActive = false
         val e = engine
         val id = activityId
@@ -224,9 +239,9 @@ class RecordingController(
                     activityId = id,
                     elapsedNanos = resumeElapsedNanos + (e?.elapsedNanos ?: 0L),
                     distanceM = e?.distanceMeters ?: resumeDistanceM,
-                    fixCount = (e?.stats?.fixCount ?: pausedFixCount).toLong(),
-                    rejectedCount = (e?.stats?.rejectedCount ?: pausedRejected).toLong(),
-                    mockDetected = if (e != null) e.stats.mockFixCount > 0 else pausedMock,
+                    fixCount = (cumFixCount + (e?.stats?.fixCount ?: 0)).toLong(),
+                    rejectedCount = (cumRejected + (e?.stats?.rejectedCount ?: 0)).toLong(),
+                    mockDetected = cumMock || (e?.stats?.mockFixCount ?: 0) > 0,
                 )
                 repo.clearResume(id)
             } catch (_: Throwable) {

@@ -8,6 +8,7 @@ val ES_TEXTS = Texts(
     cancel = "Cancelar",
     points = "Puntos",
     searching = "Buscando señal…",
+    recordingNow = "Grabando tu ruta…",
     active = "Grabación activa",
     weak = "Señal débil",
     lost = "Señal perdida",

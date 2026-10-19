@@ -8,6 +8,7 @@ val HI_TEXTS = Texts(
     cancel = "रद्द करें",
     points = "बिंदु",
     searching = "सिग्नल खोजा जा रहा है…",
+    recordingNow = "आपका मार्ग रिकॉर्ड हो रहा है…",
     active = "रिकॉर्डिंग सक्रिय",
     weak = "कमज़ोर सिग्नल",
     lost = "सिग्नल खो गया",

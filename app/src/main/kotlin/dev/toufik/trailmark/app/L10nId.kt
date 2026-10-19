@@ -8,6 +8,7 @@ val ID_TEXTS = Texts(
     cancel = "Batal",
     points = "Poin",
     searching = "Mencari sinyal…",
+    recordingNow = "Merekam rute Anda…",
     active = "Perekaman aktif",
     weak = "Sinyal lemah",
     lost = "Sinyal hilang",

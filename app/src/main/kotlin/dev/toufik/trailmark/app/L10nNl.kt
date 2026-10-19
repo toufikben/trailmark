@@ -8,6 +8,7 @@ val NL_TEXTS = Texts(
     cancel = "Annuleren",
     points = "Punten",
     searching = "Signaal zoeken…",
+    recordingNow = "Route wordt opgenomen…",
     active = "Opname actief",
     weak = "Zwak signaal",
     lost = "Signaal verloren",

@@ -56,6 +56,9 @@ class RecorderEngine(
 
     val storedPoints: List<StoredPoint> get() = points.toList()
     val storedCount: Int get() = points.size
+
+    /** Copy of `[from, to)` without materializing the whole track. */
+    fun storedSlice(from: Int, to: Int): List<StoredPoint> = points.subList(from, to).toList()
     val distanceMeters: Double get() = distanceM
     val isIdle: Boolean get() = idle
     val stats: EngineStats

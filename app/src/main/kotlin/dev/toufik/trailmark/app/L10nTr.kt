@@ -8,6 +8,7 @@ val TR_TEXTS = Texts(
     cancel = "İptal",
     points = "Noktalar",
     searching = "Sinyal aranıyor…",
+    recordingNow = "Rotanız kaydediliyor…",
     active = "Kayıt etkin",
     weak = "Zayıf sinyal",
     lost = "Sinyal kayboldu",

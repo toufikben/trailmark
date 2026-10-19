@@ -8,6 +8,7 @@ val ZH_TEXTS = Texts(
     cancel = "取消",
     points = "轨迹点",
     searching = "正在搜索信号…",
+    recordingNow = "正在记录路线…",
     active = "正在记录",
     weak = "信号弱",
     lost = "信号丢失",

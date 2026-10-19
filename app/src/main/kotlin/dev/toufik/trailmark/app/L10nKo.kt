@@ -8,6 +8,7 @@ val KO_TEXTS = Texts(
     cancel = "취소",
     points = "포인트",
     searching = "위성 신호 찾는 중…",
+    recordingNow = "경로 기록 중…",
     active = "기록 중",
     weak = "신호 약함",
     lost = "신호 끊김",

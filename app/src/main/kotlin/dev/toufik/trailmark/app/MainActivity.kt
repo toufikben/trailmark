@@ -1,6 +1,8 @@
 package dev.toufik.trailmark.app
 
+import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -76,7 +78,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (!syntheticStarted && intent?.getBooleanExtra("synthetic", false) == true) {
+        val debuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        if (debuggable && !syntheticStarted && intent?.getBooleanExtra("synthetic", false) == true) {
             syntheticStarted = true
             val svc = Intent(this, dev.toufik.trailmark.app.service.RecordingService::class.java)
                 .setAction(dev.toufik.trailmark.app.service.RecordingService.ACTION_START)
@@ -89,11 +92,17 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         org.maplibre.android.MapLibre.getInstance(this)
+        val prefs = getSharedPreferences("trailmark", Context.MODE_PRIVATE)
         val entitlements = Entitlements(this)
         val billing = BillingManager(this, entitlements)
         billing.connect()
         setContent {
-            var lang by remember { mutableStateOf(Lang.AR) }
+            var lang by remember {
+                mutableStateOf(
+                    Lang.entries.firstOrNull { it.code == prefs.getString("lang_code", null) }
+                        ?: Lang.AR,
+                )
+            }
             val texts = textsFor(lang)
             val direction = if (lang.rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
             val premiumState by entitlements.state.collectAsState()
@@ -107,12 +116,14 @@ class MainActivity : ComponentActivity() {
                 TrailmarkTheme {
                     CompositionLocalProvider(LocalLayoutDirection provides direction) {
                         var screen by remember { mutableStateOf<Screen>(Screen.Record) }
+                        var paywallFrom by remember { mutableStateOf<Screen>(Screen.Settings) }
+                        var detailFrom by remember { mutableStateOf<Screen>(Screen.History) }
                         val recState by RecordingHolder.state.collectAsState()
                         BackHandler(enabled = screen != Screen.Record) {
                             screen = when (val s = screen) {
-                                is Screen.Detail -> Screen.History
+                                is Screen.Detail -> detailFrom
                                 Screen.Regions -> Screen.Plan
-                                Screen.Paywall -> Screen.Settings
+                                Screen.Paywall -> paywallFrom
                                 else -> Screen.Record
                             }
                         }
@@ -130,28 +141,43 @@ class MainActivity : ComponentActivity() {
                                 ) { s ->
                                 when (s) {
                                     Screen.Record -> RecordingScreen(
-                                        onOpenDetail = { id -> screen = Screen.Detail(id) },
+                                        onOpenDetail = { id ->
+                                            detailFrom = Screen.Record
+                                            screen = Screen.Detail(id)
+                                        },
                                     )
                                     Screen.Plan -> PlanScreen(
                                         onRegions = { screen = Screen.Regions },
                                     )
                                     Screen.History -> HistoryScreen(
-                                        onOpen = { screen = Screen.Detail(it) },
+                                        onOpen = { id ->
+                                            detailFrom = Screen.History
+                                            screen = Screen.Detail(id)
+                                        },
                                     )
                                     Screen.Progress -> ProgressScreen()
                                     Screen.Settings -> SettingsScreen(
                                         lang = lang,
-                                        onLang = { lang = it },
-                                        onPaywall = { screen = Screen.Paywall },
+                                        onLang = {
+                                            lang = it
+                                            prefs.edit().putString("lang_code", it.code).apply()
+                                        },
+                                        onPaywall = {
+                                            paywallFrom = Screen.Settings
+                                            screen = Screen.Paywall
+                                        },
                                     )
-                                    Screen.Paywall -> PaywallScreen(onBack = { screen = Screen.Settings })
+                                    Screen.Paywall -> PaywallScreen(onBack = { screen = paywallFrom })
                                     Screen.Regions -> RegionsScreen(
                                         onBack = { screen = Screen.Plan },
-                                        onPaywall = { screen = Screen.Paywall },
+                                        onPaywall = {
+                                            paywallFrom = Screen.Regions
+                                            screen = Screen.Paywall
+                                        },
                                     )
                                     is Screen.Detail -> DetailScreen(
                                         activityId = s.id,
-                                        onBack = { screen = Screen.History },
+                                        onBack = { screen = detailFrom },
                                     )
                                 }
                                 }
@@ -190,14 +216,14 @@ private fun TabBar(current: Screen, recording: Boolean, onSelect: (Screen) -> Un
         NavigationBarItem(
             selected = current is Screen.Plan || current is Screen.Regions,
             onClick = { onSelect(Screen.Plan) },
-            icon = { Icon(Icons.Filled.Place, contentDescription = t.tabExplore, modifier = Modifier.size(22.dp)) },
+            icon = { Icon(Icons.Filled.Place, contentDescription = null, modifier = Modifier.size(22.dp)) },
             label = { TabLabel(t.tabExplore) },
             colors = colors,
         )
         NavigationBarItem(
             selected = current is Screen.History || current is Screen.Detail,
             onClick = { onSelect(Screen.History) },
-            icon = { Icon(Icons.Filled.List, contentDescription = t.tabHistory, modifier = Modifier.size(22.dp)) },
+            icon = { Icon(Icons.Filled.List, contentDescription = null, modifier = Modifier.size(22.dp)) },
             label = { TabLabel(t.tabHistory) },
             colors = colors,
         )
@@ -209,9 +235,9 @@ private fun TabBar(current: Screen, recording: Boolean, onSelect: (Screen) -> Un
             colors = colors,
         )
         NavigationBarItem(
-            selected = current is Screen.Settings,
+            selected = current is Screen.Settings || current is Screen.Paywall,
             onClick = { onSelect(Screen.Settings) },
-            icon = { Icon(Icons.Filled.Settings, contentDescription = t.tabSettings, modifier = Modifier.size(22.dp)) },
+            icon = { Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(22.dp)) },
             label = { TabLabel(t.tabSettings) },
             colors = colors,
         )

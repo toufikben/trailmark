@@ -14,11 +14,15 @@ import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import dev.toufik.trailmark.R
+import dev.toufik.trailmark.app.Lang
 import dev.toufik.trailmark.app.MainActivity
+import dev.toufik.trailmark.app.WeatherService
 import dev.toufik.trailmark.app.gps.AndroidLocationFixSource
 import dev.toufik.trailmark.app.gps.SyntheticFixSource
+import dev.toufik.trailmark.app.textsFor
 import dev.toufik.trailmark.engine.FixSource
 import dev.toufik.trailmark.engine.Sport
+import dev.toufik.trailmark.recording.Phase
 import dev.toufik.trailmark.recording.RecordingController
 import dev.toufik.trailmark.recording.RecordingState
 import kotlinx.coroutines.CoroutineScope
@@ -26,6 +30,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
@@ -36,6 +42,7 @@ class RecordingService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var controller: RecordingController? = null
     private var stateJob: Job? = null
+    private var weatherJob: Job? = null
     private var wakeLock: PowerManager.WakeLock? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -46,8 +53,14 @@ class RecordingService : Service() {
             ACTION_STOP -> stopRecording()
             ACTION_PAUSE -> scope.launch { controller?.pause() }
             ACTION_RESUME -> scope.launch { controller?.resume() }
+            else -> stopSelf()
         }
-        return START_STICKY
+        return START_NOT_STICKY
+    }
+
+    private fun currentLang(): Lang {
+        val code = getSharedPreferences("trailmark", MODE_PRIVATE).getString("lang_code", null)
+        return Lang.entries.firstOrNull { it.code == code } ?: Lang.AR
     }
 
     private fun startRecording(intent: Intent) {
@@ -82,6 +95,19 @@ class RecordingService : Service() {
         )
         controller = c
         stateJob = scope.launch { c.state.collect { RecordingHolder.update(it) } }
+        weatherJob = scope.launch {
+            while (isActive) {
+                val st = c.state.value
+                val la = st.currentLat
+                val lo = st.currentLon
+                if (la != null && lo != null && st.phase == Phase.RECORDING) {
+                    WeatherService.at(la, lo)?.let { WeatherHolder.update(it) }
+                    delay(5 * 60 * 1000L)
+                } else {
+                    delay(30_000L)
+                }
+            }
+        }
         scope.launch { c.start() }
     }
 
@@ -104,8 +130,10 @@ class RecordingService : Service() {
                 }
             }
             WeatherHolder.update(null)
-            RecordingHolder.update(RecordingState())
+            RecordingHolder.update(RecordingState(phase = Phase.STOPPED, lastActivityId = finished))
             stateJob?.cancel()
+            weatherJob?.cancel()
+            weatherJob = null
             controller = null
             releaseWakeLock()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -140,13 +168,15 @@ class RecordingService : Service() {
     private fun createChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val mgr = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (mgr.getNotificationChannel(CHANNEL_ID) != null) return
+        val t = textsFor(currentLang())
+        mgr.deleteNotificationChannel(CHANNEL_ID)
         mgr.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "تسجيل المسار", NotificationManager.IMPORTANCE_LOW),
+            NotificationChannel(CHANNEL_ID, t.tabRecord, NotificationManager.IMPORTANCE_LOW),
         )
     }
 
     private fun buildNotification(): Notification {
+        val t = textsFor(currentLang())
         val open = PendingIntent.getActivity(
             this,
             0,
@@ -156,7 +186,7 @@ class RecordingService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_track)
             .setContentTitle("Trailmark")
-            .setContentText("جارٍ تسجيل المسار")
+            .setContentText(t.recordingNow)
             .setOngoing(true)
             .setContentIntent(open)
             .build()

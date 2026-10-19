@@ -8,6 +8,7 @@ val DE_TEXTS = Texts(
     cancel = "Abbrechen",
     points = "Punkte",
     searching = "Signal wird gesucht…",
+    recordingNow = "Route wird aufgezeichnet…",
     active = "Aufzeichnung aktiv",
     weak = "Schwaches Signal",
     lost = "Signal verloren",

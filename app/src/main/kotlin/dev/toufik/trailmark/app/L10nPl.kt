@@ -8,6 +8,7 @@ val PL_TEXTS = Texts(
     cancel = "Anuluj",
     points = "Punkty",
     searching = "Szukanie sygnału…",
+    recordingNow = "Nagrywanie trasy…",
     active = "Nagrywanie aktywne",
     weak = "Słaby sygnał",
     lost = "Utracono sygnał",

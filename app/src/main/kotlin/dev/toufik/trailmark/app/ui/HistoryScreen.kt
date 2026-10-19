@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.toufik.trailmark.app.AppGraph
+import dev.toufik.trailmark.app.LocalLang
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.Texts
@@ -135,7 +136,7 @@ fun HistoryScreen(onOpen: (Long) -> Unit) {
                 else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
                     itemsIndexed(list, key = { _, row -> row.id }) { i, row ->
                         HistoryRow(row, index = i) { onOpen(row.id) }
-                        HorizontalDivider(color = Palette.surface)
+                        HorizontalDivider(color = Palette.textSecondary.copy(alpha = 0.15f))
                     }
                 }
             }
@@ -170,7 +171,7 @@ private fun HistoryRow(row: ActivityRow, index: Int = 0, onClick: () -> Unit) {
                     modifier = Modifier.padding(start = 8.dp),
                 )
             }
-            Text(formatDate(row.startWallMillis), color = Palette.textSecondary, fontSize = 12.sp)
+            Text(formatDate(row.startWallMillis, LocalLang.current), color = Palette.textSecondary, fontSize = 12.sp)
         }
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = 6.dp),

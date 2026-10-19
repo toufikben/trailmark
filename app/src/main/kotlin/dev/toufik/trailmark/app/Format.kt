@@ -29,22 +29,32 @@ fun formatPace(secPerKm: Double): String {
     return "${s / 60}:${(s % 60).toString().padStart(2, '0')}"
 }
 
-private val MONTHS_AR = listOf(
-    "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
-    "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
+private val TODAY_WORDS: Map<Lang, String> = mapOf(
+    Lang.AR to "اليوم", Lang.FR to "Aujourd'hui", Lang.EN to "Today",
+    Lang.ES to "Hoy", Lang.PT to "Hoje", Lang.DE to "Heute", Lang.IT to "Oggi",
+    Lang.NL to "Vandaag", Lang.PL to "Dzisiaj", Lang.RU to "Сегодня", Lang.TR to "Bugün",
+    Lang.ID to "Hari ini", Lang.HI to "आज", Lang.JA to "今日", Lang.KO to "오늘", Lang.ZH to "今天",
 )
 
-/** A start stamp as `15 أكتوبر 2026 · 21:33`, or اليوم / أمس for the two most recent calendar days. */
-fun formatDate(millis: Long, now: Long = System.currentTimeMillis()): String {
+private val YESTERDAY_WORDS: Map<Lang, String> = mapOf(
+    Lang.AR to "أمس", Lang.FR to "Hier", Lang.EN to "Yesterday",
+    Lang.ES to "Ayer", Lang.PT to "Ontem", Lang.DE to "Gestern", Lang.IT to "Ieri",
+    Lang.NL to "Gisteren", Lang.PL to "Wczoraj", Lang.RU to "Вчера", Lang.TR to "Dün",
+    Lang.ID to "Kemarin", Lang.HI to "कल", Lang.JA to "昨日", Lang.KO to "어제", Lang.ZH to "昨天",
+)
+
+/** A start stamp as `15 أكتوبر 2026 · 21:33`, or today / yesterday for the two most recent calendar days. */
+fun formatDate(millis: Long, lang: Lang = Lang.AR, now: Long = System.currentTimeMillis()): String {
     val c = Calendar.getInstance().apply { timeInMillis = millis }
     val n = Calendar.getInstance().apply { timeInMillis = now }
     val sameYear = c.get(Calendar.YEAR) == n.get(Calendar.YEAR)
     val dayGap = n.get(Calendar.DAY_OF_YEAR) - c.get(Calendar.DAY_OF_YEAR) +
         if (sameYear) 0 else 365 * (n.get(Calendar.YEAR) - c.get(Calendar.YEAR))
     val whenWord = when (dayGap) {
-        0 -> "اليوم"
-        1 -> "أمس"
-        else -> "${c.get(Calendar.DAY_OF_MONTH)} ${MONTHS_AR[c.get(Calendar.MONTH)]} ${c.get(Calendar.YEAR)}"
+        0 -> TODAY_WORDS[lang] ?: "اليوم"
+        1 -> YESTERDAY_WORDS[lang] ?: "أمس"
+        else -> java.text.SimpleDateFormat("d MMMM yyyy", java.util.Locale.forLanguageTag(lang.code))
+            .format(java.util.Date(millis))
     }
     val hh = c.get(Calendar.HOUR_OF_DAY).toString().padStart(2, '0')
     val mm = c.get(Calendar.MINUTE).toString().padStart(2, '0')
