@@ -58,6 +58,9 @@ class RecordingService : Service() {
     private val segmentStartedNanos = mutableMapOf<Long, Long>()
 
     @Volatile
+    private var sportName: String = "RUN"
+
+    @Volatile
     private var ttsReady = false
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -109,6 +112,7 @@ class RecordingService : Service() {
 
         val sport = intent.getStringExtra(EXTRA_SPORT)
             ?.let { runCatching { Sport.valueOf(it) }.getOrNull() } ?: Sport.RUN
+        sportName = sport.name
         val source: FixSource = if (intent.getBooleanExtra(EXTRA_SYNTHETIC, false)) {
             SyntheticFixSource()
         } else {
@@ -248,7 +252,8 @@ class RecordingService : Service() {
         val repo = dev.toufik.trailmark.app.AppGraph.repository(this)
         scope.launch {
             c?.stop()
-            val finished = c?.state?.value?.lastActivityId
+            val endState = c?.state?.value
+            val finished = endState?.lastActivityId
             val weather = WeatherHolder.state.value
             if (finished != null && weather != null) {
                 runCatching {
@@ -262,6 +267,14 @@ class RecordingService : Service() {
                 }
             }
             WeatherHolder.update(null)
+            if (finished != null && endState != null) {
+                getSharedPreferences("trailmark", MODE_PRIVATE).edit()
+                    .putFloat("last_dist_m", endState.distanceM.toFloat())
+                    .putLong("last_time_s", endState.elapsedNanos / 1_000_000_000L)
+                    .putString("last_sport", sportName)
+                    .apply()
+                dev.toufik.trailmark.app.widget.TrailmarkWidget.refresh(this@RecordingService)
+            }
             if (finished != null) {
                 buzz(longArrayOf(0, 200, 120, 200))
                 runCatching {
