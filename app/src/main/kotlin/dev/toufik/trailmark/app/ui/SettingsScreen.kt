@@ -42,7 +42,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import dev.toufik.trailmark.app.Lang
@@ -154,9 +154,7 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
             val healthScope = rememberCoroutineScope()
             val healthContract = if (healthAvailable) {
                 runCatching {
-                    HealthConnectClient.getOrCreate(context)
-                        .permissionController
-                        .createRequestPermissionResultContract()
+                    PermissionController.createRequestPermissionResultContract()
                 }.getOrNull()
             } else {
                 null
