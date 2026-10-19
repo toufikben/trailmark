@@ -229,6 +229,16 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                             shareGpx(context, d.points, d.row.startWallMillis, d.row.id, t.share)
                         }) { Text(t.share, color = Palette.accent) }
                         TextButton(onClick = {
+                            shareFit(
+                                context,
+                                d.points,
+                                d.row.startWallMillis,
+                                d.row.sport,
+                                d.row.id,
+                                t.share,
+                            )
+                        }) { Text("FIT", color = Palette.accent) }
+                        TextButton(onClick = {
                             scope.launch {
                                 val card = withContext(Dispatchers.IO) {
                                     renderStoryCard(
@@ -703,6 +713,26 @@ private fun shareGpx(
     val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
     val send = Intent(Intent.ACTION_SEND).apply {
         type = "application/gpx+xml"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(send, chooserTitle))
+}
+
+private fun shareFit(
+    context: Context,
+    points: List<StoredPoint>,
+    startWallMillis: Long,
+    sport: String,
+    id: Long,
+    chooserTitle: String,
+) {
+    val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+    val file = File(dir, "trailmark-$id.fit")
+    file.writeBytes(Fit.write(points, startWallMillis, sport))
+    val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
+    val send = Intent(Intent.ACTION_SEND).apply {
+        type = "application/vnd.ant.fit"
         putExtra(Intent.EXTRA_STREAM, uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
