@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
@@ -39,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -77,9 +79,11 @@ import kotlinx.coroutines.withContext
 import java.util.Calendar
 
 /**
- * Trip planner: tap the map to set a destination, pick a sport, and get a
- * road-following route with per-sport time estimate, elevation stats and a
- * gradient-colored line (red steep, amber mild, gray flat, green downhill).
+ * Trip planner: tap the map (or search) to add waypoints — first point is the
+ * start when GPS is unknown, later taps extend the route — pick a sport, and
+ * get a road-following route with per-sport time estimate, elevation stats, a
+ * climb-difficulty badge and a gradient-colored line (red steep, amber mild,
+ * gray flat, green downhill).
  */
 @Composable
 fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
@@ -88,11 +92,11 @@ fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
     val prefs = remember { context.getSharedPreferences("trailmark", Context.MODE_PRIVATE) }
     val darkMap = remember { prefs.getBoolean("map_dark", true) }
     var sport by remember { mutableStateOf(Sport.RUN) }
-    var dest by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    var stops by remember { mutableStateOf<List<Pair<Double, Double>>>(emptyList()) }
     var anchor by remember { mutableStateOf<StoredPoint?>(null) }
-    val packPath = remember(anchor, dest) {
-        val lat = anchor?.lat ?: dest?.first
-        val lon = anchor?.lon ?: dest?.second
+    val packPath = remember(anchor, stops) {
+        val lat = anchor?.lat ?: stops.firstOrNull()?.first
+        val lon = anchor?.lon ?: stops.firstOrNull()?.second
         MapPacks.packFor(context, lat, lon)?.absolutePath
     }
     var plan by remember { mutableStateOf<PlannedRoute?>(null) }
@@ -110,23 +114,26 @@ fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { }
 
-    LaunchedEffect(dest, sport, anchor) {
-        val d = dest
+    LaunchedEffect(stops, sport, anchor) {
         val a = anchor
-        if (d == null || a == null) {
+        val waypoints = buildList {
+            if (a != null) add(a.lat to a.lon)
+            addAll(stops)
+        }
+        if (waypoints.size < 2) {
             plan = null
             loading = false
             return@LaunchedEffect
         }
         loading = true
         plan = withContext(Dispatchers.IO) {
-            RoutePlanner.plan(a.lat, a.lon, d.first, d.second, sport)
+            RoutePlanner.plan(waypoints, sport)
         }
         loading = false
     }
 
-    LaunchedEffect(dest) {
-        val d = dest
+    LaunchedEffect(stops) {
+        val d = stops.lastOrNull()
         if (d == null) {
             destWeather = null
             bestWindow = null
@@ -161,8 +168,8 @@ fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
                     points = emptyList(),
                     packPath = packPath,
                     planChunks = plan?.chunks ?: emptyList(),
-                    planDest = dest,
-                    onMapClick = { lat, lon -> dest = lat to lon },
+                    planStops = stops,
+                    onMapClick = { lat, lon -> stops = stops + (lat to lon) },
                     onUserFix = { sp -> if (anchor == null) anchor = sp },
                     onNeedPermission = {
                         locateLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION))
@@ -275,7 +282,7 @@ fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clickable {
-                                            dest = r.lat to r.lon
+                                            stops = stops + (r.lat to r.lon)
                                             query = ""
                                             results = emptyList()
                                         }
@@ -312,9 +319,8 @@ fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
                     .onGloballyPositioned { cardH = with(density) { it.size.height.toDp() } },
             ) {
                 Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp)) {
-                    val d = dest
                     when {
-                        d == null -> Text(
+                        stops.isEmpty() -> Text(
                             t.pickDestination,
                             color = Palette.textSecondary,
                             fontSize = 13.sp,
@@ -328,7 +334,7 @@ fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
                             Spacer(Modifier.width(10.dp))
                             Text(t.calculating, color = Palette.textSecondary, fontSize = 13.sp)
                         }
-                        anchor == null -> Text(
+                        stops.size == 1 && anchor == null -> Text(
                             t.waitingGps,
                             color = Palette.textSecondary,
                             fontSize = 13.sp,
@@ -361,6 +367,27 @@ fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
                                     t.maxGrade,
                                 )
                             }
+                            Spacer(Modifier.height(10.dp))
+                            val climbPerKm = if (p.distanceM > 10.0) p.ascentM / (p.distanceM / 1000.0) else 0.0
+                            val diffColor = when {
+                                climbPerKm >= 25.0 -> Color(0xFFE5484D)
+                                climbPerKm >= 10.0 -> Color(0xFFE2B203)
+                                else -> Color(0xFF30A46C)
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .clip(CircleShape)
+                                        .background(diffColor),
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    String.format(java.util.Locale.US, "%.1f m/km", climbPerKm),
+                                    color = Palette.textSecondary,
+                                    fontSize = 12.sp,
+                                )
+                            }
                             destWeather?.let { w ->
                                 Spacer(Modifier.height(10.dp))
                                 Row(
@@ -391,10 +418,19 @@ fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
                             }
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
+                                Text(
+                                    "${t.points} ${stops.size}",
+                                    color = Palette.textSecondary,
+                                    fontSize = 12.sp,
+                                )
+                                Spacer(Modifier.weight(1f))
+                                TextButton(onClick = { stops = stops.dropLast(1) }) {
+                                    Text("↶", color = Palette.accent, fontSize = 18.sp)
+                                }
                                 TextButton(onClick = {
-                                    dest = null
+                                    stops = emptyList()
                                     plan = null
                                 }) {
                                     Text(t.clear, color = Palette.accent)

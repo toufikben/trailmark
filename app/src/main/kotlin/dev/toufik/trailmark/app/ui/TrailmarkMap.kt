@@ -85,11 +85,13 @@ import org.maplibre.android.style.layers.PropertyFactory.iconSize
 import org.maplibre.android.style.layers.PropertyFactory.lineColor
 import org.maplibre.android.style.layers.PropertyFactory.lineOpacity
 import org.maplibre.android.style.layers.PropertyFactory.lineWidth
+import org.maplibre.android.style.layers.PropertyFactory.textAllowOverlap
 import org.maplibre.android.style.layers.PropertyFactory.textColor
 import org.maplibre.android.style.layers.PropertyFactory.textField
 import org.maplibre.android.style.layers.PropertyFactory.textFont
 import org.maplibre.android.style.layers.PropertyFactory.textHaloColor
 import org.maplibre.android.style.layers.PropertyFactory.textHaloWidth
+import org.maplibre.android.style.layers.PropertyFactory.textIgnorePlacement
 import org.maplibre.android.style.layers.PropertyFactory.textMaxWidth
 import org.maplibre.android.style.layers.PropertyFactory.textSize
 import org.maplibre.android.style.layers.PropertyFactory.visibility
@@ -225,6 +227,7 @@ fun TrailmarkMap(
     speedMps: Double? = null,
     planChunks: List<RouteChunk> = emptyList(),
     planDest: Pair<Double, Double>? = null,
+    planStops: List<Pair<Double, Double>> = emptyList(),
     mediaMarks: List<MediaMark> = emptyList(),
     onMediaTap: ((Int) -> Unit)? = null,
     onMapClick: ((Double, Double) -> Unit)? = null,
@@ -456,9 +459,19 @@ fun TrailmarkMap(
                 s.addLayer(
                     CircleLayer("plan-dest", "plan-dest-source").withProperties(
                         circleColor("#C6FF3D"),
-                        circleRadius(7f),
-                        circleStrokeColor("#FFFFFF"),
-                        circleStrokeWidth(2.5f),
+                        circleRadius(9f),
+                        circleStrokeColor("#0E1113"),
+                        circleStrokeWidth(3f),
+                    ),
+                )
+                s.addLayer(
+                    SymbolLayer("plan-stop-num", "plan-dest-source").withProperties(
+                        textField(Expression.get("n")),
+                        textFont(arrayOf(if (offlineVector) "TrailmarkSans" else "Noto Sans Regular")),
+                        textSize(11f),
+                        textColor("#0E1113"),
+                        textAllowOverlap(true),
+                        textIgnorePlacement(true),
                     ),
                 )
                 s.addSource(GeoJsonSource("route-source", EMPTY))
@@ -561,17 +574,21 @@ fun TrailmarkMap(
         )
     }
 
-    LaunchedEffect(planDest, style) {
+    LaunchedEffect(planStops, planDest, style) {
         val s = style ?: return@LaunchedEffect
-        val d = planDest
-        val fc = if (d != null) {
-            FeatureCollection.fromFeatures(
-                arrayOf(Feature.fromGeometry(Point.fromLngLat(d.second, d.first))),
-            )
+        val stops = if (planStops.isNotEmpty()) {
+            planStops
         } else {
-            EMPTY
+            planDest?.let { listOf(it) } ?: emptyList()
         }
-        s.getSourceAs<GeoJsonSource>("plan-dest-source")?.setGeoJson(fc)
+        val features = stops.mapIndexed { i, st ->
+            Feature.fromGeometry(Point.fromLngLat(st.second, st.first)).apply {
+                addStringProperty("n", (i + 1).toString())
+            }
+        }
+        s.getSourceAs<GeoJsonSource>("plan-dest-source")?.setGeoJson(
+            if (features.isEmpty()) EMPTY else FeatureCollection.fromFeatures(features.toTypedArray()),
+        )
     }
 
     LaunchedEffect(mediaMarks, style) {

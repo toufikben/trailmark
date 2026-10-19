@@ -39,11 +39,16 @@ object RoutePlanner {
         destLat: Double,
         destLon: Double,
         sport: Sport,
-    ): PlannedRoute {
-        val online = runCatching {
-            fetchBrouter(startLat, startLon, destLat, destLon, sport)
-        }.getOrNull()
-        return online ?: directLine(startLat, startLon, destLat, destLon)
+    ): PlannedRoute = plan(listOf(startLat to startLon, destLat to destLon), sport)
+
+    /**
+     * Routes through every waypoint in order. Two or more points are required;
+     * with fewer the result is an empty direct route.
+     */
+    fun plan(waypoints: List<Pair<Double, Double>>, sport: Sport): PlannedRoute {
+        if (waypoints.size < 2) return directChain(waypoints)
+        val online = runCatching { fetchBrouter(waypoints, sport) }.getOrNull()
+        return online ?: directChain(waypoints)
     }
 
     /** Estimated moving time for a route under a sport's flat speed + climb penalty. */
@@ -69,17 +74,12 @@ object RoutePlanner {
     }
 
     private fun fetchBrouter(
-        startLat: Double,
-        startLon: Double,
-        destLat: Double,
-        destLon: Double,
+        waypoints: List<Pair<Double, Double>>,
         sport: Sport,
     ): PlannedRoute {
-        val lonlats = String.format(
-            Locale.US,
-            "%f,%f|%f,%f",
-            startLon, startLat, destLon, destLat,
-        )
+        val lonlats = waypoints.joinToString("|") { (lat, lon) ->
+            String.format(Locale.US, "%f,%f", lon, lat)
+        }
         val url = "https://brouter.de/brouter?lonlats=$lonlats" +
             "&profile=${profileFor(sport)}&alternativeidx=0&format=geojson"
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {
@@ -116,20 +116,22 @@ object RoutePlanner {
 
     private fun missing(): PlannedRoute = throw IllegalStateException("no route")
 
-    private fun directLine(
-        startLat: Double,
-        startLon: Double,
-        destLat: Double,
-        destLon: Double,
-    ): PlannedRoute {
-        val n = 24
-        val pts = (0..n).map { i ->
-            val f = i / n.toDouble()
-            ElevPoint(
-                lat = startLat + (destLat - startLat) * f,
-                lon = startLon + (destLon - startLon) * f,
-                eleM = 0.0,
-            )
+    private fun directChain(waypoints: List<Pair<Double, Double>>): PlannedRoute {
+        val pts = ArrayList<ElevPoint>()
+        for (i in 1 until waypoints.size) {
+            val (a, b) = waypoints[i - 1] to waypoints[i]
+            val n = 24
+            val from = if (i == 1) 0 else 1
+            for (k in from..n) {
+                val f = k / n.toDouble()
+                pts.add(
+                    ElevPoint(
+                        lat = a.first + (b.first - a.first) * f,
+                        lon = a.second + (b.second - a.second) * f,
+                        eleM = 0.0,
+                    ),
+                )
+            }
         }
         return PlannedRoute(
             points = pts,
