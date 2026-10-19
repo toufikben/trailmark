@@ -43,6 +43,7 @@ val PT_TEXTS = Texts(
     attempts = "Tentativas",
     searchPlace = "Procurar um local",
     voiceCoach = "Treinador de voz",
+    autoPause = "Pausa automática",
     on = "Ativado",
     off = "Desativado",
     caption = "Legenda",

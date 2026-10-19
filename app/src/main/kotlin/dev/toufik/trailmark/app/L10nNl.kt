@@ -43,6 +43,7 @@ val NL_TEXTS = Texts(
     attempts = "Pogingen",
     searchPlace = "Zoek een plek",
     voiceCoach = "Spraakcoach",
+    autoPause = "Automatische pauze",
     on = "Aan",
     off = "Uit",
     caption = "Bijschrift",

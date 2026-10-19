@@ -43,6 +43,7 @@ val RU_TEXTS = Texts(
     attempts = "Попытки",
     searchPlace = "Поиск места",
     voiceCoach = "Голосовой тренер",
+    autoPause = "Автопауза",
     on = "Вкл",
     off = "Выкл",
     caption = "Подпись",

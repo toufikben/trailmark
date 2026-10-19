@@ -43,6 +43,7 @@ val KO_TEXTS = Texts(
     attempts = "시도",
     searchPlace = "장소 검색",
     voiceCoach = "음성 코치",
+    autoPause = "자동 일시정지",
     on = "켜기",
     off = "끄기",
     caption = "캡션",

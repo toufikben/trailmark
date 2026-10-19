@@ -397,7 +397,11 @@ fun RecordingScreen(
                 }
                 if (state.isIdle || state.phase == Phase.PAUSED) {
                     Text(
-                        text = if (state.phase == Phase.PAUSED) t.paused else t.pause,
+                        text = when {
+                            state.autoPaused -> t.autoPause
+                            state.phase == Phase.PAUSED -> t.paused
+                            else -> t.pause
+                        },
                         color = Palette.accent,
                         fontSize = 12.sp,
                         modifier = Modifier

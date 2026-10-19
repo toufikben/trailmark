@@ -43,6 +43,7 @@ val HI_TEXTS = Texts(
     attempts = "प्रयास",
     searchPlace = "स्थान खोजें",
     voiceCoach = "वॉइस कोच",
+    autoPause = "स्वतः रोकें",
     on = "चालू",
     off = "बंद",
     caption = "कैप्शन",

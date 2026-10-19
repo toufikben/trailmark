@@ -43,6 +43,7 @@ val ID_TEXTS = Texts(
     attempts = "Percobaan",
     searchPlace = "Cari tempat",
     voiceCoach = "Pelatih suara",
+    autoPause = "Jeda otomatis",
     on = "Aktif",
     off = "Nonaktif",
     caption = "Keterangan",

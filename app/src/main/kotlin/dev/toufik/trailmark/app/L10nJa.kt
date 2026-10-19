@@ -43,6 +43,7 @@ val JA_TEXTS = Texts(
     attempts = "回数",
     searchPlace = "場所を検索",
     voiceCoach = "音声コーチ",
+    autoPause = "自動一時停止",
     on = "オン",
     off = "オフ",
     caption = "キャプション",

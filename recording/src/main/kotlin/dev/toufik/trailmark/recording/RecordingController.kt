@@ -36,6 +36,7 @@ data class RecordingState(
     val activityId: Long? = null,
     val storageError: String? = null,
     val lastActivityId: Long? = null,
+    val autoPaused: Boolean = false,
 )
 
 class RecordingController(
@@ -71,7 +72,15 @@ class RecordingController(
     private var cumFixCount = 0
     private var cumRejected = 0
     private var cumMock = false
+    private var autoPause = false
+    private var autoPaused = false
     private val writeMutex = Mutex()
+
+    /** Enables or disables the idle auto-pause. Disabling lifts an auto-pause at once. */
+    fun setAutoPause(enabled: Boolean) {
+        autoPause = enabled
+        if (!enabled && autoPaused) resume()
+    }
 
     suspend fun start() {
         if (_state.value.phase != Phase.STOPPED) return
@@ -91,6 +100,7 @@ class RecordingController(
         cumFixCount = 0
         cumRejected = 0
         cumMock = false
+        autoPaused = false
         _state.value = RecordingState(phase = Phase.STARTING, quality = GpsQuality.NONE)
 
         job = scope.launch { source.fixes().collect { onFix(it) } }
@@ -114,6 +124,13 @@ class RecordingController(
                 currentBearing = fix.bearingDeg,
                 currentSpeedMps = null,
             )
+            if (autoPaused) {
+                val s = fix.speedMps
+                if (s != null && s > 0.8) {
+                    autoPaused = false
+                    resume()
+                }
+            }
             return
         }
         var e = engine
@@ -146,6 +163,10 @@ class RecordingController(
             activityId = activityId,
         )
         persist(e)
+        if (autoPause && !paused && e.isIdle) {
+            autoPaused = true
+            pause()
+        }
     }
 
     private fun refreshQuality() {
@@ -202,15 +223,17 @@ class RecordingController(
             }
             engine = null
         }
-        _state.value = _state.value.copy(phase = Phase.PAUSED)
+        _state.value = _state.value.copy(phase = Phase.PAUSED, autoPaused = autoPaused)
     }
 
     /** Continues the session in a fresh segment; the paused gap is never counted. */
     fun resume() {
         if (!paused) return
         paused = false
+        autoPaused = false
         _state.value = _state.value.copy(
             phase = if (activityId == null) Phase.STARTING else Phase.RECORDING,
+            autoPaused = false,
         )
     }
 
@@ -252,6 +275,7 @@ class RecordingController(
         engine = null
         gate = null
         paused = false
+        autoPaused = false
     }
 }
 

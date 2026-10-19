@@ -118,6 +118,9 @@ class RecordingService : Service() {
             sport = sport,
         )
         controller = c
+        c.setAutoPause(
+            getSharedPreferences("trailmark", MODE_PRIVATE).getBoolean("auto_pause", true),
+        )
         scope.launch {
             runCatching {
                 segStarts = dev.toufik.trailmark.app.AppGraph.repository(this@RecordingService)

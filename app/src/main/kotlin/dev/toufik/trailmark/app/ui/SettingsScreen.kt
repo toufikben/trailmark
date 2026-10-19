@@ -151,6 +151,20 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                 }
             }
             Spacer(Modifier.height(24.dp))
+            Text(t.autoPause, color = Palette.textSecondary, fontSize = 13.sp)
+            Spacer(Modifier.height(8.dp))
+            var autoPauseOn by remember { mutableStateOf(prefs.getBoolean("auto_pause", true)) }
+            Pill {
+                ThemeButton(t.on, selected = autoPauseOn) {
+                    autoPauseOn = true
+                    prefs.edit().putBoolean("auto_pause", true).apply()
+                }
+                ThemeButton(t.off, selected = !autoPauseOn) {
+                    autoPauseOn = false
+                    prefs.edit().putBoolean("auto_pause", false).apply()
+                }
+            }
+            Spacer(Modifier.height(24.dp))
             Text(t.healthConnect, color = Palette.textSecondary, fontSize = 13.sp)
             Spacer(Modifier.height(8.dp))
             val healthAvailable = remember { HealthSync.available(context) }

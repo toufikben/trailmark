@@ -43,6 +43,7 @@ val DE_TEXTS = Texts(
     attempts = "Versuche",
     searchPlace = "Ort suchen",
     voiceCoach = "Sprachcoach",
+    autoPause = "Auto-Pause",
     on = "An",
     off = "Aus",
     caption = "Bildunterschrift",

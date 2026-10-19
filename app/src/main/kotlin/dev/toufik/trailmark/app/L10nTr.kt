@@ -43,6 +43,7 @@ val TR_TEXTS = Texts(
     attempts = "Denemeler",
     searchPlace = "Yer ara",
     voiceCoach = "Sesli koç",
+    autoPause = "Otomatik duraklatma",
     on = "Açık",
     off = "Kapalı",
     caption = "Başlık",

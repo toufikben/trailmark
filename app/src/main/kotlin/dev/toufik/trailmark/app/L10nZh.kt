@@ -43,6 +43,7 @@ val ZH_TEXTS = Texts(
     attempts = "尝试次数",
     searchPlace = "搜索地点",
     voiceCoach = "语音教练",
+    autoPause = "自动暂停",
     on = "开启",
     off = "关闭",
     caption = "说明文字",

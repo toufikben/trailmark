@@ -40,6 +40,19 @@ private fun walkRange(start: Int): List<RawFix> = (start until start + 3).map { 
     RawFix(36.7538 + i * (10.0 / 111111.0), 3.1856, i * 10_000_000_000L, 3.0, speedMps = 1.0)
 }
 
+private class AutoPauseSource(private val gates: List<CompletableDeferred<Unit>>) : FixSource {
+    override fun fixes(): Flow<RawFix> = flow {
+        walkRange(0).forEach { emit(it) }
+        gates[0].await()
+        val lat = 36.7538 + 2 * (10.0 / 111111.0)
+        (3..10).forEach { i -> emit(RawFix(lat, 3.1856, i * 10_000_000_000L, 3.0, speedMps = 0.1)) }
+        gates[1].await()
+        (11..14).forEach { i ->
+            emit(RawFix(lat + 0.0001 * (i - 10), 3.1856, i * 10_000_000_000L, 3.0, speedMps = 1.0))
+        }
+    }
+}
+
 private fun repo(): ActivityRepository =
     ActivityRepository(createDatabase(JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)))
 
@@ -141,5 +154,59 @@ class RecordingControllerTest {
         assertEquals(1, rows.size)
         assertTrue(rows[0].distanceM > d0, "stored totals include both segments")
         assertTrue(rows[0].elapsedNanos < 60_000_000_000L, "paused gap excluded from stored total")
+    }
+
+    @Test
+    fun autoPauseFreezesWhileIdleAndResumesOnMovement() = runTest {
+        val r = repo()
+        val gate1 = CompletableDeferred<Unit>()
+        val gate2 = CompletableDeferred<Unit>()
+        val c = RecordingController(
+            r, AutoPauseSource(listOf(gate1, gate2)), this, nowNanos = { 0L }, tickEnabled = false,
+        )
+        c.setAutoPause(true)
+        c.start()
+        advanceUntilIdle()
+
+        assertEquals(Phase.RECORDING, c.state.value.phase)
+        val d0 = c.state.value.distanceM
+        assertTrue(d0 > 0.0)
+
+        gate1.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(Phase.PAUSED, c.state.value.phase, "idle should auto-pause")
+        assertTrue(c.state.value.autoPaused, "the pause is flagged as automatic")
+        val d1 = c.state.value.distanceM
+        val e1 = c.state.value.elapsedNanos
+
+        gate2.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(Phase.RECORDING, c.state.value.phase, "movement should auto-resume")
+        assertTrue(!c.state.value.autoPaused)
+        assertTrue(c.state.value.distanceM > d1, "distance continues after auto resume")
+        assertTrue(c.state.value.elapsedNanos < 90_000_000_000L, "the idle gap is not counted")
+
+        c.stop()
+        val rows = r.listActivities()
+        assertEquals(1, rows.size)
+        assertTrue(rows[0].elapsedNanos < 90_000_000_000L, "stored total excludes the idle gap")
+    }
+
+    @Test
+    fun autoPauseDisabledNeverPauses() = runTest {
+        val r = repo()
+        val gate1 = CompletableDeferred<Unit>()
+        val gate2 = CompletableDeferred<Unit>()
+        val c = RecordingController(
+            r, AutoPauseSource(listOf(gate1, gate2)), this, nowNanos = { 0L }, tickEnabled = false,
+        )
+        c.start()
+        advanceUntilIdle()
+        gate1.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(Phase.RECORDING, c.state.value.phase, "idle does not pause when disabled")
+        gate2.complete(Unit)
+        advanceUntilIdle()
+        c.stop()
     }
 }

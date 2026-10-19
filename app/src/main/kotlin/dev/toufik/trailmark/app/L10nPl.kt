@@ -43,6 +43,7 @@ val PL_TEXTS = Texts(
     attempts = "Próby",
     searchPlace = "Szukaj miejsca",
     voiceCoach = "Trener głosowy",
+    autoPause = "Automatyczna pauza",
     on = "Włączone",
     off = "Wyłączone",
     caption = "Podpis",
