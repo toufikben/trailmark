@@ -12,6 +12,10 @@ import java.net.URL
 const val MANIFEST_URL =
     "https://github.com/toufikben/trailmark-maps/releases/download/maps-latest/manifest.json"
 
+/** Where the app fetches the offline routing graph catalogue. */
+const val ROUTING_MANIFEST_URL =
+    "https://github.com/toufikben/trailmark-maps/releases/download/routing-latest/routing-manifest.json"
+
 /** The global online basemap. Also the style offline areas are downloaded for. */
 const val ONLINE_STYLE_URL = "https://tiles.openfreemap.org/styles/dark"
 const val ONLINE_STYLE_URL_LIGHT = "https://tiles.openfreemap.org/styles/positron"
@@ -49,8 +53,15 @@ object HttpBytesFetcher : BytesFetcher {
 object MapPacks {
     fun dir(context: Context): File = File(context.filesDir, "maps").apply { mkdirs() }
 
+    /** Where downloaded routing graph zips live until [GhRouter] unpacks them. */
+    fun routingPacksDir(context: Context): File =
+        File(context.filesDir, "routing-packs").apply { mkdirs() }
+
     fun manager(context: Context): RegionManager =
         RegionManager(FileRegionFiles(dir(context)), HttpBytesFetcher)
+
+    fun routingManager(context: Context): RegionManager =
+        RegionManager(FileRegionFiles(routingPacksDir(context)), HttpBytesFetcher)
 
     /** The installed map pack file, if any (routing/terrain use other suffixes). */
     fun installedMapPack(context: Context): File? =

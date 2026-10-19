@@ -32,11 +32,67 @@ object GhRouter {
     private fun graphsDir(context: Context): File =
         File(context.filesDir, "routing").apply { mkdirs() }
 
+    private fun packsDir(context: Context): File =
+        File(context.filesDir, "routing-packs").apply { mkdirs() }
+
     /** A directory counts as a graph when GraphHopper's properties file is in it. */
     private fun isGraph(dir: File): Boolean = File(dir, "properties").isFile
 
     fun hasGraphs(context: Context): Boolean =
         graphsDir(context).listFiles()?.any { it.isDirectory && isGraph(it) } == true
+
+    /** The graph folder a downloaded `<id>.routing.pack` zip unpacks into. */
+    fun graphDirFor(context: Context, id: String): File = File(graphsDir(context), "$id-gh")
+
+    fun isUnpacked(context: Context, id: String): Boolean = isGraph(graphDirFor(context, id))
+
+    /**
+     * Extracts every downloaded routing zip whose graph folder is missing yet.
+     * Runs on a background thread; returns the number of graphs unpacked.
+     */
+    @Synchronized
+    fun unpackInstalled(context: Context): Int {
+        val out = graphsDir(context).canonicalFile
+        var done = 0
+        val zips = packsDir(context).listFiles()?.filter { it.name.endsWith(".routing.pack") }
+            ?: return 0
+        for (zip in zips) {
+            val id = zip.name.removeSuffix(".routing.pack")
+            if (isGraph(File(out, "$id-gh"))) continue
+            val ok = runCatching {
+                java.util.zip.ZipInputStream(zip.inputStream().buffered()).use { zin ->
+                    var entry = zin.nextEntry
+                    while (entry != null) {
+                        val file = File(out, entry.name)
+                        if (!file.canonicalPath.startsWith(out.canonicalPath)) {
+                            error("zip entry escapes the routing folder")
+                        }
+                        if (entry.isDirectory) {
+                            file.mkdirs()
+                        } else {
+                            file.parentFile?.mkdirs()
+                            file.outputStream().use { zin.copyTo(it) }
+                        }
+                        entry = zin.nextEntry
+                    }
+                }
+            }.isSuccess
+            if (ok) done++
+        }
+        return done
+    }
+
+    /** Removes the unpacked graph and unloads it when it is the open one. */
+    @Synchronized
+    fun removeGraph(context: Context, id: String): Boolean {
+        val dir = graphDirFor(context, id)
+        if (loadedDir == dir) {
+            runCatching { hopper?.close() }
+            hopper = null
+            loadedDir = null
+        }
+        return dir.deleteRecursively()
+    }
 
     @Synchronized
     fun route(
@@ -45,6 +101,7 @@ object GhRouter {
         sport: Sport,
     ): List<ElevPoint>? {
         if (waypoints.size < 2) return null
+        if (!hasGraphs(context)) unpackInstalled(context)
         val dir = graphsDir(context).listFiles()
             ?.firstOrNull { it.isDirectory && isGraph(it) }
             ?: return null

@@ -34,7 +34,9 @@ import dev.toufik.trailmark.app.maps.HttpBytesFetcher
 import dev.toufik.trailmark.app.maps.MANIFEST_URL
 import dev.toufik.trailmark.app.maps.MapPacks
 import dev.toufik.trailmark.app.maps.OfflineRegions
+import dev.toufik.trailmark.app.maps.ROUTING_MANIFEST_URL
 import dev.toufik.trailmark.app.maps.SavedRegion
+import dev.toufik.trailmark.app.plan.GhRouter
 import dev.toufik.trailmark.regions.RegionManifest
 import dev.toufik.trailmark.regions.RegionPack
 import dev.toufik.trailmark.regions.parseManifest
@@ -51,16 +53,24 @@ fun RegionsScreen(onBack: () -> Unit, onPaywall: () -> Unit) {
     val premium = LocalPremium.current
     val pro = premium?.isPro(System.currentTimeMillis()) == true
     var manifest by remember { mutableStateOf<RegionManifest?>(null) }
+    var routingManifest by remember { mutableStateOf<RegionManifest?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var installing by remember { mutableStateOf<String?>(null) }
     var installed by remember { mutableStateOf(setOf<String>()) }
+    var routingInstalled by remember { mutableStateOf(setOf<String>()) }
     var savedAreas by remember { mutableStateOf(listOf<SavedRegion>()) }
     val manager = remember { MapPacks.manager(context) }
+    val routingManager = remember { MapPacks.routingManager(context) }
     val regions = remember { OfflineRegions(context) }
-    val packBlocked = !pro && savedAreas.size + installed.size >= FREE_OFFLINE_AREAS
+    val packBlocked =
+        !pro && savedAreas.size + installed.size + routingInstalled.size >= FREE_OFFLINE_AREAS
 
     fun refreshInstalled(packs: List<RegionPack>) {
         installed = packs.filter { manager.isInstalled(it) }.map { it.id }.toSet()
+    }
+
+    fun refreshRoutingInstalled(packs: List<RegionPack>) {
+        routingInstalled = packs.filter { routingManager.isInstalled(it) }.map { it.id }.toSet()
     }
 
     LaunchedEffect(Unit) {
@@ -74,6 +84,14 @@ fun RegionsScreen(onBack: () -> Unit, onPaywall: () -> Unit) {
             refreshInstalled(m.packs)
         } catch (_: Throwable) {
             error = t.loadFailed
+        }
+        runCatching {
+            val text = withContext(Dispatchers.IO) {
+                HttpBytesFetcher.fetch(ROUTING_MANIFEST_URL).decodeToString()
+            }
+            val m = parseManifest(text)
+            routingManifest = m
+            refreshRoutingInstalled(m.packs)
         }
     }
 
@@ -129,12 +147,82 @@ fun RegionsScreen(onBack: () -> Unit, onPaywall: () -> Unit) {
                         }
                     }
                 }
+                item(key = "routing-title") {
+                    Column(modifier = Modifier.padding(top = 18.dp, bottom = 4.dp)) {
+                        Text(t.offlineRouting, color = Palette.text, fontSize = 18.sp)
+                        Text(t.routingHint, color = Palette.textSecondary, fontSize = 12.sp)
+                    }
+                }
+                val rm = routingManifest
+                when {
+                    rm == null -> item(key = "routing-none") {
+                        Text(t.searching, color = Palette.textSecondary, fontSize = 14.sp)
+                    }
+                    rm.packs.isEmpty() -> item(key = "routing-empty") {
+                        Text(t.noAreas, color = Palette.textSecondary, fontSize = 13.sp)
+                    }
+                    else -> items(rm.packs, key = { "r-${it.id}" }) { pack ->
+                        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
+                            Text(pack.name, color = Palette.text, fontSize = 16.sp)
+                            Text(
+                                "foot, bike · ${String.format(Locale.US, "%.1f", pack.sizeBytes / 1_048_576.0)} MB",
+                                color = Palette.textSecondary,
+                                fontSize = 12.sp,
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                if (pack.id in routingInstalled) {
+                                    Text(t.installed, color = Palette.accent, fontSize = 13.sp)
+                                    TextButton(onClick = {
+                                        scope.launch {
+                                            withContext(Dispatchers.IO) {
+                                                routingManager.remove(pack)
+                                                GhRouter.removeGraph(context, pack.id)
+                                            }
+                                            refreshRoutingInstalled(rm.packs)
+                                        }
+                                    }) { Text(t.delete, color = Palette.textSecondary) }
+                                } else {
+                                    Button(
+                                        enabled = installing == null,
+                                        onClick = {
+                                            if (packBlocked) {
+                                                onPaywall()
+                                                return@Button
+                                            }
+                                            scope.launch {
+                                                installing = pack.id
+                                                try {
+                                                    withContext(Dispatchers.IO) {
+                                                        routingManager.install(pack)
+                                                        GhRouter.unpackInstalled(context)
+                                                    }
+                                                    refreshRoutingInstalled(rm.packs)
+                                                } catch (_: Throwable) {
+                                                    error = t.loadFailed
+                                                } finally {
+                                                    installing = null
+                                                }
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = Palette.accent,
+                                            contentColor = Palette.onAccent,
+                                        ),
+                                    ) { Text(if (installing == pack.id) t.installing else t.download) }
+                                }
+                            }
+                        }
+                    }
+                }
                 item(key = "packs-title") {
                     Text(
                         t.prebuiltPacks,
                         color = Palette.text,
                         fontSize = 18.sp,
-                        modifier = Modifier.padding(top = 14.dp, bottom = 4.dp),
+                        modifier = Modifier.padding(top = 18.dp, bottom = 4.dp),
                     )
                 }
                 val m = manifest
