@@ -55,4 +55,39 @@ object MapPacks {
     /** The installed map pack file, if any (routing/terrain use other suffixes). */
     fun installedMapPack(context: Context): File? =
         dir(context).listFiles()?.firstOrNull { it.name.endsWith(".map.pack") }
+
+    /** Every installed map pack, name-sorted for a stable fallback order. */
+    fun installedMapPacks(context: Context): List<File> =
+        (dir(context).listFiles() ?: emptyArray())
+            .filter { it.name.endsWith(".map.pack") }
+            .sortedBy { it.name }
+
+    /**
+     * Bounds baked into a PMTiles v3 header as (minLon, minLat, maxLon, maxLat)
+     * in degrees, or null when the file is not a readable PMTiles archive.
+     */
+    fun packBounds(pack: File): DoubleArray? = runCatching {
+        java.io.RandomAccessFile(pack, "r").use { raf ->
+            val head = ByteArray(127)
+            raf.readFully(head)
+            if (String(head, 0, 7, Charsets.US_ASCII) != "PMTiles") return@use null
+            if (head[7].toInt() != 3) return@use null
+            fun i32(at: Int): Int =
+                (head[at].toInt() and 0xFF) or
+                    ((head[at + 1].toInt() and 0xFF) shl 8) or
+                    ((head[at + 2].toInt() and 0xFF) shl 16) or
+                    ((head[at + 3].toInt() and 0xFF) shl 24)
+            doubleArrayOf(i32(102) / 1e7, i32(106) / 1e7, i32(110) / 1e7, i32(114) / 1e7)
+        }
+    }.getOrNull()
+
+    /** Best pack for a point: the one whose bounds contain it, else the first installed. */
+    fun packFor(context: Context, lat: Double?, lon: Double?): File? {
+        val packs = installedMapPacks(context)
+        if (packs.size <= 1 || lat == null || lon == null) return packs.firstOrNull()
+        return packs.firstOrNull { p ->
+            val b = packBounds(p) ?: return@firstOrNull false
+            lat >= b[1] && lat <= b[3] && lon >= b[0] && lon <= b[2]
+        } ?: packs.first()
+    }
 }

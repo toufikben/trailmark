@@ -121,7 +121,10 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
     var segmentsById by remember { mutableStateOf<Map<Long, SegmentRow>>(emptyMap()) }
     var segmentCount by remember { mutableStateOf(0) }
     var showCreateSegment by remember { mutableStateOf(false) }
-    val packPath = remember { dev.toufik.trailmark.app.maps.MapPacks.installedMapPack(context)?.absolutePath }
+    val packPath = remember(detail) {
+        val first = detail?.points?.firstOrNull()
+        dev.toufik.trailmark.app.maps.MapPacks.packFor(context, first?.lat, first?.lon)?.absolutePath
+    }
     val darkMap = remember {
         context.getSharedPreferences("trailmark", Context.MODE_PRIVATE).getBoolean("map_dark", true)
     }

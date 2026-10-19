@@ -143,7 +143,9 @@ fun RecordingScreen(
     val t = LocalTexts.current
     val langRef = rememberUpdatedState(LocalLang.current)
     val state by RecordingHolder.state.collectAsState()
-    val packPath = remember { MapPacks.installedMapPack(context)?.absolutePath }
+    val packPath = remember(state.currentLat, state.currentLon) {
+        MapPacks.packFor(context, state.currentLat, state.currentLon)?.absolutePath
+    }
     val scope = rememberCoroutineScope()
     var sport by remember { mutableStateOf(Sport.RUN) }
 

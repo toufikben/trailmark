@@ -87,10 +87,14 @@ fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
     val t = LocalTexts.current
     val prefs = remember { context.getSharedPreferences("trailmark", Context.MODE_PRIVATE) }
     val darkMap = remember { prefs.getBoolean("map_dark", true) }
-    val packPath = remember { MapPacks.installedMapPack(context)?.absolutePath }
     var sport by remember { mutableStateOf(Sport.RUN) }
     var dest by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     var anchor by remember { mutableStateOf<StoredPoint?>(null) }
+    val packPath = remember(anchor, dest) {
+        val lat = anchor?.lat ?: dest?.first
+        val lon = anchor?.lon ?: dest?.second
+        MapPacks.packFor(context, lat, lon)?.absolutePath
+    }
     var plan by remember { mutableStateOf<PlannedRoute?>(null) }
     var loading by remember { mutableStateOf(false) }
     var destWeather by remember { mutableStateOf<WeatherNow?>(null) }
