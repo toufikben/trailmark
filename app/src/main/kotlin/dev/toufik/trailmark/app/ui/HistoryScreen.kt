@@ -1,5 +1,6 @@
 package dev.toufik.trailmark.app.ui
 
+import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
@@ -73,27 +74,7 @@ fun HistoryScreen(onOpen: (Long) -> Unit) {
             withContext(Dispatchers.IO) {
                 val bytes = context.contentResolver.openInputStream(uri)
                     ?.use { it.readBytes() } ?: return@withContext
-                val isFit = bytes.size >= 12 &&
-                    bytes[8] == '.'.code.toByte() && bytes[9] == 'F'.code.toByte() &&
-                    bytes[10] == 'I'.code.toByte() && bytes[11] == 'T'.code.toByte()
-                val imported = if (isFit) Fit.read(bytes) else Gpx.read(bytes.toString(Charsets.UTF_8))
-                if (imported.size < 2) return@withContext
-                val t0 = imported.first().timeMillis ?: System.currentTimeMillis()
-                var dist = 0.0
-                val pts = ArrayList<StoredPoint>(imported.size)
-                imported.forEachIndexed { i, p ->
-                    if (i > 0) {
-                        dist += haversineMeters(
-                            imported[i - 1].lat, imported[i - 1].lon, p.lat, p.lon,
-                        )
-                    }
-                    val tn = ((p.timeMillis ?: t0) - t0) * 1_000_000L
-                    pts.add(StoredPoint(p.lat, p.lon, tn, 5.0, WaypointType.NORMAL, altitudeM = p.altitudeM))
-                }
-                val repo = AppGraph.repository(context)
-                val id = repo.insertActivity("import-${System.currentTimeMillis()}", "RUN", t0)
-                repo.appendPoints(id, pts)
-                repo.finishActivity(id, pts.last().timeNanos, dist, pts.size.toLong(), 0, false)
+                importTrackBytes(context, bytes)
             }
             reload()
         }
@@ -112,7 +93,13 @@ fun HistoryScreen(onOpen: (Long) -> Unit) {
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = {
                     importLauncher.launch(
-                        arrayOf("application/gpx+xml", "application/octet-stream", "*/*"),
+                        arrayOf(
+                            "application/gpx+xml",
+                            "application/vnd.ant.fit",
+                            "application/zip",
+                            "application/octet-stream",
+                            "*/*",
+                        ),
                     )
                 }) { Text(t.importGpx, color = Palette.accent) }
             }
@@ -196,4 +183,48 @@ private fun sportLabel(t: Texts, sport: String): String = when (sport) {
     "BIKE" -> t.bike
     "HIKE" -> t.hike
     else -> sport
+}
+
+/**
+ * Imports a track from raw bytes: GPX text, a FIT file, or a ZIP archive that
+ * holds any number of either. Returns true when at least one activity landed.
+ */
+private fun importTrackBytes(context: Context, bytes: ByteArray): Boolean {
+    if (
+        bytes.size >= 4 &&
+        bytes[0] == 0x50.toByte() && bytes[1] == 0x4B.toByte() &&
+        bytes[2] == 0x03.toByte() && bytes[3] == 0x04.toByte()
+    ) {
+        var any = false
+        java.util.zip.ZipInputStream(java.io.ByteArrayInputStream(bytes)).use { zin ->
+            while (true) {
+                val entry = zin.nextEntry ?: break
+                val name = entry.name.lowercase()
+                if (!entry.isDirectory && (name.endsWith(".fit") || name.endsWith(".gpx"))) {
+                    if (importTrackBytes(context, zin.readBytes())) any = true
+                }
+            }
+        }
+        return any
+    }
+    val isFit = bytes.size >= 12 &&
+        bytes[8] == '.'.code.toByte() && bytes[9] == 'F'.code.toByte() &&
+        bytes[10] == 'I'.code.toByte() && bytes[11] == 'T'.code.toByte()
+    val imported = if (isFit) Fit.read(bytes) else Gpx.read(bytes.toString(Charsets.UTF_8))
+    if (imported.size < 2) return false
+    val t0 = imported.first().timeMillis ?: System.currentTimeMillis()
+    var dist = 0.0
+    val pts = ArrayList<StoredPoint>(imported.size)
+    imported.forEachIndexed { i, p ->
+        if (i > 0) {
+            dist += haversineMeters(imported[i - 1].lat, imported[i - 1].lon, p.lat, p.lon)
+        }
+        val tn = ((p.timeMillis ?: t0) - t0) * 1_000_000L
+        pts.add(StoredPoint(p.lat, p.lon, tn, 5.0, WaypointType.NORMAL, altitudeM = p.altitudeM))
+    }
+    val repo = AppGraph.repository(context)
+    val id = repo.insertActivity("import-${System.currentTimeMillis()}", "RUN", t0)
+    repo.appendPoints(id, pts)
+    repo.finishActivity(id, pts.last().timeNanos, dist, pts.size.toLong(), 0, false)
+    return true
 }
