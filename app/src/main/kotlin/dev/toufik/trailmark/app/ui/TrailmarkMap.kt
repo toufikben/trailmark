@@ -58,6 +58,7 @@ import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
+import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression
@@ -252,6 +253,7 @@ fun TrailmarkMap(
     val online = remember { isOnline(context) }
     var style by remember { mutableStateOf<Style?>(null) }
     var fitted by remember { mutableStateOf(false) }
+    var fitting by remember { mutableStateOf(false) }
     var worldShown by remember { mutableStateOf(false) }
     var following by remember { mutableStateOf(true) }
     var lastBearing by remember { mutableStateOf(0f) }
@@ -734,12 +736,26 @@ fun TrailmarkMap(
                         .include(LatLng(first.lat, first.lon))
                         .include(LatLng(last.lat, last.lon))
                         .build()
-                    map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 120))
+                    fitting = true
+                    map.animateCamera(
+                        CameraUpdateFactory.newLatLngBounds(bounds, 120),
+                        object : MapLibreMap.CancelableCallback {
+                            override fun onCancel() {
+                                fitting = false
+                                fitted = true
+                            }
+
+                            override fun onFinish() {
+                                fitting = false
+                                fitted = true
+                            }
+                        },
+                    )
                 }
                 fitted = true
                 return@getMapAsync
             }
-            if (following) {
+            if (following && !fitting) {
                 val target = c.bearingDeg?.toFloat() ?: smoothBearing
                 val delta = ((target - smoothBearing + 540f) % 360f) - 180f
                 smoothBearing = (smoothBearing + delta * 0.3f + 360f) % 360f
