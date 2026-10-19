@@ -149,7 +149,7 @@ fun PlanScreen(
         }
         loading = true
         plan = withContext(Dispatchers.IO) {
-            RoutePlanner.plan(waypoints, sport)
+            RoutePlanner.plan(waypoints, sport, context)
         }
         loading = false
     }

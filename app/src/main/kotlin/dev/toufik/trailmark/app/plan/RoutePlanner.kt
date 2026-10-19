@@ -1,5 +1,6 @@
 package dev.toufik.trailmark.app.plan
 
+import android.content.Context
 import dev.toufik.trailmark.core.geo.ElevPoint
 import dev.toufik.trailmark.core.geo.RouteChunk
 import dev.toufik.trailmark.core.geo.ascentDescent
@@ -27,9 +28,10 @@ data class PlannedRoute(
 )
 
 /**
- * Fetches road-following routes with elevation from the public BRouter server
- * and falls back to a straight-line estimate when that fails. Runs on the
- * caller's thread; call from `Dispatchers.IO`.
+ * Fetches road-following routes with elevation from the public BRouter server;
+ * when that is unreachable, falls back to a downloaded GraphHopper graph
+ * (offline, no elevation), and finally to a straight-line estimate. Runs on
+ * the caller's thread; call from `Dispatchers.IO`.
  */
 object RoutePlanner {
 
@@ -45,10 +47,18 @@ object RoutePlanner {
      * Routes through every waypoint in order. Two or more points are required;
      * with fewer the result is an empty direct route.
      */
-    fun plan(waypoints: List<Pair<Double, Double>>, sport: Sport): PlannedRoute {
+    fun plan(
+        waypoints: List<Pair<Double, Double>>,
+        sport: Sport,
+        context: Context? = null,
+    ): PlannedRoute {
         if (waypoints.size < 2) return directChain(waypoints)
         val online = runCatching { fetchBrouter(waypoints, sport) }.getOrNull()
-        return online ?: directChain(waypoints)
+        if (online != null) return online
+        val offline = context?.let { ctx ->
+            runCatching { GhRouter.route(ctx, waypoints, sport)?.let(::fromPoints) }.getOrNull()
+        }
+        return offline ?: directChain(waypoints)
     }
 
     /** Estimated moving time for a route under a sport's flat speed + climb penalty. */
@@ -115,6 +125,18 @@ object RoutePlanner {
     }
 
     private fun missing(): PlannedRoute = throw IllegalStateException("no route")
+
+    private fun fromPoints(pts: List<ElevPoint>): PlannedRoute {
+        val (up, down) = ascentDescent(pts)
+        return PlannedRoute(
+            points = pts,
+            distanceM = polylineLengthMeters(pts),
+            ascentM = up,
+            descentM = down,
+            chunks = gradeChunks(pts),
+            direct = false,
+        )
+    }
 
     private fun directChain(waypoints: List<Pair<Double, Double>>): PlannedRoute {
         val pts = ArrayList<ElevPoint>()

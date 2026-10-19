@@ -12,6 +12,8 @@ serialization = "1.7.3"
 maplibre = "11.7.0"
 billing = "7.1.1"
 health-connect = "1.1.0-alpha10"
+graphhopper = "10.0"
+slf4j = "2.0.16"
 
 [libraries]
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
@@ -21,6 +23,8 @@ kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 maplibre-android = { module = "org.maplibre.gl:android-sdk", version.ref = "maplibre" }
 billing = { module = "com.android.billingclient:billing", version.ref = "billing" }
 health-connect = { module = "androidx.health.connect:connect-client", version.ref = "health-connect" }
+graphhopper-core = { module = "com.graphhopper:graphhopper-core", version.ref = "graphhopper" }
+slf4j-nop = { module = "org.slf4j:slf4j-nop", version.ref = "slf4j" }
 sqldelight-runtime = { module = "app.cash.sqldelight:runtime", version.ref = "sqldelight" }
 sqldelight-sqlite-driver = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" }
 sqldelight-android-driver = { module = "app.cash.sqldelight:android-driver", version.ref = "sqldelight" }
