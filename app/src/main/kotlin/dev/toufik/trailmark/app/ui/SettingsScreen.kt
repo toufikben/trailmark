@@ -3,6 +3,8 @@ package dev.toufik.trailmark.app.ui
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -150,6 +152,22 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
             var healthOn by remember { mutableStateOf(prefs.getBoolean("health_sync", true)) }
             var healthGranted by remember { mutableStateOf(false) }
             val healthScope = rememberCoroutineScope()
+            val healthContract = if (healthAvailable) {
+                runCatching {
+                    HealthConnectClient.getOrCreate(context)
+                        .permissionController
+                        .createRequestPermissionResultContract()
+                }.getOrNull()
+            } else {
+                null
+            }
+            val healthLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.StartActivityForResult(),
+            ) {
+                healthScope.launch {
+                    healthGranted = healthAvailable && HealthSync.granted(context)
+                }
+            }
             LaunchedEffect(healthAvailable) {
                 healthGranted = healthAvailable && HealthSync.granted(context)
             }
@@ -181,11 +199,12 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                     }) { Text(t.download, color = Palette.textSecondary, fontSize = 13.sp) }
 
                     !healthGranted -> TextButton(onClick = {
-                        healthScope.launch {
+                        val contract = healthContract
+                        if (contract != null) {
                             runCatching {
-                                val client = HealthConnectClient.getOrCreate(context)
-                                context.startActivity(
-                                    client.permissionController.createRequestPermissionIntent(
+                                healthLauncher.launch(
+                                    contract.createIntent(
+                                        context,
                                         HealthSync.writePermissions,
                                     ),
                                 )
