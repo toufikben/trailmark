@@ -41,6 +41,7 @@ val JA_TEXTS = Texts(
     mph = "mph",
     feet = "フィート",
     attempts = "回数",
+    searchPlace = "場所を検索",
     importGpx = "GPX をインポート",
     elevation = "獲得標高",
     maxSpeed = "最大",

@@ -41,6 +41,7 @@ val KO_TEXTS = Texts(
     mph = "mph",
     feet = "피트",
     attempts = "시도",
+    searchPlace = "장소 검색",
     importGpx = "GPX 가져오기",
     elevation = "고도",
     maxSpeed = "최고",

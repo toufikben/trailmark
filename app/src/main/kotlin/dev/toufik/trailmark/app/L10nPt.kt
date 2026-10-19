@@ -41,6 +41,7 @@ val PT_TEXTS = Texts(
     mph = "mph",
     feet = "pés",
     attempts = "Tentativas",
+    searchPlace = "Procurar um local",
     importGpx = "Importar GPX",
     elevation = "Elevação",
     maxSpeed = "Máx",

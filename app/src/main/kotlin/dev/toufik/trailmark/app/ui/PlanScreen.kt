@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.CircularProgressIndicator
@@ -42,8 +44,11 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.toufik.trailmark.app.LocalLang
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.SportPicker
@@ -55,6 +60,8 @@ import dev.toufik.trailmark.app.elevationUnit
 import dev.toufik.trailmark.app.formatDistance
 import dev.toufik.trailmark.app.formatDuration
 import dev.toufik.trailmark.app.formatElevation
+import dev.toufik.trailmark.app.geocode.PlaceResult
+import dev.toufik.trailmark.app.geocode.PlaceSearch
 import dev.toufik.trailmark.app.maps.MapPacks
 import dev.toufik.trailmark.app.plan.PlannedRoute
 import dev.toufik.trailmark.app.plan.RoutePlanner
@@ -65,6 +72,7 @@ import dev.toufik.trailmark.core.geo.maxAbsGradePercent
 import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.engine.Sport
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 
@@ -87,8 +95,12 @@ fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
     var loading by remember { mutableStateOf(false) }
     var destWeather by remember { mutableStateOf<WeatherNow?>(null) }
     var bestWindow by remember { mutableStateOf<WeatherWindow?>(null) }
+    var query by remember { mutableStateOf("") }
+    var results by remember { mutableStateOf<List<PlaceResult>>(emptyList()) }
+    var searching by remember { mutableStateOf(false) }
     var cardH by remember { mutableStateOf(0.dp) }
     val density = LocalDensity.current
+    val lang = LocalLang.current
 
     val locateLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -118,6 +130,19 @@ fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
         }
         destWeather = WeatherService.at(d.first, d.second)
         bestWindow = WeatherService.bestWindow(d.first, d.second)
+    }
+
+    LaunchedEffect(query) {
+        val q = query.trim()
+        if (q.length < 3) {
+            results = emptyList()
+            searching = false
+            return@LaunchedEffect
+        }
+        searching = true
+        delay(450L)
+        results = PlaceSearch.search(q, lang.code)
+        searching = false
     }
 
     Surface(color = Palette.bg, modifier = modifier.fillMaxSize()) {
@@ -174,6 +199,102 @@ fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
                             }
                         }
                         SportPicker(t = t, sport = sport, enabled = true, onPick = { sport = it })
+                    }
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 8.dp, end = 8.dp, top = 58.dp),
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(Palette.surface.copy(alpha = 0.85f))
+                            .height(44.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        BasicTextField(
+                            value = query,
+                            onValueChange = { query = it },
+                            singleLine = true,
+                            textStyle = TextStyle(color = Palette.text, fontSize = 13.sp),
+                            decorationBox = { inner ->
+                                Box(Modifier.padding(horizontal = 14.dp)) {
+                                    if (query.isEmpty()) {
+                                        Text(t.searchPlace, color = Palette.textSecondary, fontSize = 13.sp)
+                                    }
+                                    inner()
+                                }
+                            },
+                            modifier = Modifier.width(230.dp),
+                        )
+                        if (query.isNotEmpty()) {
+                            Text(
+                                "\u2715",
+                                color = Palette.textSecondary,
+                                fontSize = 14.sp,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(24.dp))
+                                    .clickable {
+                                        query = ""
+                                        results = emptyList()
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                            )
+                        }
+                    }
+                }
+                if (results.isNotEmpty() || (searching && query.trim().length >= 3)) {
+                    Surface(
+                        color = Palette.surface,
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(start = 8.dp, end = 8.dp, top = 110.dp)
+                            .fillMaxWidth(),
+                    ) {
+                        Column(Modifier.padding(vertical = 4.dp)) {
+                            if (searching && results.isEmpty()) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(14.dp),
+                                        strokeWidth = 2.dp,
+                                        color = Palette.accent,
+                                    )
+                                }
+                            }
+                            results.forEach { r ->
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            dest = r.lat to r.lon
+                                            query = ""
+                                            results = emptyList()
+                                        }
+                                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                                ) {
+                                    Text(
+                                        r.name,
+                                        color = Palette.text,
+                                        fontSize = 13.sp,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                            if (results.isNotEmpty()) {
+                                Text(
+                                    "\u00a9 OpenStreetMap",
+                                    color = Palette.textSecondary,
+                                    fontSize = 10.sp,
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                                )
+                            }
+                        }
                     }
                 }
             }

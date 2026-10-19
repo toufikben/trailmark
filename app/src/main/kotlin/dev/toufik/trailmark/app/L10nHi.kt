@@ -41,6 +41,7 @@ val HI_TEXTS = Texts(
     mph = "मील/घं",
     feet = "फुट",
     attempts = "प्रयास",
+    searchPlace = "स्थान खोजें",
     importGpx = "GPX आयात करें",
     elevation = "ऊँचाई",
     maxSpeed = "अधिकतम",
