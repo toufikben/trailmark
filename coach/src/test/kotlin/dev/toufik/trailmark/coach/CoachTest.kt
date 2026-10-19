@@ -60,4 +60,23 @@ class CoachTest {
         assertTrue(ar.contains("Mont Bouzareah"))
         assertTrue(ar.contains("1:05"))
     }
+
+    @Test
+    fun turnAnnouncesDirectionAndDistance() {
+        val en = Coach.message(CoachEvent.Turn(TurnDirection.RIGHT, 120), Locale.EN, 0)
+        assertTrue(en.contains("right"), en)
+        assertTrue(en.contains("120"), en)
+        val ar = Coach.message(CoachEvent.Turn(TurnDirection.LEFT, 50), Locale.AR, 0)
+        assertTrue(ar.contains("يساراً"), ar)
+        assertTrue(ar.contains("50"), ar)
+        val fr = Coach.message(CoachEvent.Turn(TurnDirection.UTURN, 30), Locale.FR, 0)
+        assertTrue(fr.contains("demi-tour"), fr)
+    }
+
+    @Test
+    fun offRouteDoesNotMentionDistance() {
+        val en = Coach.message(CoachEvent.OffRoute, Locale.EN, 0)
+        assertTrue(en.contains("off route"), en)
+        assertTrue(Coach.message(CoachEvent.OffRoute, Locale.AR, 1).isNotEmpty())
+    }
 }

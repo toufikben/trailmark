@@ -2,6 +2,16 @@ package dev.toufik.trailmark.coach
 
 enum class Locale { AR, FR, EN }
 
+enum class TurnDirection {
+    LEFT,
+    RIGHT,
+    SLIGHT_LEFT,
+    SLIGHT_RIGHT,
+    SHARP_LEFT,
+    SHARP_RIGHT,
+    UTURN,
+}
+
 /** The moments the coach speaks at. Text only — never audio. */
 sealed interface CoachEvent {
     /** Before a run, comparing the goal with the user's own best on this distance. */
@@ -15,6 +25,8 @@ sealed interface CoachEvent {
     data class Milestone(val km: Int) : CoachEvent
     data class SegmentStart(val name: String) : CoachEvent
     data class SegmentFinish(val name: String, val seconds: Long) : CoachEvent
+    data class Turn(val direction: TurnDirection, val metres: Int) : CoachEvent
+    data object OffRoute : CoachEvent
     data class Finish(val distanceM: Double, val seconds: Long, val isRecord: Boolean) : CoachEvent
 }
 
@@ -63,6 +75,8 @@ object Coach {
                 "name" to event.name,
                 "time" to clock(event.seconds),
             )
+            is CoachEvent.Turn -> fill(pick, "m" to event.metres.toString())
+            is CoachEvent.OffRoute -> pick
             is CoachEvent.Finish -> fill(
                 pick,
                 "km" to km(event.distanceM),
@@ -130,6 +144,57 @@ object Coach {
             Locale.AR -> listOf("أنهيت مقطع {name} في {time} — أحسنت!", "نهاية {name}: {time}. عمل رائع.")
             Locale.FR -> listOf("Segment {name} terminé en {time} !", "Fin du segment {name} — {time}.")
             Locale.EN -> listOf("Segment {name} done in {time}!", "Finished {name} — {time}.")
+        }
+        is CoachEvent.Turn -> when (event.direction) {
+            TurnDirection.LEFT -> when (locale) {
+                Locale.AR -> listOf("انعطف يساراً بعد {m} متر.", "يساراً بعد {m} متر.")
+                Locale.FR -> listOf("Tournez à gauche dans {m} m.", "À gauche dans {m} m.")
+                Locale.EN -> listOf("Turn left in {m} m.", "Left in {m} m.")
+            }
+            TurnDirection.RIGHT -> when (locale) {
+                Locale.AR -> listOf("انعطف يميناً بعد {m} متر.", "يميناً بعد {m} متر.")
+                Locale.FR -> listOf("Tournez à droite dans {m} m.", "À droite dans {m} m.")
+                Locale.EN -> listOf("Turn right in {m} m.", "Right in {m} m.")
+            }
+            TurnDirection.SLIGHT_LEFT -> when (locale) {
+                Locale.AR -> listOf("انحرف قليلاً إلى اليسار بعد {m} متر.", "ميل يسير لليسار بعد {m} متر.")
+                Locale.FR -> listOf("Serrez à gauche dans {m} m.", "Légèrement à gauche dans {m} m.")
+                Locale.EN -> listOf("Bear left in {m} m.", "Keep left in {m} m.")
+            }
+            TurnDirection.SLIGHT_RIGHT -> when (locale) {
+                Locale.AR -> listOf("انحرف قليلاً إلى اليمين بعد {m} متر.", "ميل يسير لليمين بعد {m} متر.")
+                Locale.FR -> listOf("Serrez à droite dans {m} m.", "Légèrement à droite dans {m} m.")
+                Locale.EN -> listOf("Bear right in {m} m.", "Keep right in {m} m.")
+            }
+            TurnDirection.SHARP_LEFT -> when (locale) {
+                Locale.AR -> listOf("منعطف حاد إلى اليسار بعد {m} متر.", "يسار حاد بعد {m} متر.")
+                Locale.FR -> listOf("Virage serré à gauche dans {m} m.", "Gauche serré dans {m} m.")
+                Locale.EN -> listOf("Sharp left in {m} m.", "Hard left in {m} m.")
+            }
+            TurnDirection.SHARP_RIGHT -> when (locale) {
+                Locale.AR -> listOf("منعطف حاد إلى اليمين بعد {m} متر.", "يمين حاد بعد {m} متر.")
+                Locale.FR -> listOf("Virage serré à droite dans {m} m.", "Droite serré dans {m} m.")
+                Locale.EN -> listOf("Sharp right in {m} m.", "Hard right in {m} m.")
+            }
+            TurnDirection.UTURN -> when (locale) {
+                Locale.AR -> listOf("استدر للخلف بعد {m} متر.", "دوران كامل بعد {m} متر.")
+                Locale.FR -> listOf("Faites demi-tour dans {m} m.", "Demi-tour dans {m} m.")
+                Locale.EN -> listOf("Make a U-turn in {m} m.", "U-turn in {m} m.")
+            }
+        }
+        is CoachEvent.OffRoute -> when (locale) {
+            Locale.AR -> listOf(
+                "أنت خارج المسار — ارجع إلى الخط المخطط.",
+                "خارج المسار. عد إلى المسار المخطط.",
+            )
+            Locale.FR -> listOf(
+                "Vous avez quitté l'itinéraire — revenez sur le tracé.",
+                "Hors itinéraire. Rejoignez le tracé.",
+            )
+            Locale.EN -> listOf(
+                "You're off route — head back to the planned line.",
+                "Off route. Return to the planned line.",
+            )
         }
         is CoachEvent.Finish -> when (locale) {
             Locale.AR -> listOf(
