@@ -8,6 +8,7 @@ import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.net.ConnectivityManager
+import android.net.Network
 import android.net.NetworkCapabilities
 import android.os.Looper
 import android.view.Gravity
@@ -112,6 +113,28 @@ private fun isOnline(context: Context): Boolean {
     val net = cm.activeNetwork ?: return false
     val caps = cm.getNetworkCapabilities(net) ?: return false
     return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+}
+
+/** Tracks the default network so the map can switch between online and offline styles live. */
+@Composable
+private fun rememberOnline(): Boolean {
+    val context = LocalContext.current
+    var online by remember { mutableStateOf(isOnline(context)) }
+    DisposableEffect(context) {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        val cb = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                online = true
+            }
+
+            override fun onLost(network: Network) {
+                online = isOnline(context)
+            }
+        }
+        runCatching { cm?.registerDefaultNetworkCallback(cb) }
+        onDispose { runCatching { cm?.unregisterNetworkCallback(cb) } }
+    }
+    return online
 }
 
 /** `["coalesce",["get","name:xx"],["get","name"]]` — labels follow the app language. */
@@ -250,11 +273,12 @@ fun TrailmarkMap(
     val route = remember(points) { points.filter { it.type != WaypointType.REJECTED } }
     val ghost = remember(ghostRoute) { ghostRoute.filter { it.type != WaypointType.REJECTED } }
     val glyphsBase = remember { GlyphStore.ensure(context).absolutePath }
-    val online = remember { isOnline(context) }
+    val online = rememberOnline()
     var style by remember { mutableStateOf<Style?>(null) }
     var fitted by remember { mutableStateOf(false) }
     var fitting by remember { mutableStateOf(false) }
     var worldShown by remember { mutableStateOf(false) }
+    var fixCentered by remember { mutableStateOf(false) }
     var following by remember { mutableStateOf(true) }
     var lastBearing by remember { mutableStateOf(0f) }
     var smoothBearing by remember { mutableStateOf(0f) }
@@ -287,7 +311,9 @@ fun TrailmarkMap(
         }
     }
 
-    LaunchedEffect(attributionBottom) {
+    val density = LocalDensity.current
+    val controlStackHeight = 44.dp * 5 + 8.dp * 4
+    LaunchedEffect(attributionBottom, controlsBottomInset) {
         mapView.getMapAsync { map ->
             val d = context.resources.displayMetrics.density
             val ui = map.uiSettings
@@ -298,8 +324,15 @@ fun TrailmarkMap(
                 attributionBottom + (8 * d).toInt(),
             )
             ui.isCompassEnabled = true
-            ui.setCompassGravity(Gravity.TOP or Gravity.END)
-            ui.setCompassMargins(0, (128 * d).toInt(), (12 * d).toInt(), 0)
+            ui.setCompassGravity(Gravity.BOTTOM or Gravity.END)
+            ui.setCompassMargins(
+                0,
+                0,
+                (12 * d).toInt(),
+                attributionBottom + (20 * d).toInt() +
+                    with(density) { controlsBottomInset.roundToPx() } +
+                    with(density) { controlStackHeight.roundToPx() },
+            )
         }
     }
 
@@ -395,7 +428,7 @@ fun TrailmarkMap(
         }
     }
 
-    LaunchedEffect(packPath, dark, lang.code) {
+    LaunchedEffect(packPath, dark, lang.code, online) {
         mapView.getMapAsync { map ->
             val builder = when {
                 packPath != null && !online ->
@@ -711,14 +744,24 @@ fun TrailmarkMap(
     LaunchedEffect(route.size, current, following, userFix, tiltDeg, flyover) {
         mapView.getMapAsync { map ->
             val c = current ?: run {
-                if (!worldShown) {
-                    val fix = userFix
-                    map.cameraPosition = if (fix != null) {
-                        CameraPosition.Builder().target(LatLng(fix.lat, fix.lon)).zoom(14.0).tilt(tiltDeg).build()
-                    } else {
-                        CameraPosition.Builder().target(LatLng(20.0, 10.0)).zoom(1.6).build()
+                val fix = userFix
+                when {
+                    fix != null && !fixCentered && following -> {
+                        map.cameraPosition = CameraPosition.Builder()
+                            .target(LatLng(fix.lat, fix.lon))
+                            .zoom(14.0)
+                            .tilt(tiltDeg)
+                            .build()
+                        fixCentered = true
+                        worldShown = true
                     }
-                    worldShown = true
+                    fix == null && !worldShown -> {
+                        map.cameraPosition = CameraPosition.Builder()
+                            .target(LatLng(20.0, 10.0))
+                            .zoom(1.6)
+                            .build()
+                        worldShown = true
+                    }
                 }
                 return@getMapAsync
             }
