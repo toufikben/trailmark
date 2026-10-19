@@ -224,7 +224,10 @@ fun PlanScreen(onRegions: () -> Unit, modifier: Modifier = Modifier) {
                             ) {
                                 PlanStat("↑ ${p.ascentM.toInt()} ${t.metre}", t.elevation)
                                 PlanStat("↓ ${p.descentM.toInt()} ${t.metre}", t.descent)
-                                PlanStat("%.0f%%".format(maxAbsGradePercent(p.chunks)), t.maxGrade)
+                                PlanStat(
+                                    String.format(java.util.Locale.US, "%.0f%%", maxAbsGradePercent(p.chunks)),
+                                    t.maxGrade,
+                                )
                             }
                             destWeather?.let { w ->
                                 Spacer(Modifier.height(10.dp))

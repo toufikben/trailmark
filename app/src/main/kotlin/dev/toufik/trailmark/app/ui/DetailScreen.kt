@@ -156,7 +156,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                             fontSize = 14.sp,
                         )
                         Text(
-                            "${t.maxSpeed} ${"%.1f".format(a.maxSpeedMps * 3.6)} ${t.kmh}",
+                            "${t.maxSpeed} ${String.format(java.util.Locale.US, "%.1f", a.maxSpeedMps * 3.6)} ${t.kmh}",
                             color = Palette.textSecondary,
                             fontSize = 14.sp,
                         )
