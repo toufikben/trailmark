@@ -60,6 +60,7 @@ import dev.toufik.trailmark.app.ui.PlanScreen
 import dev.toufik.trailmark.app.ui.ProgressScreen
 import dev.toufik.trailmark.app.ui.RegionsScreen
 import dev.toufik.trailmark.app.ui.SettingsScreen
+import dev.toufik.trailmark.app.ui.SplashScreen
 import dev.toufik.trailmark.recording.Phase
 
 sealed interface Screen {
@@ -75,6 +76,7 @@ sealed interface Screen {
 
 class MainActivity : ComponentActivity() {
     private var syntheticStarted = false
+    private var splashDone = false
 
     override fun onResume() {
         super.onResume()
@@ -119,6 +121,7 @@ class MainActivity : ComponentActivity() {
                         var screen by remember { mutableStateOf<Screen>(Screen.Record) }
                         var paywallFrom by remember { mutableStateOf<Screen>(Screen.Settings) }
                         var detailFrom by remember { mutableStateOf<Screen>(Screen.History) }
+                        var showSplash by remember { mutableStateOf(!splashDone) }
                         val recState by RecordingHolder.state.collectAsState()
                         BackHandler(enabled = screen != Screen.Record) {
                             screen = when (val s = screen) {
@@ -128,6 +131,7 @@ class MainActivity : ComponentActivity() {
                                 else -> Screen.Record
                             }
                         }
+                        Box(modifier = Modifier.fillMaxSize()) {
                         Column(modifier = Modifier.fillMaxSize()) {
                             Box(modifier = Modifier.weight(1f)) {
                                 AnimatedContent(
@@ -189,6 +193,15 @@ class MainActivity : ComponentActivity() {
                                 recording = recState.phase == Phase.RECORDING,
                                 onSelect = { screen = it },
                             )
+                        }
+                        if (showSplash) {
+                            SplashScreen(
+                                onDone = {
+                                    splashDone = true
+                                    showSplash = false
+                                },
+                            )
+                        }
                         }
                     }
                 }
