@@ -16,17 +16,17 @@ class NavigationTest {
 
     @Test
     fun rightAngleProducesOneRightTurn() {
-        val pts = leg(startLat, startLon, 0.0, 100.0) + leg(turn.lat, turn.lon, 90.0, 100.0).drop(1)
+        val pts = leg(startLat, startLon, 0.0, 100.0) + leg(turn.first, turn.second, 90.0, 100.0).drop(1)
         val cues = turnCues(pts)
         assertEquals(1, cues.size, cues.toString())
         assertEquals(TurnKind.RIGHT, cues[0].kind)
         assertTrue(abs(cues[0].distanceAlongM - 100.0) < 15.0, "cue at ${cues[0].distanceAlongM}")
-        assertEquals(turn.lat, cues[0].lat, 1e-6)
+        assertEquals(turn.first, cues[0].lat, 1e-6)
     }
 
     @Test
     fun gentleBendIsSlight() {
-        val pts = leg(startLat, startLon, 0.0, 100.0) + leg(turn.lat, turn.lon, 40.0, 100.0).drop(1)
+        val pts = leg(startLat, startLon, 0.0, 100.0) + leg(turn.first, turn.second, 40.0, 100.0).drop(1)
         val cues = turnCues(pts)
         assertEquals(1, cues.size, cues.toString())
         assertEquals(TurnKind.SLIGHT_RIGHT, cues[0].kind)
@@ -34,7 +34,7 @@ class NavigationTest {
 
     @Test
     fun reversalIsUturn() {
-        val pts = leg(startLat, startLon, 0.0, 100.0) + leg(turn.lat, turn.lon, 180.0, 100.0).drop(1)
+        val pts = leg(startLat, startLon, 0.0, 100.0) + leg(turn.first, turn.second, 180.0, 100.0).drop(1)
         val cues = turnCues(pts)
         assertEquals(1, cues.size, cues.toString())
         assertEquals(TurnKind.UTURN, cues[0].kind)
