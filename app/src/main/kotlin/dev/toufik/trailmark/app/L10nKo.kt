@@ -49,6 +49,7 @@ val KO_TEXTS = Texts(
     healthConnect = "Health Connect",
     connect = "연결",
     weight = "체중",
+    monthlyGoal = "월간 목표",
     importGpx = "GPX 가져오기",
     elevation = "고도",
     maxSpeed = "최고",

@@ -49,6 +49,7 @@ val IT_TEXTS = Texts(
     healthConnect = "Health Connect",
     connect = "Connetti",
     weight = "Peso",
+    monthlyGoal = "Obiettivo mensile",
     importGpx = "Importa GPX",
     elevation = "Dislivello",
     maxSpeed = "Max",

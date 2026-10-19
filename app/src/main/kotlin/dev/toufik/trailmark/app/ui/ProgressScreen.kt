@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -65,6 +67,7 @@ import dev.toufik.trailmark.data.SegmentStat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Calendar
+import android.content.Context
 
 private const val WEEK_MS = 7L * 24 * 60 * 60 * 1000
 private val SPORT_ORDER = listOf("RUN", "WALK", "BIKE", "HIKE")
@@ -80,6 +83,8 @@ private class Totals {
 fun ProgressScreen() {
     val context = LocalContext.current
     val t = LocalTexts.current
+    val prefs = remember { context.getSharedPreferences("trailmark", Context.MODE_PRIVATE) }
+    val goalKm = remember { prefs.getInt("goal_km", 100) }
     var rows by remember { mutableStateOf<List<ActivityRow>?>(null) }
     var records by remember { mutableStateOf<PersonalRecords?>(null) }
     var segments by remember { mutableStateOf<List<SegmentStat>>(emptyList()) }
@@ -141,6 +146,11 @@ fun ProgressScreen() {
                             )
                         } else {
                             SummaryRow(t, filtered)
+                            GoalCard(
+                                t,
+                                totalsSince(list, startOfMonth(System.currentTimeMillis())).distanceM,
+                                goalKm,
+                            )
                             WeeklyCard(t, filtered)
                             if (sport == null) {
                                 records?.let { RecordsCard(t, it) }
@@ -314,6 +324,61 @@ private fun SegmentsCard(t: Texts, segments: List<SegmentStat>) {
                         fontSize = 14.sp,
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GoalCard(t: Texts, monthM: Double, goalKm: Int) {
+    val goalM = goalKm.coerceAtLeast(1) * 1000.0
+    val frac = (monthM / goalM).coerceIn(0.0, 1.0)
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { shown = true }
+    val grow by animateFloatAsState(
+        targetValue = if (shown) frac.toFloat() else 0f,
+        animationSpec = tween(Motion.SLOW, easing = Motion.EaseOut),
+        label = "goal-grow",
+    )
+    Surface(
+        color = Palette.surface,
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp)
+            .appearIn(1),
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(t.monthlyGoal, color = Palette.text, fontSize = 14.sp)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "${(frac * 100).toInt()}%",
+                    color = if (frac >= 1.0) Palette.accent else Palette.textSecondary,
+                    fontSize = 12.sp,
+                )
+            }
+            Text(
+                "${formatDistance(monthM)} / $goalKm ${t.km}",
+                color = Palette.textSecondary,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Palette.bg),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(grow)
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Palette.accent),
+                )
             }
         }
     }

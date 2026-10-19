@@ -260,6 +260,36 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                 }
             }
             Spacer(Modifier.height(24.dp))
+            Text(t.monthlyGoal, color = Palette.textSecondary, fontSize = 13.sp)
+            Spacer(Modifier.height(8.dp))
+            var goalText by remember { mutableStateOf(prefs.getInt("goal_km", 100).toString()) }
+            Surface(color = Palette.surface, shape = RoundedCornerShape(16.dp)) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    BasicTextField(
+                        value = goalText,
+                        onValueChange = { s ->
+                            val clean = s.filter { it.isDigit() }.take(4)
+                            goalText = clean
+                            clean.toIntOrNull()?.let { v ->
+                                if (v in 1..9999) {
+                                    prefs.edit().putInt("goal_km", v).apply()
+                                }
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        textStyle = TextStyle(color = Palette.text, fontSize = 16.sp),
+                        singleLine = true,
+                        modifier = Modifier
+                            .width(64.dp)
+                            .heightIn(min = 44.dp),
+                    )
+                    Text(t.km, color = Palette.textSecondary, fontSize = 13.sp)
+                }
+            }
+            Spacer(Modifier.height(24.dp))
             Text(t.about, color = Palette.textSecondary, fontSize = 13.sp)
             Spacer(Modifier.height(8.dp))
             Surface(

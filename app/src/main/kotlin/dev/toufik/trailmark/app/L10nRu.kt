@@ -49,6 +49,7 @@ val RU_TEXTS = Texts(
     healthConnect = "Health Connect",
     connect = "Подключить",
     weight = "Вес",
+    monthlyGoal = "Цель месяца",
     importGpx = "Импорт GPX",
     elevation = "Набор высоты",
     maxSpeed = "Макс",

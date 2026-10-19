@@ -49,6 +49,7 @@ val PL_TEXTS = Texts(
     healthConnect = "Health Connect",
     connect = "Połącz",
     weight = "Waga",
+    monthlyGoal = "Cel miesięczny",
     importGpx = "Importuj GPX",
     elevation = "Przewyższenie",
     maxSpeed = "Maks",

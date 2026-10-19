@@ -49,6 +49,7 @@ val ID_TEXTS = Texts(
     healthConnect = "Health Connect",
     connect = "Hubungkan",
     weight = "Berat",
+    monthlyGoal = "Target bulanan",
     importGpx = "Impor GPX",
     elevation = "Elevasi",
     maxSpeed = "Maks",
