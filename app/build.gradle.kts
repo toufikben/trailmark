@@ -88,6 +88,7 @@ dependencies {
     implementation(libs.sqldelight.android.driver)
     implementation(libs.maplibre.android)
     implementation(libs.billing)
+    implementation(libs.health.connect)
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.graphics)

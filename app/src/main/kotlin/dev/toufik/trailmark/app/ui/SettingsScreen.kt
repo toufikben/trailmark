@@ -1,6 +1,8 @@
 package dev.toufik.trailmark.app.ui
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,21 +26,30 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.health.connect.client.HealthConnectClient
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import dev.toufik.trailmark.app.Lang
 import dev.toufik.trailmark.app.LocalPremium
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.Units
+import dev.toufik.trailmark.app.health.HealthSync
+import kotlinx.coroutines.launch
 
 /** Language, subscription, map theme and app info. */
 @Composable
@@ -130,6 +141,68 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                 ThemeButton(t.off, selected = !voice) {
                     voice = false
                     prefs.edit().putBoolean("voice_coach", false).apply()
+                }
+            }
+            Spacer(Modifier.height(24.dp))
+            Text(t.healthConnect, color = Palette.textSecondary, fontSize = 13.sp)
+            Spacer(Modifier.height(8.dp))
+            val healthAvailable = remember { HealthSync.available(context) }
+            var healthOn by remember { mutableStateOf(prefs.getBoolean("health_sync", true)) }
+            var healthGranted by remember { mutableStateOf(false) }
+            val healthScope = rememberCoroutineScope()
+            LaunchedEffect(healthAvailable) {
+                healthGranted = healthAvailable && HealthSync.granted(context)
+            }
+            val lifecycleOwner = LocalLifecycleOwner.current
+            DisposableEffect(lifecycleOwner, healthAvailable) {
+                val obs = LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_RESUME) {
+                        healthScope.launch {
+                            healthGranted = healthAvailable && HealthSync.granted(context)
+                        }
+                    }
+                }
+                lifecycleOwner.lifecycle.addObserver(obs)
+                onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+            }
+            Pill {
+                when {
+                    !healthAvailable -> TextButton(onClick = {
+                        runCatching {
+                            context.startActivity(
+                                Intent(
+                                    Intent.ACTION_VIEW,
+                                    Uri.parse(
+                                        "market://details?id=com.google.android.apps.healthdata",
+                                    ),
+                                ),
+                            )
+                        }
+                    }) { Text(t.download, color = Palette.textSecondary, fontSize = 13.sp) }
+
+                    !healthGranted -> TextButton(onClick = {
+                        healthScope.launch {
+                            runCatching {
+                                val client = HealthConnectClient.getOrCreate(context)
+                                context.startActivity(
+                                    client.permissionController.createRequestPermissionIntent(
+                                        HealthSync.writePermissions,
+                                    ),
+                                )
+                            }
+                        }
+                    }) { Text(t.connect, color = Palette.accent, fontSize = 13.sp) }
+
+                    else -> {
+                        ThemeButton(t.on, selected = healthOn) {
+                            healthOn = true
+                            prefs.edit().putBoolean("health_sync", true).apply()
+                        }
+                        ThemeButton(t.off, selected = !healthOn) {
+                            healthOn = false
+                            prefs.edit().putBoolean("health_sync", false).apply()
+                        }
+                    }
                 }
             }
             Spacer(Modifier.height(24.dp))

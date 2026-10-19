@@ -200,6 +200,19 @@ class RecordingService : Service() {
                     val points = repo.loadPoints(finished)
                     dev.toufik.trailmark.app.matchSegments(repo, finished, points)
                 }
+                val prefs = getSharedPreferences("trailmark", MODE_PRIVATE)
+                if (prefs.getBoolean("health_sync", true)) {
+                    runCatching {
+                        val row = repo.activityById(finished)
+                        if (row != null) {
+                            dev.toufik.trailmark.app.health.HealthSync.writeActivity(
+                                this@RecordingService,
+                                row,
+                                prefs.getFloat("weight_kg", 70f).toDouble(),
+                            )
+                        }
+                    }
+                }
             }
             RecordingHolder.update(RecordingState(phase = Phase.STOPPED, lastActivityId = finished))
             stateJob?.cancel()
