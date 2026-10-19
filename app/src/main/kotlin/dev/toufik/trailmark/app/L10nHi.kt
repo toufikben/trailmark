@@ -45,6 +45,7 @@ val HI_TEXTS = Texts(
     voiceCoach = "वॉइस कोच",
     on = "चालू",
     off = "बंद",
+    caption = "कैप्शन",
     importGpx = "GPX आयात करें",
     elevation = "ऊँचाई",
     maxSpeed = "अधिकतम",

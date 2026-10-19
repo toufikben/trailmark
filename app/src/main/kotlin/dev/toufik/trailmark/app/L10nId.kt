@@ -45,6 +45,7 @@ val ID_TEXTS = Texts(
     voiceCoach = "Pelatih suara",
     on = "Aktif",
     off = "Nonaktif",
+    caption = "Keterangan",
     importGpx = "Impor GPX",
     elevation = "Elevasi",
     maxSpeed = "Maks",

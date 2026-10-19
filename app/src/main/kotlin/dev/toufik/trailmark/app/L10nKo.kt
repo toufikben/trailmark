@@ -45,6 +45,7 @@ val KO_TEXTS = Texts(
     voiceCoach = "음성 코치",
     on = "켜기",
     off = "끄기",
+    caption = "캡션",
     importGpx = "GPX 가져오기",
     elevation = "고도",
     maxSpeed = "최고",

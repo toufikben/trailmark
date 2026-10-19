@@ -45,6 +45,7 @@ val ZH_TEXTS = Texts(
     voiceCoach = "语音教练",
     on = "开启",
     off = "关闭",
+    caption = "说明文字",
     importGpx = "导入 GPX",
     elevation = "累计爬升",
     maxSpeed = "最高",

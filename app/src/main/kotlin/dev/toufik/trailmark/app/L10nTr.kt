@@ -45,6 +45,7 @@ val TR_TEXTS = Texts(
     voiceCoach = "Sesli koç",
     on = "Açık",
     off = "Kapalı",
+    caption = "Başlık",
     importGpx = "GPX içe aktar",
     elevation = "Tırmanış",
     maxSpeed = "Maks",

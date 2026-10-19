@@ -45,6 +45,7 @@ val PL_TEXTS = Texts(
     voiceCoach = "Trener głosowy",
     on = "Włączone",
     off = "Wyłączone",
+    caption = "Podpis",
     importGpx = "Importuj GPX",
     elevation = "Przewyższenie",
     maxSpeed = "Maks",

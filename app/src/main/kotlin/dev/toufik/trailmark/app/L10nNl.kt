@@ -45,6 +45,7 @@ val NL_TEXTS = Texts(
     voiceCoach = "Spraakcoach",
     on = "Aan",
     off = "Uit",
+    caption = "Bijschrift",
     importGpx = "GPX importeren",
     elevation = "Hoogtemeters",
     maxSpeed = "Max",

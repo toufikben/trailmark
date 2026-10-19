@@ -122,6 +122,16 @@ class ActivityRepositoryTest {
     }
 
     @Test
+    fun mediaCaptionIsEditableAndClearable() {
+        val id = repo.insertActivity("m4", "RUN", 3)
+        val mediaId = repo.insertMedia(id, "PHOTO", "/p2.jpg", null, null, null, 0.0, 0L, 1, null, null)
+        repo.setMediaCaption(mediaId, "sunrise at the pass")
+        assertEquals("sunrise at the pass", repo.listMedia(id).single().caption)
+        repo.setMediaCaption(mediaId, null)
+        assertNull(repo.listMedia(id).single().caption)
+    }
+
+    @Test
     fun mediaIsScopedToItsActivityAndDeletable() {
         val a = repo.insertActivity("m2", "RUN", 1)
         val b = repo.insertActivity("m3", "RUN", 2)

@@ -34,7 +34,7 @@ class ActivityRow(
 )
 
 /** One captured media item pinned to a place and a moment along the route. */
-class MediaRow(
+data class MediaRow(
     val id: Long,
     val activityId: Long,
     val kind: String,
@@ -293,6 +293,10 @@ class ActivityRepository(private val db: TrailmarkDb) {
 
     fun deleteMedia(id: Long) {
         q.deleteMedia(id = id)
+    }
+
+    fun setMediaCaption(id: Long, caption: String?) {
+        q.setMediaCaption(caption = caption, id = id)
     }
 
     fun insertSegment(

@@ -45,6 +45,7 @@ val IT_TEXTS = Texts(
     voiceCoach = "Allenatore vocale",
     on = "Attivo",
     off = "Disattivo",
+    caption = "Didascalia",
     importGpx = "Importa GPX",
     elevation = "Dislivello",
     maxSpeed = "Max",

@@ -460,7 +460,25 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
         }
         viewerMedia?.let { m ->
             if (m.kind == "PHOTO") {
-                PhotoViewer(media = m, description = t.photo) { viewerMedia = null }
+                PhotoViewer(
+                    media = m,
+                    description = t.photo,
+                    captionLabel = t.caption,
+                    onSaveCaption = { cap ->
+                        scope.launch {
+                            withContext(Dispatchers.IO) {
+                                AppGraph.repository(context).setMediaCaption(m.id, cap)
+                            }
+                            viewerMedia = m.copy(caption = cap)
+                            detail = detail?.let { dd ->
+                                dd.copy(
+                                    media = dd.media.map { if (it.id == m.id) it.copy(caption = cap) else it },
+                                )
+                            }
+                        }
+                    },
+                    onDismiss = { viewerMedia = null },
+                )
             }
         }
         val dd = detail

@@ -45,6 +45,7 @@ val JA_TEXTS = Texts(
     voiceCoach = "音声コーチ",
     on = "オン",
     off = "オフ",
+    caption = "キャプション",
     importGpx = "GPX をインポート",
     elevation = "獲得標高",
     maxSpeed = "最大",

@@ -45,6 +45,7 @@ val RU_TEXTS = Texts(
     voiceCoach = "Голосовой тренер",
     on = "Вкл",
     off = "Выкл",
+    caption = "Подпись",
     importGpx = "Импорт GPX",
     elevation = "Набор высоты",
     maxSpeed = "Макс",

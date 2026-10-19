@@ -45,6 +45,7 @@ val ES_TEXTS = Texts(
     voiceCoach = "Entrenador de voz",
     on = "Activado",
     off = "Desactivado",
+    caption = "Pie de foto",
     importGpx = "Importar GPX",
     elevation = "Desnivel",
     maxSpeed = "Máx",

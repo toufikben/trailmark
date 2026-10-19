@@ -45,6 +45,7 @@ val DE_TEXTS = Texts(
     voiceCoach = "Sprachcoach",
     on = "An",
     off = "Aus",
+    caption = "Bildunterschrift",
     importGpx = "GPX importieren",
     elevation = "Höhenmeter",
     maxSpeed = "Max",
