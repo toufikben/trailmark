@@ -339,6 +339,37 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                     }
                     Spacer(Modifier.height(10.dp))
                     Text(t.attribution, color = Palette.textSecondary, fontSize = 11.sp)
+                    Spacer(Modifier.height(12.dp))
+                    HorizontalDivider(color = Palette.textSecondary.copy(alpha = 0.15f))
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                runCatching {
+                                    context.startActivity(
+                                        Intent(
+                                            Intent.ACTION_SENDTO,
+                                            Uri.parse(
+                                                "mailto:toufik.bendjeddah@gmail.com" +
+                                                    "?subject=Trailmark%20feedback",
+                                            ),
+                                        ),
+                                    )
+                                }
+                            },
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("Email", color = Palette.text, fontSize = 13.sp)
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            "toufik.bendjeddah@gmail.com",
+                            color = Palette.accent,
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                        )
+                    }
                 }
             }
         }

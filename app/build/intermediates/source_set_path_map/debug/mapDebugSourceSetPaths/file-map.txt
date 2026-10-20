@@ -1,0 +1,61 @@
+dev.toufik.trailmark.app-lifecycle-livedata-2.8.7-0 C:\Users\Administrator\.gradle\caches\8.13\transforms\041ef190942257f3516b78cb3947559d\transformed\lifecycle-livedata-2.8.7\res
+dev.toufik.trailmark.app-connect-client-1.1.0-alpha10-1 C:\Users\Administrator\.gradle\caches\8.13\transforms\0c00da8de84ad0bf407a3a68b52fcf75\transformed\connect-client-1.1.0-alpha10\res
+dev.toufik.trailmark.app-ui-graphics-release-2 C:\Users\Administrator\.gradle\caches\8.13\transforms\1079c74db350a6a64196500f06b7e0ee\transformed\ui-graphics-release\res
+dev.toufik.trailmark.app-lifecycle-viewmodel-ktx-2.8.7-3 C:\Users\Administrator\.gradle\caches\8.13\transforms\10953c9b84f2120d4cf63f8d839a002a\transformed\lifecycle-viewmodel-ktx-2.8.7\res
+dev.toufik.trailmark.app-animation-core-release-4 C:\Users\Administrator\.gradle\caches\8.13\transforms\19585ce88a9369f903e529dade6e447a\transformed\animation-core-release\res
+dev.toufik.trailmark.app-tracing-1.2.0-5 C:\Users\Administrator\.gradle\caches\8.13\transforms\1f1594683422c96da5fcf6c2252c0c95\transformed\tracing-1.2.0\res
+dev.toufik.trailmark.app-lifecycle-viewmodel-savedstate-2.8.7-6 C:\Users\Administrator\.gradle\caches\8.13\transforms\22711ce4cffa04b45c99547d2978f3b4\transformed\lifecycle-viewmodel-savedstate-2.8.7\res
+dev.toufik.trailmark.app-lifecycle-runtime-release-7 C:\Users\Administrator\.gradle\caches\8.13\transforms\22aec21bd46123c74f0ab52310ae613a\transformed\lifecycle-runtime-release\res
+dev.toufik.trailmark.app-runtime-release-8 C:\Users\Administrator\.gradle\caches\8.13\transforms\297c3fb041d43b1ac0c9a39b67a2189d\transformed\runtime-release\res
+dev.toufik.trailmark.app-savedstate-ktx-1.2.1-9 C:\Users\Administrator\.gradle\caches\8.13\transforms\29f043ae8a5fdfd6ca58b74a1f591bef\transformed\savedstate-ktx-1.2.1\res
+dev.toufik.trailmark.app-lifecycle-livedata-core-2.8.7-10 C:\Users\Administrator\.gradle\caches\8.13\transforms\2e6e065d4d53ad0f9a7872bc3ef5d4fd\transformed\lifecycle-livedata-core-2.8.7\res
+dev.toufik.trailmark.app-ui-text-release-11 C:\Users\Administrator\.gradle\caches\8.13\transforms\2eb0cb76704435099330855eda35c6d4\transformed\ui-text-release\res
+dev.toufik.trailmark.app-play-services-base-18.5.0-12 C:\Users\Administrator\.gradle\caches\8.13\transforms\3238bcc57f65ccbe115f8d9c0463fc8c\transformed\play-services-base-18.5.0\res
+dev.toufik.trailmark.app-sqlite-framework-2.4.0-13 C:\Users\Administrator\.gradle\caches\8.13\transforms\393f78720f2f35956be246ad2598fa6c\transformed\sqlite-framework-2.4.0\res
+dev.toufik.trailmark.app-foundation-layout-release-14 C:\Users\Administrator\.gradle\caches\8.13\transforms\3a19c1b9ebc595a665247fd7d83434af\transformed\foundation-layout-release\res
+dev.toufik.trailmark.app-ui-geometry-release-15 C:\Users\Administrator\.gradle\caches\8.13\transforms\400a7e32f3f77329940015a67b99b4d9\transformed\ui-geometry-release\res
+dev.toufik.trailmark.app-lifecycle-runtime-ktx-release-16 C:\Users\Administrator\.gradle\caches\8.13\transforms\4c69d75d998533366a280d20ceccdade\transformed\lifecycle-runtime-ktx-release\res
+dev.toufik.trailmark.app-play-services-basement-18.9.0-17 C:\Users\Administrator\.gradle\caches\8.13\transforms\582ce9fdd60e30f60081239625f89e1d\transformed\play-services-basement-18.9.0\res
+dev.toufik.trailmark.app-graphics-path-1.0.1-18 C:\Users\Administrator\.gradle\caches\8.13\transforms\598559b9dba313d7ea3037fffd3872e5\transformed\graphics-path-1.0.1\res
+dev.toufik.trailmark.app-foundation-release-19 C:\Users\Administrator\.gradle\caches\8.13\transforms\59cda5a2ff5d17a830bf4610de54b468\transformed\foundation-release\res
+dev.toufik.trailmark.app-profileinstaller-1.3.1-20 C:\Users\Administrator\.gradle\caches\8.13\transforms\61ca25453bd1a8da0e00923bf96b3f81\transformed\profileinstaller-1.3.1\res
+dev.toufik.trailmark.app-ui-release-21 C:\Users\Administrator\.gradle\caches\8.13\transforms\62c267f578cec6c6444a8f74ada7499a\transformed\ui-release\res
+dev.toufik.trailmark.app-android-sdk-11.7.0-22 C:\Users\Administrator\.gradle\caches\8.13\transforms\6518d04e887fa5579032317a763734f8\transformed\android-sdk-11.7.0\res
+dev.toufik.trailmark.app-billing-9.1.0-23 C:\Users\Administrator\.gradle\caches\8.13\transforms\7a1d031474852b0d3f9c2ab9358acdd3\transformed\billing-9.1.0\res
+dev.toufik.trailmark.app-ui-util-release-24 C:\Users\Administrator\.gradle\caches\8.13\transforms\92edf5911b14237a3cba5fb27a480627\transformed\ui-util-release\res
+dev.toufik.trailmark.app-runtime-saveable-release-25 C:\Users\Administrator\.gradle\caches\8.13\transforms\979c2dc6d238e658f1d425a0f390c914\transformed\runtime-saveable-release\res
+dev.toufik.trailmark.app-core-1.15.0-26 C:\Users\Administrator\.gradle\caches\8.13\transforms\9d367d502efc193c9264540d6f2a65de\transformed\core-1.15.0\res
+dev.toufik.trailmark.app-ui-unit-release-27 C:\Users\Administrator\.gradle\caches\8.13\transforms\9d7a48b8d8eb99c0e527a9a4d3864168\transformed\ui-unit-release\res
+dev.toufik.trailmark.app-fragment-1.8.2-28 C:\Users\Administrator\.gradle\caches\8.13\transforms\9e138b074139813c729c02e5af1453e3\transformed\fragment-1.8.2\res
+dev.toufik.trailmark.app-annotation-experimental-1.4.1-29 C:\Users\Administrator\.gradle\caches\8.13\transforms\a1783059b2e5a7f2ccbda7d78a80e158\transformed\annotation-experimental-1.4.1\res
+dev.toufik.trailmark.app-material3-release-30 C:\Users\Administrator\.gradle\caches\8.13\transforms\b564fcd561a91ab01c7b1fcbcc81f319\transformed\material3-release\res
+dev.toufik.trailmark.app-lifecycle-process-2.8.7-31 C:\Users\Administrator\.gradle\caches\8.13\transforms\b6ade8645db3b688fcc7922b4e91f310\transformed\lifecycle-process-2.8.7\res
+dev.toufik.trailmark.app-activity-ktx-1.9.3-32 C:\Users\Administrator\.gradle\caches\8.13\transforms\b83fbfa6ff28abc8ff09b929e0f872ef\transformed\activity-ktx-1.9.3\res
+dev.toufik.trailmark.app-activity-1.9.3-33 C:\Users\Administrator\.gradle\caches\8.13\transforms\b978d5dcd356a651f3b1f8fe39cc86fa\transformed\activity-1.9.3\res
+dev.toufik.trailmark.app-lifecycle-runtime-compose-release-34 C:\Users\Administrator\.gradle\caches\8.13\transforms\bc920d3d4a999a7908954416e2b6b521\transformed\lifecycle-runtime-compose-release\res
+dev.toufik.trailmark.app-ui-tooling-data-release-35 C:\Users\Administrator\.gradle\caches\8.13\transforms\bedca616fcb1fd1ec9a3ae60d6315ffe\transformed\ui-tooling-data-release\res
+dev.toufik.trailmark.app-sqlite-2.4.0-36 C:\Users\Administrator\.gradle\caches\8.13\transforms\c1dd0df863a69bc25b81176624d21268\transformed\sqlite-2.4.0\res
+dev.toufik.trailmark.app-startup-runtime-1.1.1-37 C:\Users\Administrator\.gradle\caches\8.13\transforms\cc8417f4c562f2c66ce485a5bd0760ec\transformed\startup-runtime-1.1.1\res
+dev.toufik.trailmark.app-lifecycle-viewmodel-release-38 C:\Users\Administrator\.gradle\caches\8.13\transforms\cdae177acf0c893637780a1f67d3a037\transformed\lifecycle-viewmodel-release\res
+dev.toufik.trailmark.app-ui-tooling-preview-release-39 C:\Users\Administrator\.gradle\caches\8.13\transforms\d0953a8ca37427d6bdd0539ce60d2407\transformed\ui-tooling-preview-release\res
+dev.toufik.trailmark.app-ui-tooling-release-40 C:\Users\Administrator\.gradle\caches\8.13\transforms\d10f9f719bc8241546279b37c7ac8da2\transformed\ui-tooling-release\res
+dev.toufik.trailmark.app-emoji2-1.3.0-41 C:\Users\Administrator\.gradle\caches\8.13\transforms\d2208dd10fc5d3a510943b750d9e6a68\transformed\emoji2-1.3.0\res
+dev.toufik.trailmark.app-material-ripple-release-42 C:\Users\Administrator\.gradle\caches\8.13\transforms\d47e9c42a61af9128a3857754bcad442\transformed\material-ripple-release\res
+dev.toufik.trailmark.app-core-ktx-1.15.0-43 C:\Users\Administrator\.gradle\caches\8.13\transforms\d7b0c5cf6d99311387798595abe7f910\transformed\core-ktx-1.15.0\res
+dev.toufik.trailmark.app-activity-compose-1.9.3-44 C:\Users\Administrator\.gradle\caches\8.13\transforms\dca964b9ce906042798eb85e0abe7650\transformed\activity-compose-1.9.3\res
+dev.toufik.trailmark.app-savedstate-1.2.1-45 C:\Users\Administrator\.gradle\caches\8.13\transforms\dd06927307eebb436e52b6a651c809c7\transformed\savedstate-1.2.1\res
+dev.toufik.trailmark.app-material-icons-core-release-46 C:\Users\Administrator\.gradle\caches\8.13\transforms\debff51714c9e9324892d9c87f4a6dca\transformed\material-icons-core-release\res
+dev.toufik.trailmark.app-lifecycle-livedata-core-ktx-2.8.7-47 C:\Users\Administrator\.gradle\caches\8.13\transforms\df5e797ccbb779765715a6d28a06e945\transformed\lifecycle-livedata-core-ktx-2.8.7\res
+dev.toufik.trailmark.app-material-release-48 C:\Users\Administrator\.gradle\caches\8.13\transforms\e19a5fd063dbbf2b00a7d308e2fad179\transformed\material-release\res
+dev.toufik.trailmark.app-animation-release-49 C:\Users\Administrator\.gradle\caches\8.13\transforms\ed80f759a78f2ae1fc51ff9cacc2f808\transformed\animation-release\res
+dev.toufik.trailmark.app-maplibre-android-gestures-0.0.3-50 C:\Users\Administrator\.gradle\caches\8.13\transforms\f3c02c9aa099fbfd77c8948497752628\transformed\maplibre-android-gestures-0.0.3\res
+dev.toufik.trailmark.app-core-runtime-2.2.0-51 C:\Users\Administrator\.gradle\caches\8.13\transforms\f449710c5cd4d6c7fad8120a1fb8e569\transformed\core-runtime-2.2.0\res
+dev.toufik.trailmark.app-customview-poolingcontainer-1.0.0-52 C:\Users\Administrator\.gradle\caches\8.13\transforms\fb344d821977f1e7838ab7661ea4d5c7\transformed\customview-poolingcontainer-1.0.0\res
+dev.toufik.trailmark.app-pngs-53 C:\Users\Administrator\Documents\Default Project\trailmark\app\build\generated\res\pngs\debug
+dev.toufik.trailmark.app-resValues-54 C:\Users\Administrator\Documents\Default Project\trailmark\app\build\generated\res\resValues\debug
+dev.toufik.trailmark.app-updated_navigation_xml-55 C:\Users\Administrator\Documents\Default Project\trailmark\app\build\generated\updated_navigation_xml\debug
+dev.toufik.trailmark.app-packageDebugResources-56 C:\Users\Administrator\Documents\Default Project\trailmark\app\build\intermediates\incremental\debug\packageDebugResources\merged.dir
+dev.toufik.trailmark.app-packageDebugResources-57 C:\Users\Administrator\Documents\Default Project\trailmark\app\build\intermediates\incremental\debug\packageDebugResources\stripped.dir
+dev.toufik.trailmark.app-debug-58 C:\Users\Administrator\Documents\Default Project\trailmark\app\build\intermediates\merged_res\debug\mergeDebugResources
+dev.toufik.trailmark.app-debug-59 C:\Users\Administrator\Documents\Default Project\trailmark\app\src\debug\res
+dev.toufik.trailmark.app-main-60 C:\Users\Administrator\Documents\Default Project\trailmark\app\src\main\res

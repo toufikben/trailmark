@@ -11,6 +11,7 @@ coroutines = "1.8.1"
 serialization = "1.7.3"
 maplibre = "11.7.0"
 billing = "9.1.0"
+play-review = "2.0.2"
 health-connect = "1.1.0-alpha10"
 graphhopper = "10.0"
 slf4j = "2.0.16"
@@ -25,6 +26,7 @@ kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-t
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 maplibre-android = { module = "org.maplibre.gl:android-sdk", version.ref = "maplibre" }
 billing = { module = "com.android.billingclient:billing", version.ref = "billing" }
+play-review = { module = "com.google.android.play:review", version.ref = "play-review" }
 health-connect = { module = "androidx.health.connect:connect-client", version.ref = "health-connect" }
 graphhopper-core = { module = "com.graphhopper:graphhopper-core", version.ref = "graphhopper" }
 slf4j-nop = { module = "org.slf4j:slf4j-nop", version.ref = "slf4j" }

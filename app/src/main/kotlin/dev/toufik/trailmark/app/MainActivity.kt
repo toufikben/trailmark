@@ -35,6 +35,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -62,6 +63,7 @@ import dev.toufik.trailmark.app.ui.RegionsScreen
 import dev.toufik.trailmark.app.ui.SettingsScreen
 import dev.toufik.trailmark.app.ui.SplashScreen
 import dev.toufik.trailmark.recording.Phase
+import kotlinx.coroutines.delay
 
 sealed interface Screen {
     data object Record : Screen
@@ -123,6 +125,14 @@ class MainActivity : ComponentActivity() {
                         var detailFrom by remember { mutableStateOf<Screen>(Screen.History) }
                         var showSplash by remember { mutableStateOf(!splashDone) }
                         val recState by RecordingHolder.state.collectAsState()
+                        LaunchedEffect(recState.phase, recState.lastActivityId) {
+                            val id = recState.lastActivityId
+                            if (recState.phase == Phase.STOPPED && id != null) {
+                                ReviewPrompt.onRecordingStopped(this@MainActivity, id)
+                                delay(2500)
+                                ReviewPrompt.maybeAsk(this@MainActivity)
+                            }
+                        }
                         BackHandler(enabled = screen != Screen.Record) {
                             screen = when (val s = screen) {
                                 is Screen.Detail -> detailFrom
