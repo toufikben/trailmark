@@ -9,6 +9,7 @@ import androidx.health.connect.client.records.Record
 import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
 import androidx.health.connect.client.units.kilocalories
 import androidx.health.connect.client.units.meters
+import dev.toufik.trailmark.app.AppGraph
 import dev.toufik.trailmark.data.ActivityRow
 import dev.toufik.trailmark.engine.Calories
 import java.time.Instant
@@ -80,6 +81,22 @@ object HealthSync {
         HealthConnectClient.getOrCreate(context).insertRecords(records)
         true
     }.getOrDefault(false)
+
+    /**
+     * Writes freshly imported activities — including tracks sent by the Wear
+     * app — to Health Connect, honouring the same preference as recordings.
+     */
+    suspend fun writeActivities(context: Context, ids: Collection<Long>) {
+        if (ids.isEmpty()) return
+        val prefs = context.getSharedPreferences("trailmark", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("health_sync", true)) return
+        val weightKg = prefs.getFloat("weight_kg", 70f).toDouble()
+        val repo = AppGraph.repository(context)
+        for (id in ids) {
+            val row = repo.activityById(id) ?: continue
+            writeActivity(context, row, weightKg)
+        }
+    }
 
     /** Health Connect exercise-type codes for Trailmark sport strings. */
     private fun exerciseType(sport: String): Int = when (sport) {

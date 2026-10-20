@@ -38,6 +38,7 @@ import dev.toufik.trailmark.app.LocalLang
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.Texts
+import dev.toufik.trailmark.app.health.HealthSync
 import dev.toufik.trailmark.app.formatDate
 import dev.toufik.trailmark.app.formatDistance
 import dev.toufik.trailmark.app.formatDuration
@@ -71,10 +72,13 @@ fun HistoryScreen(onOpen: (Long) -> Unit) {
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
-            withContext(Dispatchers.IO) {
+            val ids = withContext(Dispatchers.IO) {
                 val bytes = context.contentResolver.openInputStream(uri)
-                    ?.use { it.readBytes() } ?: return@withContext
+                    ?.use { it.readBytes() } ?: return@withContext emptyList<Long>()
                 importTrackBytes(context, bytes)
+            }
+            if (ids.isNotEmpty()) {
+                withContext(Dispatchers.IO) { HealthSync.writeActivities(context, ids) }
             }
             reload()
         }
@@ -216,29 +220,29 @@ private fun sportLabel(t: Texts, sport: String): String = when (sport) {
  * Imports a track from raw bytes: GPX text, a FIT file, or a ZIP archive that
  * holds any number of either. Returns true when at least one activity landed.
  */
-internal fun importTrackBytes(context: Context, bytes: ByteArray): Boolean {
+internal fun importTrackBytes(context: Context, bytes: ByteArray): List<Long> {
     if (
         bytes.size >= 4 &&
         bytes[0] == 0x50.toByte() && bytes[1] == 0x4B.toByte() &&
         bytes[2] == 0x03.toByte() && bytes[3] == 0x04.toByte()
     ) {
-        var any = false
+        val ids = ArrayList<Long>()
         java.util.zip.ZipInputStream(java.io.ByteArrayInputStream(bytes)).use { zin ->
             while (true) {
                 val entry = zin.nextEntry ?: break
                 val name = entry.name.lowercase()
                 if (!entry.isDirectory && (name.endsWith(".fit") || name.endsWith(".gpx"))) {
-                    if (importTrackBytes(context, zin.readBytes())) any = true
+                    ids.addAll(importTrackBytes(context, zin.readBytes()))
                 }
             }
         }
-        return any
+        return ids
     }
     val isFit = bytes.size >= 12 &&
         bytes[8] == '.'.code.toByte() && bytes[9] == 'F'.code.toByte() &&
         bytes[10] == 'I'.code.toByte() && bytes[11] == 'T'.code.toByte()
     val imported = if (isFit) Fit.read(bytes) else Gpx.read(bytes.toString(Charsets.UTF_8))
-    if (imported.size < 2) return false
+    if (imported.size < 2) return emptyList()
     val t0 = imported.first().timeMillis ?: System.currentTimeMillis()
     var dist = 0.0
     val pts = ArrayList<StoredPoint>(imported.size)
@@ -253,5 +257,5 @@ internal fun importTrackBytes(context: Context, bytes: ByteArray): Boolean {
     val id = repo.insertActivity("import-${System.currentTimeMillis()}", "RUN", t0)
     repo.appendPoints(id, pts)
     repo.finishActivity(id, pts.last().timeNanos, dist, pts.size.toLong(), 0, false)
-    return true
+    return listOf(id)
 }

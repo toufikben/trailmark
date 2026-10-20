@@ -3,7 +3,9 @@ package dev.toufik.trailmark.app.wear
 import com.google.android.gms.wearable.ChannelClient
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
+import dev.toufik.trailmark.app.health.HealthSync
 import dev.toufik.trailmark.app.ui.importTrackBytes
+import kotlinx.coroutines.runBlocking
 
 /**
  * Receives finished GPX tracks from the Wear OS app over a Wearable channel
@@ -17,7 +19,12 @@ class WearGpxListener : WearableListenerService() {
             Thread {
                 runCatching { input.use { it.readBytes() } }
                     .onSuccess { bytes ->
-                        if (bytes.size > 2) importTrackBytes(this, bytes)
+                        if (bytes.size > 2) {
+                            val ids = importTrackBytes(this, bytes)
+                            if (ids.isNotEmpty()) {
+                                runBlocking { HealthSync.writeActivities(this@WearGpxListener, ids) }
+                            }
+                        }
                     }
                 runCatching { client.close(channel) }
             }.start()

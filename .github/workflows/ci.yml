@@ -58,7 +58,7 @@ jobs:
           RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
-        run: ./gradlew :app:assembleRelease :app:bundleRelease --no-daemon --stacktrace
+        run: ./gradlew :app:assembleRelease :app:bundleRelease :wear:assembleRelease --no-daemon --stacktrace
       - uses: actions/upload-artifact@v4
         with:
           name: trailmark-debug-apk
@@ -69,6 +69,12 @@ jobs:
         with:
           name: trailmark-wear-apk
           path: wear/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trailmark-wear-release-apk
+          path: wear/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 7
       - uses: actions/upload-artifact@v4
