@@ -292,18 +292,18 @@ private fun bearingDeg(lat1: Double, lon1: Double, lat2: Double, lon2: Double): 
 
 private suspend fun awaitMapIdle(map: MapLibreMap, timeoutMs: Long = 1600) {
     val done = CompletableDeferred<Unit>()
-    val listener = MapLibreMap.OnMapIdleListener { done.complete(Unit) }
-    map.addOnMapIdleListener(listener)
+    val listener = MapLibreMap.OnCameraIdleListener { done.complete(Unit) }
+    map.addOnCameraIdleListener(listener)
     try {
         withTimeoutOrNull(timeoutMs) { done.await() }
     } finally {
-        runCatching { map.removeOnMapIdleListener(listener) }
+        runCatching { map.removeOnCameraIdleListener(listener) }
     }
 }
 
 private suspend fun captureMap(map: MapLibreMap): Bitmap =
     suspendCancellableCoroutine { cont ->
-        map.snapshot(object : MapLibreMap.OnSnapshotReadyCallback {
+        map.snapshot(object : MapLibreMap.SnapshotReadyCallback {
             override fun onSnapshotReady(snapshot: Bitmap) {
                 if (cont.isActive) cont.resume(snapshot) else snapshot.recycle()
             }

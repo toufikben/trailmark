@@ -90,8 +90,9 @@ class BillingManager(
         }
         c.queryProductDetailsAsync(
             QueryProductDetailsParams.newBuilder().setProductList(products).build(),
-        ) { result, list ->
+        ) { result, queryResult ->
             if (result.responseCode != BillingClient.BillingResponseCode.OK) return@queryProductDetailsAsync
+            val list = queryResult.productDetailsList
             details = list.associateBy { it.productId }
             _prices.value = list.associate { d -> d.productId to priceOf(d) }
         }
