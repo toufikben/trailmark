@@ -50,6 +50,8 @@ jobs:
           printf '%s' "$RELEASE_KEYSTORE_B64" | base64 -d > app/release-keystore.jks
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+      - name: Build Wear debug APK
+        run: ./gradlew :wear:assembleDebug --no-daemon --stacktrace
       - name: Build signed release APK and AAB
         env:
           RELEASE_KEYSTORE_FILE: app/release-keystore.jks
@@ -61,6 +63,12 @@ jobs:
         with:
           name: trailmark-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trailmark-wear-apk
+          path: wear/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 7
       - uses: actions/upload-artifact@v4

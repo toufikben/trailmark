@@ -216,7 +216,7 @@ private fun sportLabel(t: Texts, sport: String): String = when (sport) {
  * Imports a track from raw bytes: GPX text, a FIT file, or a ZIP archive that
  * holds any number of either. Returns true when at least one activity landed.
  */
-private fun importTrackBytes(context: Context, bytes: ByteArray): Boolean {
+internal fun importTrackBytes(context: Context, bytes: ByteArray): Boolean {
     if (
         bytes.size >= 4 &&
         bytes[0] == 0x50.toByte() && bytes[1] == 0x4B.toByte() &&

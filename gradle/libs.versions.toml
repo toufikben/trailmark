@@ -14,10 +14,13 @@ billing = "9.1.0"
 health-connect = "1.1.0-alpha10"
 graphhopper = "10.0"
 slf4j = "2.0.16"
+wear-compose = "1.4.0"
+play-services-wearable = "20.0.1"
 
 [libraries]
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 maplibre-android = { module = "org.maplibre.gl:android-sdk", version.ref = "maplibre" }
@@ -38,6 +41,9 @@ compose-ui-graphics = { module = "androidx.compose.ui:ui-graphics" }
 compose-material3 = { module = "androidx.compose.material3:material3" }
 compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
 compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
+wear-compose-foundation = { module = "androidx.wear.compose:compose-foundation", version.ref = "wear-compose" }
+wear-compose-material = { module = "androidx.wear.compose:compose-material", version.ref = "wear-compose" }
+play-services-wearable = { module = "com.google.android.gms:play-services-wearable", version.ref = "play-services-wearable" }
 
 [plugins]
 android-library = { id = "com.android.library", version.ref = "agp" }

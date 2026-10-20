@@ -51,6 +51,19 @@
             android:exported="false"
             android:foregroundServiceType="location|dataSync" />
 
+        <service
+            android:name=".app.wear.WearGpxListener"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.CHANNEL_EVENT" />
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/trailmark/gpx" />
+            </intent-filter>
+        </service>
+
         <receiver
             android:name=".app.widget.TrailmarkWidget"
             android:exported="false">
