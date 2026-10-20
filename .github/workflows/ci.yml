@@ -59,6 +59,15 @@ jobs:
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: ./gradlew :app:assembleRelease :app:bundleRelease :wear:assembleRelease --no-daemon --stacktrace
+      - name: Verify release APKs are signed
+        run: |
+          test -f app/build/outputs/apk/release/app-release.apk
+          test -f wear/build/outputs/apk/release/wear-release.apk
+          if [ -n "$ANDROID_HOME" ]; then
+            APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort | tail -n 1)
+            "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk
+            "$APKSIGNER" verify --print-certs wear/build/outputs/apk/release/wear-release.apk
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: trailmark-debug-apk

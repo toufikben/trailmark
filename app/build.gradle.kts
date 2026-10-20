@@ -27,7 +27,7 @@ android {
             }
         }
         create("release") {
-            val ks = System.getenv("RELEASE_KEYSTORE_FILE")?.let { file(it) }
+            val ks = System.getenv("RELEASE_KEYSTORE_FILE")?.let { rootProject.file(it) }
             val storePw = System.getenv("RELEASE_STORE_PASSWORD")
             val alias = System.getenv("RELEASE_KEY_ALIAS")
             val keyPw = System.getenv("RELEASE_KEY_PASSWORD")
