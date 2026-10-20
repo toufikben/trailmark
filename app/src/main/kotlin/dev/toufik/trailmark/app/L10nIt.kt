@@ -99,6 +99,7 @@ val IT_TEXTS = Texts(
     savedRoutes = "Percorsi salvati",
     noSavedRoutes = "Nessun percorso salvato",
     routeSaved = "Percorso salvato",
+    exportVideo = "Esporta video",
     prebuiltPacks = "Pacchetti pronti (opzionale)",
     mapRecenter = "Centra su di me",
     mapTheme = "Tema mappa",

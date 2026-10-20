@@ -99,6 +99,7 @@ val ZH_TEXTS = Texts(
     savedRoutes = "已保存路线",
     noSavedRoutes = "尚无保存的路线",
     routeSaved = "路线已保存",
+    exportVideo = "导出视频",
     prebuiltPacks = "预设包（可选）",
     mapRecenter = "回到我的位置",
     mapTheme = "地图主题",

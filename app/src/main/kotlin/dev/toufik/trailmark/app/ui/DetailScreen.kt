@@ -126,6 +126,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
     var segmentsById by remember { mutableStateOf<Map<Long, SegmentRow>>(emptyMap()) }
     var segmentCount by remember { mutableStateOf(0) }
     var showCreateSegment by remember { mutableStateOf(false) }
+    var flyoverExport by remember { mutableStateOf(false) }
     val packPath = remember(detail) {
         val first = detail?.points?.firstOrNull()
         dev.toufik.trailmark.app.maps.MapPacks.packFor(context, first?.lat, first?.lon)?.absolutePath
@@ -307,6 +308,11 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                                 shareStoryCardImage(context, card, d.row.id, t.storyCard)
                             }
                         }) { Text(t.storyCard, color = Palette.accent) }
+                        if (d.points.size > 1) {
+                            TextButton(onClick = { flyoverExport = true }) {
+                                Text(t.exportVideo, color = Palette.accent)
+                            }
+                        }
                         TextButton(onClick = { showCreateSegment = true }) {
                             Text(t.createSegment, color = Palette.accent)
                         }
@@ -568,6 +574,20 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
             }
         }
         val dd = detail
+        if (flyoverExport && dd != null) {
+            FlyoverOverlay(
+                points = dd.points,
+                packPath = packPath,
+                dark = darkMap,
+                langCode = langNow.code,
+                onDone = { file ->
+                    flyoverExport = false
+                    shareVideo(context, file, t.share)
+                },
+                onCancel = { flyoverExport = false },
+                onError = { flyoverExport = false },
+            )
+        }
         if (showCreateSegment && dd != null && dd.points.size > 1) {
             SegmentCreateDialog(
                 points = dd.points,

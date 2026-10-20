@@ -99,6 +99,7 @@ val ID_TEXTS = Texts(
     savedRoutes = "Rute tersimpan",
     noSavedRoutes = "Belum ada rute tersimpan",
     routeSaved = "Rute disimpan",
+    exportVideo = "Ekspor video",
     prebuiltPacks = "Paket siap pakai (opsional)",
     mapRecenter = "Pusatkan ke saya",
     mapTheme = "Tema peta",

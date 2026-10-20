@@ -99,6 +99,7 @@ val RU_TEXTS = Texts(
     savedRoutes = "Сохранённые маршруты",
     noSavedRoutes = "Сохранённых маршрутов пока нет",
     routeSaved = "Маршрут сохранён",
+    exportVideo = "Экспорт видео",
     prebuiltPacks = "Готовые наборы (необязательно)",
     mapRecenter = "Центрировать на мне",
     mapTheme = "Тема карты",

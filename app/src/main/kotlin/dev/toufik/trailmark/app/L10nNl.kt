@@ -99,6 +99,7 @@ val NL_TEXTS = Texts(
     savedRoutes = "Opgeslagen routes",
     noSavedRoutes = "Nog geen opgeslagen routes",
     routeSaved = "Route opgeslagen",
+    exportVideo = "Video exporteren",
     prebuiltPacks = "Kant-en-klare pakketten (optioneel)",
     mapRecenter = "Centreer op mij",
     mapTheme = "Kaartthema",

@@ -99,6 +99,7 @@ val KO_TEXTS = Texts(
     savedRoutes = "저장된 경로",
     noSavedRoutes = "저장된 경로가 없습니다",
     routeSaved = "경로가 저장되었습니다",
+    exportVideo = "동영상 내보내기",
     prebuiltPacks = "기본 제공 팩 (선택)",
     mapRecenter = "내 위치로",
     mapTheme = "지도 테마",

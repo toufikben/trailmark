@@ -142,7 +142,7 @@ private fun nameField(lang: String): String =
     """["coalesce",["get","name:$lang"],["get","name"]]"""
 
 /** A richer OpenMapTiles style with SDF labels localized to [lang], falling back to the local name. */
-private fun vectorStyle(packPath: String, glyphsBase: String, dark: Boolean, lang: String): String {
+internal fun vectorStyle(packPath: String, glyphsBase: String, dark: Boolean, lang: String): String {
     val bg = if (dark) "#0E1113" else "#F5F6F4"
     val landcover = if (dark) "#141A16" else "#EDEFE9"
     val landuse = if (dark) "#161C17" else "#EEF0EA"

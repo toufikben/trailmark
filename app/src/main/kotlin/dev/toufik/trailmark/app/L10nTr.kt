@@ -99,6 +99,7 @@ val TR_TEXTS = Texts(
     savedRoutes = "Kaydedilen rotalar",
     noSavedRoutes = "Henüz kaydedilmiş rota yok",
     routeSaved = "Rota kaydedildi",
+    exportVideo = "Videoyu dışa aktar",
     prebuiltPacks = "Hazır paketler (isteğe bağlı)",
     mapRecenter = "Beni merkeze al",
     mapTheme = "Harita teması",

@@ -99,6 +99,7 @@ val JA_TEXTS = Texts(
     savedRoutes = "保存したルート",
     noSavedRoutes = "保存したルートはまだありません",
     routeSaved = "ルートを保存しました",
+    exportVideo = "動画を書き出す",
     prebuiltPacks = "プリセットパック（任意）",
     mapRecenter = "現在地に戻る",
     mapTheme = "マップテーマ",

@@ -99,6 +99,7 @@ val HI_TEXTS = Texts(
     savedRoutes = "सहेजे गए मार्ग",
     noSavedRoutes = "अभी कोई सहेजा गया मार्ग नहीं",
     routeSaved = "मार्ग सहेजा गया",
+    exportVideo = "वीडियो निर्यात करें",
     prebuiltPacks = "तैयार पैक (वैकल्पिक)",
     mapRecenter = "मुझ पर केंद्रित करें",
     mapTheme = "नक्शा थीम",
