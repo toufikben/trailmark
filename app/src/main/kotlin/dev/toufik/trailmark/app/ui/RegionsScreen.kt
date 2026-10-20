@@ -54,6 +54,7 @@ fun RegionsScreen(onBack: () -> Unit, onPaywall: () -> Unit) {
     val pro = premium?.isPro(System.currentTimeMillis()) == true
     var manifest by remember { mutableStateOf<RegionManifest?>(null) }
     var routingManifest by remember { mutableStateOf<RegionManifest?>(null) }
+    var routingFailed by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var installing by remember { mutableStateOf<String?>(null) }
     var installed by remember { mutableStateOf(setOf<String>()) }
@@ -85,13 +86,15 @@ fun RegionsScreen(onBack: () -> Unit, onPaywall: () -> Unit) {
         } catch (_: Throwable) {
             error = t.loadFailed
         }
-        runCatching {
+        try {
             val text = withContext(Dispatchers.IO) {
                 HttpBytesFetcher.fetch(ROUTING_MANIFEST_URL).decodeToString()
             }
             val m = parseManifest(text)
             routingManifest = m
             refreshRoutingInstalled(m.packs)
+        } catch (_: Throwable) {
+            routingFailed = true
         }
     }
 
@@ -155,6 +158,9 @@ fun RegionsScreen(onBack: () -> Unit, onPaywall: () -> Unit) {
                 }
                 val rm = routingManifest
                 when {
+                    rm == null && routingFailed -> item(key = "routing-error") {
+                        Text(t.loadFailed, color = Palette.textSecondary, fontSize = 14.sp)
+                    }
                     rm == null -> item(key = "routing-none") {
                         Text(t.searching, color = Palette.textSecondary, fontSize = 14.sp)
                     }
@@ -172,6 +178,7 @@ fun RegionsScreen(onBack: () -> Unit, onPaywall: () -> Unit) {
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 if (pack.id in routingInstalled) {
                                     Text(t.installed, color = Palette.accent, fontSize = 13.sp)
@@ -244,6 +251,7 @@ fun RegionsScreen(onBack: () -> Unit, onPaywall: () -> Unit) {
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 if (pack.id in installed) {
                                     Text(t.installed, color = Palette.accent, fontSize = 13.sp)
