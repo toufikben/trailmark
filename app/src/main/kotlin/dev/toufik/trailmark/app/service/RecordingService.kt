@@ -129,11 +129,8 @@ class RecordingService : Service() {
             this,
             NOTIF_ID,
             buildNotification(),
-            when {
-                Build.VERSION.SDK_INT < Build.VERSION_CODES.Q -> 0
-                synthetic -> ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-                else -> ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-            },
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) 0
+            else ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
         )
         acquireWakeLock()
 
