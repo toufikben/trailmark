@@ -16,3 +16,4 @@ local.properties
 key.properties
 /trailmark/build
 build/
+.kotlin/
