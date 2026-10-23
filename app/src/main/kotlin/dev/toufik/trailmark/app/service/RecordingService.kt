@@ -491,10 +491,17 @@ class RecordingService : Service() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val mgr = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val t = textsFor(currentLang())
-        mgr.deleteNotificationChannel(CHANNEL_ID)
-        mgr.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, t.tabRecord, NotificationManager.IMPORTANCE_LOW),
-        )
+        mgr.deleteNotificationChannel(LEGACY_CHANNEL_ID)
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            t.tabRecord,
+            NotificationManager.IMPORTANCE_DEFAULT,
+        ).apply {
+            setSound(null, null)
+            enableVibration(false)
+            setShowBadge(false)
+        }
+        mgr.createNotificationChannel(channel)
     }
 
     private fun buildNotification(state: RecordingState? = null): Notification {
@@ -545,7 +552,8 @@ class RecordingService : Service() {
         const val ACTION_RESUME = "dev.toufik.trailmark.action.RESUME"
         const val EXTRA_SPORT = "sport"
         const val EXTRA_SYNTHETIC = "synthetic"
-        private const val CHANNEL_ID = "recording"
+        private const val CHANNEL_ID = "recording_v2"
+        private const val LEGACY_CHANNEL_ID = "recording"
         private const val NOTIF_ID = 4711
     }
 }
