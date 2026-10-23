@@ -161,7 +161,6 @@ private fun PlanCard(
                 Spacer(Modifier.padding(top = 4.dp))
                 Button(
                     onClick = onClick,
-                    enabled = price != null,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Palette.accent,
                         contentColor = Palette.onAccent,

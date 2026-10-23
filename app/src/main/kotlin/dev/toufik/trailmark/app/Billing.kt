@@ -91,10 +91,18 @@ class BillingManager(
         c.queryProductDetailsAsync(
             QueryProductDetailsParams.newBuilder().setProductList(products).build(),
         ) { result, queryResult ->
-            if (result.responseCode != BillingClient.BillingResponseCode.OK) return@queryProductDetailsAsync
+            if (result.responseCode != BillingClient.BillingResponseCode.OK) {
+                _lastError.value = "products"
+                return@queryProductDetailsAsync
+            }
             val list = queryResult.productDetailsList
+            if (list.isEmpty()) {
+                _lastError.value = "products"
+                return@queryProductDetailsAsync
+            }
             details = list.associateBy { it.productId }
             _prices.value = list.associate { d -> d.productId to priceOf(d) }
+            _lastError.value = null
         }
     }
 
