@@ -2,6 +2,7 @@ package dev.toufik.trailmark.app.ui
 
 import android.content.Context
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -64,6 +65,7 @@ import dev.toufik.trailmark.analytics.ReplayTrack
 import dev.toufik.trailmark.app.AppGraph
 import dev.toufik.trailmark.app.LocalLang
 import dev.toufik.trailmark.app.LocalTexts
+import dev.toufik.trailmark.app.MediaCapture
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.WeatherNow
 import dev.toufik.trailmark.app.Units
@@ -582,6 +584,10 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                 langCode = langNow.code,
                 onDone = { file ->
                     flyoverExport = false
+                    val saved = MediaCapture.saveVideoToGallery(context, file)
+                    if (saved != null) {
+                        Toast.makeText(context, t.mediaSaved, Toast.LENGTH_SHORT).show()
+                    }
                     shareVideo(context, file, t.share)
                 },
                 onCancel = { flyoverExport = false },
