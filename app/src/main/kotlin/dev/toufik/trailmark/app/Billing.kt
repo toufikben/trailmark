@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.compose.runtime.compositionLocalOf
 import com.android.billingclient.api.AcknowledgePurchaseParams
 import com.android.billingclient.api.BillingClient
@@ -19,6 +20,8 @@ import java.util.Collections
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+
+private const val TAG = "TrailmarkBilling"
 
 /** Play Billing wrapper: monthly / yearly subscriptions and a lifetime purchase. */
 class BillingManager(
@@ -57,6 +60,11 @@ class BillingManager(
                     _lastError.value = null
                     queryProducts()
                     refreshPurchases()
+                } else {
+                    Log.w(TAG, "Billing setup failed: ${result.responseCode} ${result.debugMessage}")
+                    _lastError.value = "store"
+                    client = null
+                    retryConnect()
                 }
             }
 
@@ -77,31 +85,42 @@ class BillingManager(
         _lastError.value = null
     }
 
+    /**
+     * Product types must be queried separately: Play Billing rejects a single
+     * request that mixes subscriptions with one-time products.
+     */
     private fun queryProducts() {
         val c = client ?: return
-        val products = PremiumProducts.ALL.map { id ->
+        queryType(c, BillingClient.ProductType.SUBS)
+        queryType(c, BillingClient.ProductType.INAPP)
+    }
+
+    private fun queryType(c: BillingClient, type: String) {
+        val subscriptions = type == BillingClient.ProductType.SUBS
+        val ids = PremiumProducts.ALL.filter { PremiumProducts.isSubscription(it) == subscriptions }
+        if (ids.isEmpty()) return
+        val products = ids.map { id ->
             QueryProductDetailsParams.Product.newBuilder()
                 .setProductId(id)
-                .setProductType(
-                    if (PremiumProducts.isSubscription(id)) BillingClient.ProductType.SUBS
-                    else BillingClient.ProductType.INAPP,
-                )
+                .setProductType(type)
                 .build()
         }
         c.queryProductDetailsAsync(
             QueryProductDetailsParams.newBuilder().setProductList(products).build(),
         ) { result, queryResult ->
             if (result.responseCode != BillingClient.BillingResponseCode.OK) {
-                _lastError.value = "products"
+                Log.w(TAG, "Product query $type failed: ${result.responseCode} ${result.debugMessage}")
+                if (details.isEmpty()) _lastError.value = "products"
                 return@queryProductDetailsAsync
             }
             val list = queryResult.productDetailsList
             if (list.isEmpty()) {
-                _lastError.value = "products"
+                Log.w(TAG, "Product query $type returned no products")
+                if (details.isEmpty()) _lastError.value = "products"
                 return@queryProductDetailsAsync
             }
-            details = list.associateBy { it.productId }
-            _prices.value = list.associate { d -> d.productId to priceOf(d) }
+            details = details + list.associateBy { it.productId }
+            _prices.value = details.mapValues { priceOf(it.value) }
             _lastError.value = null
         }
     }
