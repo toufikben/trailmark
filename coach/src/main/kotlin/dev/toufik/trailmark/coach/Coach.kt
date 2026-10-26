@@ -38,7 +38,7 @@ private fun clock(seconds: Long): String {
 
 private fun km(distanceM: Double): String {
     val whole = (distanceM / 1000.0)
-    return if (whole % 1.0 == 0.0) whole.toInt().toString() else "%.2f".format(whole)
+    return if (whole % 1.0 == 0.0) whole.toInt().toString() else "%.2f".format(java.util.Locale.US, whole)
 }
 
 private fun fill(template: String, vararg pairs: Pair<String, String>): String {
@@ -88,52 +88,52 @@ object Coach {
     private fun variantsFor(event: CoachEvent, locale: Locale): List<String> = when (event) {
         is CoachEvent.PreviousBest -> when (locale) {
             Locale.AR -> listOf(
-                "آخر مرة {km} كم في {time} — تكسرها اليوم؟ لا تكون كسول 😉",
-                "{km} كم في {time} في الجيب. أظهر أنك أقوى اليوم.",
+                "آخر جولة: {km} كم في {time}. اليوم ابدأ بثبات وابنِ الإيقاع.",
+                "{km} كم في {time} هو رقمك السابق. خطوة خطوة وستتجاوزه.",
             )
             Locale.FR -> listOf(
-                "La dernière fois : {km} km en {time}. Tu fais mieux aujourd'hui ? Sois pas fainéant 😉",
-                "{km} km en {time} dans la poche. Montre qui est le patron aujourd'hui.",
+                "Dernière sortie : {km} km en {time}. Aujourd'hui, pars régulier et construis ton rythme.",
+                "{km} km en {time}, c'est ton repère. Pas à pas, tu vas le battre.",
             )
             Locale.EN -> listOf(
-                "Last time: {km} km in {time}. Beating it today? Don't be lazy 😉",
-                "{km} km in {time} in the bag. Show up stronger today.",
+                "Last time: {km} km in {time}. Today, start steady and build the pace.",
+                "{km} km in {time} is your mark. Step by step, you'll beat it.",
             )
         }
         is CoachEvent.Ahead -> when (locale) {
-            Locale.AR -> listOf("متقدّم بـ {s} ثانية على نسختك السابقة — حافظ على الوتيرة!", "أنت أمام شبحك بـ {s} ث. لا تتراجع الآن.")
-            Locale.FR -> listOf("Tu devances ton fantôme de {s} s — tiens le rythme !", "{s} s d'avance. Ne lâche rien.")
-            Locale.EN -> listOf("You're {s}s ahead of your ghost — hold the pace!", "{s}s up. Don't give it back now.")
+            Locale.AR -> listOf("متقدم بـ {s} ث على شبحك — حافظ على هذا الإيقاع.", "أنت أمام الشبح بـ {s} ث. ثبّت النفس ولا تغيّر خطتك.")
+            Locale.FR -> listOf("{s} s d'avance sur ton fantôme — garde ce rythme.", "Tu mènes de {s} s. Reste régulier.")
+            Locale.EN -> listOf("{s}s ahead of your ghost — hold this pace.", "{s}s up. Stay steady.")
         }
         is CoachEvent.Behind -> when (locale) {
-            Locale.AR -> listOf("متأخّر بـ {s} ثانية — اشتدّ قليلاً!", "خلف شبحك بـ {s} ث. أعطِ أكثر قليلاً.")
-            Locale.FR -> listOf("Retard de {s} s — accélère un peu !", "{s} s de retard. Donne un peu plus.")
-            Locale.EN -> listOf("{s}s behind — push a little!", "{s}s down. Give a bit more.")
+            Locale.AR -> listOf("بينك وبين الشبح {s} ث. ارفع الإيقاع تدريجيًا.", "متأخر {s} ث — خطوة أسرع في الدقيقة القادمة تكفي.")
+            Locale.FR -> listOf("{s} s de retard. Monte le rythme progressivement.", "{s} s à reprendre — une foulée plus vive suffit.")
+            Locale.EN -> listOf("{s}s to close. Lift the pace gradually.", "{s}s behind — one stronger stride at a time.")
         }
         is CoachEvent.GhostAhead -> when (locale) {
-            Locale.AR -> listOf("شبحك متقدم بـ {m} م — أدركه!", "خلف شبحك بـ {m} م. زد السرعة قليلاً.", "الشبح أمامك بـ {m} م — لا تستسلم.")
-            Locale.FR -> listOf("Ton fantôme mène de {m} m — rattrape-le !", "{m} m de retard sur ton fantôme. Accélère.", "Le fantôme est devant de {m} m — lâche rien.")
-            Locale.EN -> listOf("Your ghost leads by {m}m — reel it in!", "{m}m behind your ghost — pick it up.", "Ghost is {m}m ahead — don't fold.")
+            Locale.AR -> listOf("الشبح متقدم بـ {m} م. قرّب المسافة بهدوء.", "الفارق {m} م. ركّز على الخطوة التالية.", "الشبح أمامك بـ {m} م — كل متر يقلّص الفارق.")
+            Locale.FR -> listOf("Ton fantôme mène de {m} m. Reviens mètre par mètre.", "Écart : {m} m. Concentre-toi sur la prochaine foulée.", "Le fantôme est {m} m devant — chaque mètre compte.")
+            Locale.EN -> listOf("Your ghost leads by {m}m. Close the gap metre by metre.", "{m}m gap. Focus on the next stride.", "Ghost is {m}m ahead — every metre counts.")
         }
         is CoachEvent.GhostBehind -> when (locale) {
-            Locale.AR -> listOf("أنت متقدم على شبحك بـ {m} م — واصل!", "تقدمك {m} م عن شبحك. لا تفرّط بها.", "الشبح خلفك بـ {m} م — حافظ على الإيقاع.")
-            Locale.FR -> listOf("Tu mènes de {m} m sur ton fantôme — tiens bon !", "{m} m d'avance. Ne lâche pas.", "Fantôme derrière de {m} m — garde le rythme.")
-            Locale.EN -> listOf("You're {m}m ahead of your ghost — hold it!", "{m}m up. Don't give it back.", "Ghost is {m}m back — keep the pace.")
+            Locale.AR -> listOf("أنت متقدم بـ {m} م. حافظ على الإيقاع.", "تقدمك {m} م — ثبّت السرعة.", "الشبح خلفك بـ {m} م. استمر بنفس الوتيرة.")
+            Locale.FR -> listOf("Tu mènes de {m} m. Garde ce rythme.", "{m} m d'avance — reste régulier.", "Fantôme {m} m derrière. Continue comme ça.")
+            Locale.EN -> listOf("You're {m}m ahead. Hold this pace.", "{m}m up — stay steady.", "Ghost is {m}m behind. Keep it going.")
         }
         is CoachEvent.Overtook -> when (locale) {
-            Locale.AR -> listOf("تجاوزت شبحك! 🔥", "سبقته — أنت متقدم بـ {m} م الآن.", "التجاوز تم! {m} م لصالحك.")
-            Locale.FR -> listOf("Tu as dépassé ton fantôme ! 🔥", "Dépassement — {m} m d'avance.", "Tu l'as eu ! {m} m devant.")
-            Locale.EN -> listOf("You overtook your ghost! 🔥", "Passed it — {m}m ahead now.", "Got him! {m}m in front.")
+            Locale.AR -> listOf("تجاوزت الشبح! الفارق الآن {m} م.", "أنت في المقدمة بـ {m} م — واصل.", "تجاوز ناجح. حافظ على تفوق {m} م.")
+            Locale.FR -> listOf("Tu as dépassé ton fantôme ! {m} m d'avance.", "Tu passes devant — {m} m.", "Dépassement réussi. Garde {m} m d'avance.")
+            Locale.EN -> listOf("You passed your ghost! {m}m ahead.", "You're in front — {m}m.", "Clean overtake. Keep {m}m of daylight.")
         }
         is CoachEvent.GotOvertaken -> when (locale) {
-            Locale.AR -> listOf("سبقك شبحك — ردّ الهجوم!", "الشبح تقدم — فارق {m} م. استعد.", "تجاوَزك شبحك بـ {m} م — اشتعل!")
-            Locale.FR -> listOf("Ton fantôme t'a dépassé — réagis !", "Le fantôme passe devant — {m} m.", "Dépassé de {m} m — réveille-toi !")
-            Locale.EN -> listOf("Your ghost overtook you — fight back!", "Ghost took the lead — {m}m gap.", "Overtaken by {m}m — light it up!")
+            Locale.AR -> listOf("الشبح تقدم. الفارق {m} م — ارفع إيقاعك قليلاً.", "تأخرت {m} م. عد إلى وتيرتك القوية.", "الشبح أمامك الآن بـ {m} م. سباق طويل، واصل.")
+            Locale.FR -> listOf("Le fantôme est passé. {m} m à reprendre, sans forcer.", "Écart : {m} m. Reprends ton rythme fort.", "Le fantôme mène de {m} m. La course est encore longue.")
+            Locale.EN -> listOf("Your ghost moved ahead. {m}m to close — lift smoothly.", "{m}m gap. Get back to your strong rhythm.", "Ghost leads by {m}m. Long race — keep going.")
         }
         is CoachEvent.Milestone -> when (locale) {
-            Locale.AR -> listOf("{km} كم! استمر", "تجاوزت {km} كم — أحسنت.")
-            Locale.FR -> listOf("{km} km ! Continue", "{km} km passés — bien joué.")
-            Locale.EN -> listOf("{km} km down! Keep going", "{km} km in — nice work.")
+            Locale.AR -> listOf("{km} كم — علامة جديدة في هذه الجولة.", "{km} كم. حافظ على هذه الوتيرة.")
+            Locale.FR -> listOf("{km} km — un nouveau palier sur cette sortie.", "{km} km parcourus. Tiens ce rythme.")
+            Locale.EN -> listOf("{km} km — a new marker this run.", "{km} km done. Hold this rhythm.")
         }
         is CoachEvent.SegmentStart -> when (locale) {
             Locale.AR -> listOf("بداية المقطع: {name} — ركّز!", "مقطع {name} يبدأ الآن.")
@@ -198,11 +198,17 @@ object Coach {
         }
         is CoachEvent.Finish -> when (locale) {
             Locale.AR -> listOf(
-                "أنهيت {km} كم في {time}. رقم جديد؟ 🎉",
-                "{km} كم في {time} — إنجاز يستحق.",
+                "أنهيت {km} كم في {time}. جولة تستحق الاحتفاء.",
+                "{km} كم في {time} — عمل متين. استعد للجولة القادمة.",
             )
-            Locale.FR -> listOf("{km} km en {time}. Record ? 🎉", "{km} km en {time} — belle sortie.")
-            Locale.EN -> listOf("{km} km in {time}. New record? 🎉", "{km} km in {time} — strong finish.")
+            Locale.FR -> listOf(
+                "Terminé : {km} km en {time}. Belle sortie.",
+                "{km} km en {time} — du travail solide.",
+            )
+            Locale.EN -> listOf(
+                "Done: {km} km in {time}. A run worth celebrating.",
+                "{km} km in {time} — solid work. Recover and come back stronger.",
+            )
         }
     }
 }

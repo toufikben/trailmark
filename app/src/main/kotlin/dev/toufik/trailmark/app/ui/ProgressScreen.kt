@@ -145,11 +145,17 @@ fun ProgressScreen() {
                                 modifier = Modifier.padding(top = 24.dp),
                             )
                         } else {
+                            NextGoalCard(t, list)
                             SummaryRow(t, filtered)
                             GoalCard(
                                 t,
                                 totalsSince(list, startOfMonth(System.currentTimeMillis())).distanceM,
                                 goalKm,
+                            )
+                            WeekGoalCard(
+                                t,
+                                totalsSince(list, startOfWeek(System.currentTimeMillis())).distanceM,
+                                (goalKm / 4).coerceAtLeast(1),
                             )
                             WeeklyCard(t, filtered)
                             if (sport == null) {
@@ -186,6 +192,142 @@ private fun SportFilterRow(t: Texts, selected: String?, onSelect: (String?) -> U
                 onClick = { onSelect(if (selected == s) null else s) },
                 label = { Text(sportLabel(t, s), fontSize = 12.sp) },
             )
+        }
+    }
+}
+
+/**
+ * The single closest locked achievement, promoted above the charts: a clear
+ * "what is next" target instead of a wall of small badges at the bottom.
+ */
+@Composable
+private fun NextGoalCard(t: Texts, rows: List<ActivityRow>) {
+    val lang = LocalLang.current
+    val states = remember(rows) {
+        evaluateAchievements(rows.map { ActivityStat(it.startWallMillis, it.distanceM) })
+    }
+    val next = remember(states) {
+        states.filter { !it.unlocked }
+            .maxByOrNull { if (it.target > 0.0) it.current / it.target else 0.0 }
+    } ?: return
+    val unlocked = states.count { it.unlocked }
+    val frac = (next.current / next.target).toFloat().coerceIn(0f, 1f)
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { shown = true }
+    val grow by animateFloatAsState(
+        targetValue = if (shown) frac else 0f,
+        animationSpec = tween(Motion.SLOW, easing = Motion.EaseOut),
+        label = "next-goal-grow",
+    )
+    Surface(
+        color = Palette.surface,
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp)
+            .appearIn(0),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(t.achievements, color = Palette.textSecondary, fontSize = 11.sp)
+                Spacer(Modifier.weight(1f))
+                Text("$unlocked/${states.size}", color = Palette.accent, fontSize = 12.sp)
+            }
+            Text(
+                achievementTitle(lang, next.id),
+                color = Palette.text,
+                fontSize = 20.sp,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    achievementProgress(t, next),
+                    color = Palette.textSecondary,
+                    fontSize = 12.sp,
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "${(frac * 100).toInt()}%",
+                    color = Palette.accent,
+                    fontSize = 12.sp,
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp)
+                    .height(10.dp)
+                    .clip(RoundedCornerShape(5.dp))
+                    .background(Palette.bg),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(grow)
+                        .height(10.dp)
+                        .clip(RoundedCornerShape(5.dp))
+                        .background(Palette.accent),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WeekGoalCard(t: Texts, weekM: Double, goalKm: Int) {
+    val goalM = goalKm.coerceAtLeast(1) * 1000.0
+    val frac = (weekM / goalM).coerceIn(0.0, 1.0)
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { shown = true }
+    val grow by animateFloatAsState(
+        targetValue = if (shown) frac.toFloat() else 0f,
+        animationSpec = tween(Motion.SLOW, easing = Motion.EaseOut),
+        label = "week-goal-grow",
+    )
+    Surface(
+        color = Palette.surface,
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp)
+            .appearIn(1),
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(t.progressWeek, color = Palette.text, fontSize = 14.sp)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "${(frac * 100).toInt()}%",
+                    color = if (frac >= 1.0) Palette.accent else Palette.textSecondary,
+                    fontSize = 12.sp,
+                )
+            }
+            Text(
+                "${formatDistance(weekM)} / $goalKm ${t.km}",
+                color = Palette.textSecondary,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Palette.bg),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(grow)
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Palette.accent.copy(alpha = 0.80f)),
+                )
+            }
         }
     }
 }

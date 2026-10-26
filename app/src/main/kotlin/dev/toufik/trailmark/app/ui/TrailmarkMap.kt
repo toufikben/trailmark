@@ -82,10 +82,12 @@ import org.maplibre.android.style.layers.PropertyFactory.fillOpacity
 import org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap
 import org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement
 import org.maplibre.android.style.layers.PropertyFactory.iconImage
+import org.maplibre.android.style.layers.PropertyFactory.iconOpacity
 import org.maplibre.android.style.layers.PropertyFactory.iconRotate
 import org.maplibre.android.style.layers.PropertyFactory.iconRotationAlignment
 import org.maplibre.android.style.layers.PropertyFactory.iconSize
 import org.maplibre.android.style.layers.PropertyFactory.lineColor
+import org.maplibre.android.style.layers.PropertyFactory.lineDasharray
 import org.maplibre.android.style.layers.PropertyFactory.lineOpacity
 import org.maplibre.android.style.layers.PropertyFactory.lineWidth
 import org.maplibre.android.style.layers.PropertyFactory.textAllowOverlap
@@ -96,6 +98,7 @@ import org.maplibre.android.style.layers.PropertyFactory.textHaloColor
 import org.maplibre.android.style.layers.PropertyFactory.textHaloWidth
 import org.maplibre.android.style.layers.PropertyFactory.textIgnorePlacement
 import org.maplibre.android.style.layers.PropertyFactory.textMaxWidth
+import org.maplibre.android.style.layers.PropertyFactory.textOffset
 import org.maplibre.android.style.layers.PropertyFactory.textSize
 import org.maplibre.android.style.layers.PropertyFactory.visibility
 import org.maplibre.android.style.sources.GeoJsonSource
@@ -375,7 +378,7 @@ fun TrailmarkMap(
             val ms = if (kmh < 1.0) 400L else (1100.0 / kmh).toLong().coerceIn(80L, 170L)
             delay(ms)
             if (kmh >= 1.0) frameIndex = (frameIndex + 1) % SPRITE_FRAMES
-            val size = 0.90f + (kmh.coerceIn(0.0, 30.0) / 30.0 * 0.18).toFloat()
+            val size = 0.96f + (kmh.coerceIn(0.0, 30.0) / 30.0 * 0.10).toFloat()
             style?.getLayerAs<SymbolLayer>("current-layer")?.setProperties(iconSize(size))
         }
     }
@@ -528,21 +531,51 @@ fun TrailmarkMap(
                         lineWidth(5f),
                     ),
                 )
-                s.addSource(GeoJsonSource("current-source", EMPTY))
                 Sport.entries.forEach { sp ->
                     for (f in 0 until SPRITE_FRAMES) {
                         s.addImage(spriteImageId(sp, f), spriteBitmap(context, sp, f))
                     }
                     s.addImage("me-ghost-" + sp.name, ghostSpriteBitmapFor(context, sp))
                 }
+                s.addSource(GeoJsonSource("ghost-source", EMPTY))
                 s.addLayer(
-                    SymbolLayer("current-layer", "current-source").withProperties(
-                        iconImage(frameIconExpr(sport)),
-                        iconSize(0.92f),
-                        iconRotate(lastBearing),
+                    LineLayer("ghost-casing", "ghost-source").withProperties(
+                        lineColor("#0E1113"),
+                        lineWidth(6f),
+                        lineOpacity(0.30f),
+                    ),
+                )
+                s.addLayer(
+                    LineLayer("ghost-line", "ghost-source").withProperties(
+                        lineColor("#D7E0F0"),
+                        lineWidth(3.2f),
+                        lineOpacity(0.82f),
+                        lineDasharray(arrayOf(1.3f, 1.6f)),
+                    ),
+                )
+                s.addSource(GeoJsonSource("ghost-current-source", EMPTY))
+                s.addLayer(
+                    SymbolLayer("ghost-current-layer", "ghost-current-source").withProperties(
+                        iconImage("me-ghost-" + sport.name),
+                        iconSize(1f),
+                        iconOpacity(0.92f),
+                        iconRotate(0f),
                         iconRotationAlignment("map"),
                         iconAllowOverlap(true),
                         iconIgnorePlacement(true),
+                    ),
+                )
+                s.addLayer(
+                    SymbolLayer("ghost-label", "ghost-current-source").withProperties(
+                        textField(t.ghost),
+                        textFont(arrayOf(if (offlineVector) "TrailmarkSans" else "Noto Sans Regular")),
+                        textSize(10f),
+                        textColor("#E8EEEA"),
+                        textHaloColor("#0E1113"),
+                        textHaloWidth(1.3f),
+                        textOffset(arrayOf(0f, 1.9f)),
+                        textAllowOverlap(true),
+                        textIgnorePlacement(true),
                     ),
                 )
                 s.addSource(GeoJsonSource("user-accuracy-source", EMPTY))
@@ -561,20 +594,12 @@ fun TrailmarkMap(
                         circleStrokeWidth(3f),
                     ),
                 )
-                s.addSource(GeoJsonSource("ghost-source", EMPTY))
+                s.addSource(GeoJsonSource("current-source", EMPTY))
                 s.addLayer(
-                    LineLayer("ghost-line", "ghost-source").withProperties(
-                        lineColor("#8A93A6"),
-                        lineWidth(4f),
-                        lineOpacity(0.55f),
-                    ),
-                )
-                s.addSource(GeoJsonSource("ghost-current-source", EMPTY))
-                s.addLayer(
-                    SymbolLayer("ghost-current-layer", "ghost-current-source").withProperties(
-                        iconImage("me-ghost-" + sport.name),
-                        iconSize(1f),
-                        iconRotate(0f),
+                    SymbolLayer("current-layer", "current-source").withProperties(
+                        iconImage(frameIconExpr(sport)),
+                        iconSize(0.98f),
+                        iconRotate(lastBearing),
                         iconRotationAlignment("map"),
                         iconAllowOverlap(true),
                         iconIgnorePlacement(true),
@@ -741,7 +766,7 @@ fun TrailmarkMap(
         if (flyover) following = true
     }
 
-    LaunchedEffect(route.size, current, following, userFix, tiltDeg, flyover) {
+    LaunchedEffect(route.size, current, ghostCurrent, following, userFix, tiltDeg, flyover) {
         mapView.getMapAsync { map ->
             val c = current ?: run {
                 val fix = userFix
@@ -802,9 +827,20 @@ fun TrailmarkMap(
                 val target = c.bearingDeg?.toFloat() ?: smoothBearing
                 val delta = ((target - smoothBearing + 540f) % 360f) - 180f
                 smoothBearing = (smoothBearing + delta * 0.3f + 360f) % 360f
+                // Keep the ghost on screen: zoom out only as far as the gap requires.
+                val ghostGap = ghostCurrent?.let {
+                    haversineMeters(c.lat, c.lon, it.lat, it.lon)
+                } ?: 0.0
+                val followZoom = when {
+                    flyover -> 15.5
+                    ghostGap > 700.0 -> 12.8
+                    ghostGap > 450.0 -> 13.8
+                    ghostGap > 250.0 -> 14.8
+                    else -> 16.0
+                }
                 map.cameraPosition = CameraPosition.Builder()
                     .target(LatLng(c.lat, c.lon))
-                    .zoom(if (flyover) 15.5 else if (fitted) map.cameraPosition.zoom else 16.0)
+                    .zoom(followZoom)
                     .bearing(smoothBearing.toDouble())
                     .tilt(tiltDeg)
                     .build()

@@ -46,22 +46,48 @@ class AnalysisTest {
 
 class GhostTest {
     private val ghost = Ghost(
-        listOf(p(0L, 36.7538), p(100_000_000_000L, 36.7548)),
+        listOf(p(0L, 36.7538), p(10_000_000_000L, 36.7548)),
         0L,
     )
 
     @Test
     fun interpolatesDistanceByTime() {
-        assertEquals(ghost.lengthM, ghost.distanceAt(100_000_000_000L), 1e-6)
-        assertEquals(ghost.lengthM / 2, ghost.distanceAt(50_000_000_000L), 2.0)
+        assertEquals(ghost.lengthM, ghost.distanceAt(10_000_000_000L), 1e-6)
+        assertEquals(ghost.lengthM / 2, ghost.distanceAt(5_000_000_000L), 2.0)
         assertEquals(0.0, ghost.distanceAt(-1L), 1e-9)
     }
 
     @Test
     fun deltaIsPositiveWhenAhead() {
-        val mid = ghost.distanceAt(50_000_000_000L)
-        assertTrue(ghostDeltaM(ghost, mid + 10, 50_000_000_000L) > 9.0)
-        assertTrue(ghostDeltaM(ghost, mid - 10, 50_000_000_000L) < -9.0)
+        val mid = ghost.distanceAt(5_000_000_000L)
+        assertTrue(ghostDeltaM(ghost, mid + 10, 5_000_000_000L) > 9.0)
+        assertTrue(ghostDeltaM(ghost, mid - 10, 5_000_000_000L) < -9.0)
+    }
+
+    @Test
+    fun pauseGapIsClampedInsteadOfTeleportingTheGhost() {
+        // 0..10 s moving, then a 10-minute pause baked into the stored clock.
+        val paused = Ghost(
+            listOf(
+                p(0L, 36.7538),
+                p(10_000_000_000L, 36.7548),
+                p(610_000_000_000L, 36.7558),
+            ),
+            0L,
+        )
+        // 15 s of clamped race time: the pause adds only the cap, not 10 min.
+        assertEquals(25_000_000_000L, paused.durationNanos)
+        val atPause = paused.distanceAt(20_000_000_000L)
+        assertTrue(atPause > 0.0 && atPause < paused.lengthM, "ghost mid-route, not at the end")
+    }
+
+    @Test
+    fun positionInterpolatesAndPointsAlongTheLeg() {
+        val mid = ghost.positionAt(5_000_000_000L)!!
+        assertTrue(mid.lat > 36.7538 && mid.lat < 36.7548)
+        assertTrue(mid.bearingDeg!! in 0.0..1.0, "due north, ${mid.bearingDeg}")
+        assertEquals(36.7538, ghost.positionAt(-5L)!!.lat, 1e-9)
+        assertEquals(36.7548, ghost.positionAt(99_000_000_000L)!!.lat, 1e-9)
     }
 }
 

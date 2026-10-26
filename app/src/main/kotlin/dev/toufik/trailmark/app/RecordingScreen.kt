@@ -68,7 +68,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import dev.toufik.trailmark.analytics.Ghost
+import dev.toufik.trailmark.analytics.GhostCandidate
+import dev.toufik.trailmark.analytics.GhostMatch
 import dev.toufik.trailmark.analytics.ghostDeltaM
+import dev.toufik.trailmark.analytics.matchGhost
+import dev.toufik.trailmark.analytics.routeOverlapM
 import dev.toufik.trailmark.app.maps.MapPacks
 import dev.toufik.trailmark.app.service.PlanRouteHolder
 import dev.toufik.trailmark.app.service.RecordingHolder
@@ -85,6 +89,7 @@ import dev.toufik.trailmark.coach.Coach
 import dev.toufik.trailmark.coach.CoachEvent
 import dev.toufik.trailmark.coach.Locale
 import dev.toufik.trailmark.core.geo.TurnKind
+import dev.toufik.trailmark.core.geo.haversineMeters
 import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.core.model.WaypointType
 import dev.toufik.trailmark.data.MediaRow
@@ -166,7 +171,10 @@ fun RecordingScreen(
     val nav by RouteNavHolder.state.collectAsState()
     var ghost by remember { mutableStateOf<Ghost?>(null) }
     var ghostRoute by remember { mutableStateOf<List<StoredPoint>>(emptyList()) }
-    var ghostStartNanos by remember { mutableStateOf(0L) }
+    var ghostCandidates by remember { mutableStateOf<List<GhostCandidate>?>(null) }
+    var ghostMatch by remember { mutableStateOf<GhostMatch?>(null) }
+    var ghostValidated by remember { mutableStateOf(false) }
+    var mapFix by remember { mutableStateOf<StoredPoint?>(null) }
     var barHeightPx by remember { mutableStateOf(0) }
 
     LaunchedEffect(state.activityId) {
@@ -192,50 +200,119 @@ fun RecordingScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        val loaded = withContext(Dispatchers.IO) {
+    LaunchedEffect(state.lastActivityId) {
+        ghostCandidates = withContext(Dispatchers.IO) {
             val repo = AppGraph.repository(context)
-            val last = repo.listActivities().firstOrNull { !it.isOpen && it.distanceM > 0 }
-                ?: return@withContext null
-            last to repo.loadPoints(last.id).filter { it.type != WaypointType.REJECTED }
+            repo.listActivities()
+                .filter { !it.isOpen && it.distanceM >= 40.0 }
+                .sortedByDescending { it.startWallMillis }
+                .take(30)
+                .mapNotNull { row ->
+                    val points = repo.loadPoints(row.id).filter { it.type != WaypointType.REJECTED }
+                    if (points.size < 2) {
+                        null
+                    } else {
+                        GhostCandidate(
+                            activityId = row.id,
+                            sport = row.sport,
+                            startWallMillis = row.startWallMillis,
+                            distanceM = row.distanceM,
+                            elapsedNanos = row.elapsedNanos,
+                            points = points,
+                        )
+                    }
+                }
         }
-        if (loaded != null) {
-            val (row, points) = loaded
-            coachLine = Coach.message(
-                CoachEvent.PreviousBest(
-                    distanceM = row.distanceM,
-                    seconds = row.elapsedNanos / 1_000_000_000L,
-                    targetM = row.distanceM,
-                ),
-                coachLocale(langRef.value),
-            )
-            if (points.size >= 2) {
-                ghost = Ghost(points, points.first().timeNanos)
-                ghostRoute = points
-                ghostStartNanos = points.first().timeNanos
+    }
+
+    // Pick the ghost once the first real fix lands, using the same sport, the
+    // start point, the heading and (a little later) the actual route overlap.
+    val stateRef = rememberUpdatedState(state)
+    val routeRef = rememberUpdatedState(route)
+    val mapFixRef = rememberUpdatedState(mapFix)
+    LaunchedEffect(state.activityId, sport, ghostCandidates) {
+        val id = state.activityId
+        if (id == null) {
+            ghost = null
+            ghostRoute = emptyList()
+            ghostMatch = null
+            ghostValidated = false
+            return@LaunchedEffect
+        }
+        if (ghostMatch != null) return@LaunchedEffect
+        val candidates = ghostCandidates ?: return@LaunchedEffect
+        if (candidates.isEmpty()) return@LaunchedEffect
+
+        var start: StoredPoint? = null
+        var startBearing: Double? = null
+        var waited = 0L
+        while (start == null && waited < 15_000L) {
+            val s = stateRef.value
+            val fix = mapFixRef.value
+            val la = s.currentLat ?: fix?.lat
+            val lo = s.currentLon ?: fix?.lon
+            if (la != null && lo != null) {
+                start = StoredPoint(la, lo, 0L, 5.0, WaypointType.NORMAL)
+                startBearing = s.currentBearing ?: fix?.bearingDeg
+            } else {
+                delay(200L)
+                waited += 200L
             }
         }
+        val from = start ?: return@LaunchedEffect
+        val m = matchGhost(
+            sport = sport.name,
+            startLat = from.lat,
+            startLon = from.lon,
+            currentBearing = startBearing,
+            currentRoute = routeRef.value,
+            candidates = candidates,
+        ) ?: return@LaunchedEffect
+
+        val points = m.candidate.points.filter { it.type != WaypointType.REJECTED }
+        if (points.size < 2) return@LaunchedEffect
+        ghostMatch = m
+        ghost = Ghost(points, points.first().timeNanos)
+        ghostRoute = points
+        coachLine = Coach.message(
+            CoachEvent.PreviousBest(
+                distanceM = m.candidate.distanceM,
+                seconds = m.candidate.elapsedNanos / 1_000_000_000L,
+                targetM = m.candidate.distanceM,
+            ),
+            coachLocale(langRef.value),
+        )
     }
 
+    // A heading match at the start is only a guess. Once ~4 fixes exist, drop
+    // the ghost if the two routes do not actually share the same ground.
+    LaunchedEffect(state.activityId, route.size) {
+        val m = ghostMatch ?: return@LaunchedEffect
+        if (ghostValidated || route.size < 4) return@LaunchedEffect
+        val overlap = routeOverlapM(route, m.candidate.points) ?: return@LaunchedEffect
+        ghostValidated = true
+        if (overlap > 45.0) {
+            ghost = null
+            ghostRoute = emptyList()
+            ghostMatch = null
+        }
+    }
+
+    val moveBearing = remember(route) { movementBearing(route) }
     val current: StoredPoint? = state.currentLat?.let { la ->
         state.currentLon?.let { lo ->
-            StoredPoint(la, lo, state.elapsedNanos, 5.0, WaypointType.NORMAL, bearingDeg = state.currentBearing)
+            StoredPoint(
+                la,
+                lo,
+                state.elapsedNanos,
+                5.0,
+                WaypointType.NORMAL,
+                bearingDeg = state.currentBearing ?: moveBearing,
+            )
         }
     }
 
-    val ghostNow: StoredPoint? = if (ghostRoute.size < 2) {
-        null
-    } else {
-        val idx = ghostRoute.indexOfLast { it.timeNanos - ghostStartNanos <= state.elapsedNanos }
-        if (idx < 0) {
-            null
-        } else {
-            val p = ghostRoute[idx]
-            val prev = ghostRoute.getOrNull(idx - 1)
-            val b = if (prev != null) bearingDeg(prev.lat, prev.lon, p.lat, p.lon) else p.bearingDeg
-            p.copy(bearingDeg = b ?: p.bearingDeg)
-        }
-    }
+    val ghostNow: StoredPoint? = ghost?.positionAt(state.elapsedNanos)
 
     val gLive = ghost
     val liveDelta: Int? = if (gLive != null && state.phase == Phase.RECORDING) {
@@ -365,8 +442,16 @@ fun RecordingScreen(
                     sport = sport,
                     speedMps = state.currentSpeedMps,
                     planChunks = planRoute,
-                    ghostRoute = ghostRoute,
-                    ghostCurrent = ghostNow,
+                    ghostRoute = if (state.phase == Phase.RECORDING || state.phase == Phase.PAUSED) {
+                        ghostRoute
+                    } else {
+                        emptyList()
+                    },
+                    ghostCurrent = if (state.phase == Phase.RECORDING || state.phase == Phase.PAUSED) {
+                        ghostNow
+                    } else {
+                        null
+                    },
                     mediaMarks = media.mapIndexed { i, m -> MediaMark(i, m.lat, m.lon, m.kind) },
                     onMediaTap = { i ->
                         val m = media.getOrNull(i) ?: return@TrailmarkMap
@@ -379,6 +464,7 @@ fun RecordingScreen(
                     onNeedPermission = {
                         locateLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION))
                     },
+                    onUserFix = { mapFix = it },
                     dark = darkMap,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -462,6 +548,29 @@ fun RecordingScreen(
                             .padding(horizontal = 10.dp, vertical = 6.dp),
                     )
                 }
+                if (ghostMatch != null && liveDelta != null && state.phase == Phase.RECORDING) {
+                    val d = liveDelta
+                    val ahead = d >= 0
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 12.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Palette.surface.copy(alpha = 0.92f))
+                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(7.dp),
+                    ) {
+                        Text("👻", fontSize = 13.sp)
+                        Text(t.ghost, color = Palette.textSecondary, fontSize = 11.sp)
+                        Text(
+                            (if (ahead) "+" else "−") +
+                                formatElevation(Math.abs(d).toDouble()) + " " + elevationUnit(t),
+                            color = if (ahead) Palette.accent else Color(0xFFFFB224),
+                            fontSize = 14.sp,
+                        )
+                    }
+                }
                 if (mediaFlash) {
                     Text(
                         text = t.mediaSaved,
@@ -469,7 +578,7 @@ fun RecordingScreen(
                         fontSize = 12.sp,
                         modifier = Modifier
                             .align(Alignment.TopCenter)
-                            .padding(top = 12.dp)
+                            .padding(top = 52.dp)
                             .clip(RoundedCornerShape(12.dp))
                             .background(Palette.surface.copy(alpha = 0.85f))
                             .padding(horizontal = 10.dp, vertical = 6.dp),
@@ -572,14 +681,8 @@ fun RecordingScreen(
                 coachLine?.let {
                     Text(text = it, color = Palette.textSecondary, fontSize = 12.sp)
                 }
-                if (ghost != null && state.phase == Phase.RECORDING && liveDelta != null) {
-                    val seed = (state.elapsedNanos / 20_000_000_000L).toInt()
-                    val line = overtakeFlash ?: if (liveDelta >= 0) {
-                        Coach.message(CoachEvent.GhostBehind(Math.abs(liveDelta)), coachLocale(langRef.value), seed)
-                    } else {
-                        Coach.message(CoachEvent.GhostAhead(Math.abs(liveDelta)), coachLocale(langRef.value), seed)
-                    }
-                    Text(text = line, color = Palette.accent, fontSize = 12.sp)
+                if (overtakeFlash != null) {
+                    Text(text = overtakeFlash!!, color = Palette.accent, fontSize = 12.sp)
                 }
                 state.storageError?.let {
                     Text(text = t.loadFailed, color = Palette.dangerText, fontSize = 12.sp)
@@ -792,6 +895,15 @@ private fun RoundRecordButton(
         }
         }
     }
+}
+
+/** Bearing of the last meaningful movement, used when GPS does not report one. */
+private fun movementBearing(route: List<StoredPoint>): Double? {
+    val last = route.lastOrNull() ?: return null
+    val prev = route.asReversed().drop(1).firstOrNull {
+        haversineMeters(it.lat, it.lon, last.lat, last.lon) >= 6.0
+    } ?: return null
+    return bearingDeg(prev.lat, prev.lon, last.lat, last.lon)
 }
 
 private fun bearingDeg(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
