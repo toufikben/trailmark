@@ -3,6 +3,7 @@ package dev.toufik.trailmark.app.ui
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.media.Image
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
@@ -390,6 +391,8 @@ private class Mp4Writer(private val file: File, fps: Int = 24) {
     private var muxerStarted = false
     private var ptsUs = 0L
     private var finished = false
+    private val colorFormat = pickColorFormat(codec)
+    private val frameBytes = VIDEO_WIDTH * VIDEO_HEIGHT * 3 / 2
 
     init {
         val format = MediaFormat.createVideoFormat(
@@ -397,10 +400,7 @@ private class Mp4Writer(private val file: File, fps: Int = 24) {
             VIDEO_WIDTH,
             VIDEO_HEIGHT,
         ).apply {
-            setInteger(
-                MediaFormat.KEY_COLOR_FORMAT,
-                MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar,
-            )
+            setInteger(MediaFormat.KEY_COLOR_FORMAT, colorFormat)
             setInteger(MediaFormat.KEY_BIT_RATE, VIDEO_WIDTH * VIDEO_HEIGHT * 5)
             setInteger(MediaFormat.KEY_FRAME_RATE, fps)
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
@@ -411,9 +411,14 @@ private class Mp4Writer(private val file: File, fps: Int = 24) {
 
     fun encode(bitmap: Bitmap) {
         val index = dequeueInput()
-        val buf = codec.getInputBuffer(index) ?: error("missing encoder input buffer")
-        fillYuv(bitmap, buf)
-        codec.queueInputBuffer(index, 0, VIDEO_WIDTH * VIDEO_HEIGHT * 3 / 2, ptsUs, 0)
+        val image = runCatching { codec.getInputImage(index) }.getOrNull()
+        if (image != null) {
+            fillImage(bitmap, image)
+        } else {
+            val buf = codec.getInputBuffer(index) ?: error("missing encoder input buffer")
+            fillYuv(bitmap, buf)
+        }
+        codec.queueInputBuffer(index, 0, frameBytes, ptsUs, 0)
         ptsUs += frameUs
         drain(false)
     }
@@ -461,6 +466,67 @@ private class Mp4Writer(private val file: File, fps: Int = 24) {
         }
     }
 
+    /**
+     * Fills the encoder's YUV image plane by plane, honouring row and pixel strides.
+     * Writing raw bytes at fixed offsets produced a green video on devices whose
+     * encoder uses a padded luma stride, so the Image API is the source of truth here.
+     */
+    private fun fillImage(bitmap: Bitmap, image: Image) {
+        val argb = IntArray(VIDEO_WIDTH * VIDEO_HEIGHT)
+        bitmap.getPixels(argb, 0, VIDEO_WIDTH, 0, 0, VIDEO_WIDTH, VIDEO_HEIGHT)
+        val yPlane = image.planes[0]
+        val yBuf = yPlane.buffer
+        yBuf.position(0)
+        val yRowStride = yPlane.rowStride
+        val yPixelStride = yPlane.pixelStride
+        for (row in 0 until VIDEO_HEIGHT) {
+            var c = row * VIDEO_WIDTH
+            var pos = row * yRowStride
+            repeat(VIDEO_WIDTH) {
+                val p = argb[c++]
+                val r = (p shr 16) and 0xFF
+                val g = (p shr 8) and 0xFF
+                val b = p and 0xFF
+                yBuf.position(pos)
+                yBuf.put((((66 * r + 129 * g + 25 * b + 128) shr 8) + 16).toByte())
+                pos += yPixelStride
+            }
+        }
+        val uPlane = image.planes[1]
+        val vPlane = image.planes[2]
+        val uBuf = uPlane.buffer
+        val vBuf = vPlane.buffer
+        uBuf.position(0)
+        vBuf.position(0)
+        val uRowStride = uPlane.rowStride
+        val uPixelStride = uPlane.pixelStride
+        val vRowStride = vPlane.rowStride
+        val vPixelStride = vPlane.pixelStride
+        for (row in 0 until VIDEO_HEIGHT / 2) {
+            var posU = row * uRowStride
+            var posV = row * vRowStride
+            var c = row * 2 * VIDEO_WIDTH
+            repeat(VIDEO_WIDTH / 2) {
+                val p1 = argb[c]
+                val p2 = argb[c + 1]
+                val p3 = argb[c + VIDEO_WIDTH]
+                val p4 = argb[c + VIDEO_WIDTH + 1]
+                c += 2
+                val r = ((p1 shr 16) and 0xFF) + ((p2 shr 16) and 0xFF) +
+                    ((p3 shr 16) and 0xFF) + ((p4 shr 16) and 0xFF)
+                val g = ((p1 shr 8) and 0xFF) + ((p2 shr 8) and 0xFF) +
+                    ((p3 shr 8) and 0xFF) + ((p4 shr 8) and 0xFF)
+                val b = (p1 and 0xFF) + (p2 and 0xFF) + (p3 and 0xFF) + (p4 and 0xFF)
+                uBuf.position(posU)
+                uBuf.put((((-38 * r - 74 * g + 112 * b + 512) shr 10) + 128).toByte())
+                vBuf.position(posV)
+                vBuf.put((((112 * r - 94 * g - 18 * b + 512) shr 10) + 128).toByte())
+                posU += uPixelStride
+                posV += vPixelStride
+            }
+        }
+    }
+
     private fun fillYuv(bitmap: Bitmap, buf: java.nio.ByteBuffer) {
         val argb = IntArray(VIDEO_WIDTH * VIDEO_HEIGHT)
         bitmap.getPixels(argb, 0, VIDEO_WIDTH, 0, 0, VIDEO_WIDTH, VIDEO_HEIGHT)
@@ -493,5 +559,20 @@ private class Mp4Writer(private val file: File, fps: Int = 24) {
                 buf.put((((112 * r - 94 * g - 18 * b + 512) shr 10) + 128).toByte())
             }
         }
+    }
+}
+
+/** Prefers flexible YUV so frames can be written through [MediaCodec.getInputImage]. */
+private fun pickColorFormat(codec: MediaCodec): Int {
+    val formats = runCatching {
+        codec.codecInfo.getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_AVC).colorFormats
+    }.getOrDefault(IntArray(0))
+    return when {
+        formats.contains(MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible) ->
+            MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible
+        formats.contains(MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar) ->
+            MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar
+        formats.isNotEmpty() -> formats.first()
+        else -> MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible
     }
 }
