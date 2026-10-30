@@ -160,6 +160,10 @@ class MainActivity : ComponentActivity() {
                                             detailFrom = Screen.Record
                                             screen = Screen.Detail(id)
                                         },
+                                        onPaywall = {
+                                            paywallFrom = Screen.Record
+                                            screen = Screen.Paywall
+                                        },
                                     )
                                     Screen.Plan -> PlanScreen(
                                         onRegions = { screen = Screen.Regions },
@@ -171,7 +175,12 @@ class MainActivity : ComponentActivity() {
                                             screen = Screen.Detail(id)
                                         },
                                     )
-                                    Screen.Progress -> ProgressScreen()
+                                    Screen.Progress -> ProgressScreen(
+                                        onPaywall = {
+                                            paywallFrom = Screen.Progress
+                                            screen = Screen.Paywall
+                                        },
+                                    )
                                     Screen.Settings -> SettingsScreen(
                                         lang = lang,
                                         onLang = {

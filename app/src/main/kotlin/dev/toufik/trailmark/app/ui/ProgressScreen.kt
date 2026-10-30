@@ -80,7 +80,7 @@ private class Totals {
 
 /** Merged stats + charts page: period cards, sport filter, weekly bars, sport split. */
 @Composable
-fun ProgressScreen() {
+fun ProgressScreen(onPaywall: () -> Unit) {
     val context = LocalContext.current
     val t = LocalTexts.current
     val prefs = remember { context.getSharedPreferences("trailmark", Context.MODE_PRIVATE) }
@@ -112,7 +112,14 @@ fun ProgressScreen() {
                 .statusBarsPadding()
                 .padding(16.dp),
         ) {
-            Text(t.tabProgress, color = Palette.text, fontSize = 22.sp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(t.tabProgress, color = Palette.text, fontSize = 22.sp)
+                Spacer(Modifier.weight(1f))
+                ProCta(onClick = onPaywall)
+            }
             when (val list = rows) {
                 null -> Box(
                     modifier = Modifier.fillMaxSize(),

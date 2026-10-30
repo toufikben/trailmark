@@ -82,6 +82,7 @@ import dev.toufik.trailmark.app.service.WeatherHolder
 import dev.toufik.trailmark.app.ui.MediaMark
 import dev.toufik.trailmark.app.ui.Motion
 import dev.toufik.trailmark.app.ui.PhotoViewer
+import dev.toufik.trailmark.app.ui.ProCta
 import dev.toufik.trailmark.app.ui.TrailmarkMap
 import dev.toufik.trailmark.app.ui.WeatherChip
 import dev.toufik.trailmark.app.ui.openVideoPlayer
@@ -146,6 +147,7 @@ private fun coachLocale(lang: Lang): Locale = when (lang) {
 @Composable
 fun RecordingScreen(
     onOpenDetail: (Long) -> Unit,
+    onPaywall: () -> Unit,
 ) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("trailmark", Context.MODE_PRIVATE) }
@@ -541,6 +543,12 @@ fun RecordingScreen(
                         )
                     }
                 }
+                ProCta(
+                    onClick = onPaywall,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(end = 12.dp, top = 12.dp),
+                )
                 if (state.isIdle || state.phase == Phase.PAUSED) {
                     Text(
                         text = when {
@@ -552,7 +560,7 @@ fun RecordingScreen(
                         fontSize = 12.sp,
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .padding(end = 12.dp, top = 12.dp)
+                            .padding(end = 12.dp, top = 52.dp)
                             .clip(RoundedCornerShape(12.dp))
                             .background(Palette.surface.copy(alpha = 0.85f))
                             .padding(horizontal = 10.dp, vertical = 6.dp),

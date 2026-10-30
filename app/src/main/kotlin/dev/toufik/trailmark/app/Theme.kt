@@ -13,6 +13,7 @@ object Palette {
     val textSecondary = Color(0xFF9DA4A1)
     val accent = Color(0xFFC6FF3D)
     val onAccent = Color(0xFF0E1113)
+    val gold = Color(0xFFFFC93C)
     val danger = Color(0xFFB42318)
     val dangerText = Color(0xFFFF8A80)
 }
