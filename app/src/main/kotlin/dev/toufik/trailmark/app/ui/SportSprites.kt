@@ -70,7 +70,7 @@ private fun drawPuck(c: Canvas, s: Float, sport: Sport, frame: Int, ghost: Boole
         // Player: bright core inside a white casing, so it stays readable on any
         // map style. A dark chevron carries the heading instead of a tiny glyph.
         c.drawCircle(cx, cy, r * (1.14f + 0.05f * pulse), paint(0x33C6FF3D))
-        c.drawCircle(cx, cy, r, paint(0xFFF7FAF2))
+        c.drawCircle(cx, cy, r, paint(0xFFF7FAF2.toInt()))
         c.drawCircle(cx, cy, r * 0.78f, paint(ACCENT))
         val arrow = Path().apply {
             moveTo(cx, cy - r * 0.52f)
