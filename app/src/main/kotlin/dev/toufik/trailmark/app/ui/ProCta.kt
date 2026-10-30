@@ -36,11 +36,10 @@ fun ProCta(onClick: () -> Unit, modifier: Modifier = Modifier) {
             .clip(RoundedCornerShape(50))
             .background(Brush.horizontalGradient(listOf(Palette.gold, GoldDeep)))
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 7.dp),
+            .padding(horizontal = 16.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text("★", color = OnGold, fontSize = 12.sp)
         Text("PRO", color = OnGold, fontSize = 12.sp, fontWeight = FontWeight.Bold)
     }
 }
