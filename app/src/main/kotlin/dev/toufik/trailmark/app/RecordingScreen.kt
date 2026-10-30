@@ -85,6 +85,7 @@ import dev.toufik.trailmark.app.ui.PhotoViewer
 import dev.toufik.trailmark.app.ui.TrailmarkMap
 import dev.toufik.trailmark.app.ui.WeatherChip
 import dev.toufik.trailmark.app.ui.openVideoPlayer
+import dev.toufik.trailmark.app.ui.rememberPro
 import dev.toufik.trailmark.coach.Coach
 import dev.toufik.trailmark.coach.CoachEvent
 import dev.toufik.trailmark.coach.Locale
@@ -151,6 +152,7 @@ fun RecordingScreen(
     val darkMap = remember { prefs.getBoolean("map_dark", true) }
     val t = LocalTexts.current
     val langRef = rememberUpdatedState(LocalLang.current)
+    val pro = rememberPro()
     val state by RecordingHolder.state.collectAsState()
     val packPath = remember(state.currentLat, state.currentLon) {
         MapPacks.packFor(context, state.currentLat, state.currentLon)?.absolutePath
@@ -230,9 +232,17 @@ fun RecordingScreen(
     val stateRef = rememberUpdatedState(state)
     val routeRef = rememberUpdatedState(route)
     val mapFixRef = rememberUpdatedState(mapFix)
-    LaunchedEffect(state.activityId, sport, ghostCandidates) {
+    LaunchedEffect(state.activityId, sport, ghostCandidates, pro) {
         val id = state.activityId
         if (id == null) {
+            ghost = null
+            ghostRoute = emptyList()
+            ghostMatch = null
+            ghostValidated = false
+            return@LaunchedEffect
+        }
+        if (!pro) {
+            // Ghost racing is a Pro feature: free users record without a rival.
             ghost = null
             ghostRoute = emptyList()
             ghostMatch = null

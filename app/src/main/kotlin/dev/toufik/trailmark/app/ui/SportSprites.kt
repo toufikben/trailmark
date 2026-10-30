@@ -35,9 +35,9 @@ private fun paint(color: Int, style: Paint.Style = Paint.Style.FILL): Paint =
     }
 
 /**
- * A top-down puck: dark disc, accent ring and a forward nose that always points
- * to the top of the bitmap. The map rotates it by the live bearing, so the nose
- * follows the real direction of travel.
+ * A top-down puck: bright accent core in a white casing, with a dark chevron that
+ * always points to the top of the bitmap. The map rotates it by the live bearing,
+ * so the arrow follows the real direction of travel.
  */
 fun spriteBitmap(context: Context, sport: Sport, frame: Int): Bitmap {
     val d = context.resources.displayMetrics.density
@@ -67,16 +67,26 @@ private fun drawPuck(c: Canvas, s: Float, sport: Sport, frame: Int, ghost: Boole
         c.drawCircle(cx, cy, r * 1.12f, paint(0x22E8EEEA))
         c.drawCircle(cx, cy, r, paint(0x33E8EEEA))
     } else {
-        c.drawCircle(cx, cy, r * (1.14f + 0.05f * pulse), paint(0x28C6FF3D))
-        c.drawCircle(cx, cy, r, paint(PLAYER_INK))
+        // Player: bright core inside a white casing, so it stays readable on any
+        // map style. A dark chevron carries the heading instead of a tiny glyph.
+        c.drawCircle(cx, cy, r * (1.14f + 0.05f * pulse), paint(0x33C6FF3D))
+        c.drawCircle(cx, cy, r, paint(0xFFF7FAF2))
+        c.drawCircle(cx, cy, r * 0.78f, paint(ACCENT))
+        val arrow = Path().apply {
+            moveTo(cx, cy - r * 0.52f)
+            lineTo(cx - r * 0.40f, cy + r * 0.26f)
+            lineTo(cx, cy + r * 0.02f)
+            lineTo(cx + r * 0.40f, cy + r * 0.26f)
+            close()
+        }
+        c.drawPath(arrow, paint(PLAYER_INK))
+        return
     }
 
-    val ring = paint(if (ghost) GHOST_TONE else ACCENT, Paint.Style.STROKE).apply {
+    val ring = paint(GHOST_TONE, Paint.Style.STROKE).apply {
         strokeWidth = s * 0.040f
-        if (ghost) {
-            alpha = 205
-            pathEffect = DashPathEffect(floatArrayOf(s * 0.060f, s * 0.045f), 0f)
-        }
+        alpha = 205
+        pathEffect = DashPathEffect(floatArrayOf(s * 0.060f, s * 0.045f), 0f)
     }
     c.drawCircle(cx, cy, r * 0.93f, ring)
 
@@ -87,14 +97,12 @@ private fun drawPuck(c: Canvas, s: Float, sport: Sport, frame: Int, ghost: Boole
         lineTo(cx + s * 0.078f, s * 0.148f)
         close()
     }
-    c.drawPath(nose, paint(if (ghost) GHOST_TONE else ACCENT).apply {
-        if (ghost) alpha = 170
-    })
+    c.drawPath(nose, paint(GHOST_TONE).apply { alpha = 170 })
 
     c.save()
     c.translate(cx, cy)
     c.scale(s, s)
-    drawGlyph(c, sport, ghost)
+    drawGlyph(c, sport, ghost = true)
     c.restore()
 }
 

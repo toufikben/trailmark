@@ -115,10 +115,11 @@ private data class SegLoad(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun DetailScreen(activityId: Long, onBack: () -> Unit) {
+fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit) {
     val context = LocalContext.current
     val t = LocalTexts.current
     val langNow = LocalLang.current
+    val pro = rememberPro()
     val scope = rememberCoroutineScope()
     var detail by remember { mutableStateOf<Detail?>(null) }
     var loading by remember { mutableStateOf(true) }
@@ -311,7 +312,9 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit) {
                             }
                         }) { Text(t.storyCard, color = Palette.accent) }
                         if (d.points.size > 1) {
-                            TextButton(onClick = { flyoverExport = true }) {
+                            TextButton(onClick = {
+                                if (pro) flyoverExport = true else onPaywall()
+                            }) {
                                 Text(t.exportVideo, color = Palette.accent)
                             }
                         }

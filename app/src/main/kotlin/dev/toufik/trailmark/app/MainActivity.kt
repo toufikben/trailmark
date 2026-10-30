@@ -194,6 +194,10 @@ class MainActivity : ComponentActivity() {
                                     is Screen.Detail -> DetailScreen(
                                         activityId = s.id,
                                         onBack = { screen = detailFrom },
+                                        onPaywall = {
+                                            paywallFrom = s
+                                            screen = Screen.Paywall
+                                        },
                                     )
                                 }
                                 }
