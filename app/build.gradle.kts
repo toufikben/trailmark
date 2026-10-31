@@ -42,6 +42,9 @@ android {
 
     buildTypes {
         debug {
+            // QA installs use their own package so a store purchase on the main
+            // package never hides trial-only UI during testing.
+            applicationIdSuffix = ".qa"
             if (file("shared-debug.jks").exists()) {
                 signingConfig = signingConfigs.getByName("sharedDebug")
             }
