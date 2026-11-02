@@ -43,7 +43,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.FileProvider
 import dev.toufik.trailmark.analytics.ReplayTrack
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
@@ -57,8 +56,10 @@ import dev.toufik.trailmark.engine.Sport
 import java.io.File
 import kotlin.coroutines.resume
 import kotlin.math.roundToInt
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -157,6 +158,7 @@ fun FlyoverOverlay(
     val plan = remember(track, speed) { flyoverPlan(track.totalNanos, speed) }
 
     LaunchedEffect(Unit) {
+        var output: File? = null
         try {
             while (mapView.width == 0) delay(50)
             val map = withContext(Dispatchers.Main) {
@@ -177,7 +179,8 @@ fun FlyoverOverlay(
                 }
             }
             val style = map.style
-            val file = File(File(context.cacheDir, "exports").apply { mkdirs() }, "trailmark-flyover.mp4")
+            val file = withContext(Dispatchers.IO) { newExportFile(context) }
+            output = file
             val writer = Mp4Writer(file)
             try {
                 withContext(Dispatchers.Main) {
@@ -223,10 +226,16 @@ fun FlyoverOverlay(
                 }
                 withContext(Dispatchers.Default) { writer.finish() }
             } finally {
-                runCatching { writer.finish() }
+                // Draining the encoder blocks, so never on the main thread, and it
+                // must still run when the user cancels mid-render.
+                withContext(NonCancellable + Dispatchers.Default) { runCatching { writer.finish() } }
             }
             onDone(file)
+        } catch (e: CancellationException) {
+            output?.let { f -> withContext(NonCancellable + Dispatchers.IO) { f.delete() } }
+            throw e
         } catch (_: Throwable) {
+            output?.let { f -> withContext(NonCancellable + Dispatchers.IO) { f.delete() } }
             onError()
         }
     }
@@ -296,15 +305,27 @@ fun FlyoverOverlay(
     }
 }
 
-/** A finished video can be handed straight to the system share sheet. */
-fun shareVideo(context: Context, file: File, chooserTitle: String) {
-    val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
+/** A finished video (gallery or FileProvider URI) can be handed straight to the system share sheet. */
+fun shareVideo(context: Context, uri: android.net.Uri, chooserTitle: String) {
     val send = Intent(Intent.ACTION_SEND).apply {
         type = "video/mp4"
         putExtra(Intent.EXTRA_STREAM, uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
     context.startActivity(Intent.createChooser(send, chooserTitle))
+}
+
+private const val EXPORT_PREFIX = "trailmark-flyover"
+
+/**
+ * A fresh file per export, so two renders never write the same path. Earlier
+ * renders are dropped first: each one was copied to the gallery when it finished.
+ */
+private fun newExportFile(context: Context): File {
+    val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+    dir.listFiles { f -> f.name.startsWith(EXPORT_PREFIX) && f.name.endsWith(".mp4") }
+        ?.forEach { it.delete() }
+    return File(dir, "$EXPORT_PREFIX-${System.currentTimeMillis()}.mp4")
 }
 
 private fun isOnline(context: Context): Boolean {
@@ -400,14 +421,19 @@ private suspend fun awaitMapIdle(map: MapLibreMap, timeoutMs: Long = 1600) {
     }
 }
 
+/** A snapshot that never arrives (surface gone in the background) fails the export instead of hanging it. */
+private const val SNAPSHOT_TIMEOUT_MS = 10_000L
+
 private suspend fun captureMap(map: MapLibreMap): Bitmap =
-    suspendCancellableCoroutine { cont ->
-        map.snapshot(object : MapLibreMap.SnapshotReadyCallback {
-            override fun onSnapshotReady(snapshot: Bitmap) {
-                if (cont.isActive) cont.resume(snapshot) else snapshot.recycle()
-            }
-        })
-    }
+    withTimeoutOrNull(SNAPSHOT_TIMEOUT_MS) {
+        suspendCancellableCoroutine { cont ->
+            map.snapshot(object : MapLibreMap.SnapshotReadyCallback {
+                override fun onSnapshotReady(snapshot: Bitmap) {
+                    if (cont.isActive) cont.resume(snapshot) else snapshot.recycle()
+                }
+            })
+        }
+    } ?: error("map snapshot timed out")
 
 /** Center-crops the screen-shaped snapshot to 720x1280. */
 private fun scaleToPortrait(src: Bitmap): Bitmap {
@@ -421,6 +447,8 @@ private fun scaleToPortrait(src: Bitmap): Bitmap {
     if (scaled !== src && scaled !== out) scaled.recycle()
     return out
 }
+
+private const val CODEC_STALL_MS = 5_000L
 
 /** Minimal synchronous H.264 encoder writing an MP4 through MediaMuxer. */
 private class Mp4Writer(private val file: File, fps: Int = 24) {
@@ -471,27 +499,39 @@ private class Mp4Writer(private val file: File, fps: Int = 24) {
     fun finish() {
         if (finished) return
         finished = true
-        val index = dequeueInput()
-        codec.queueInputBuffer(index, 0, 0, lastPtsUs + frameUs, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-        drain(true)
-        runCatching { codec.stop() }
-        codec.release()
-        if (muxerStarted) runCatching { muxer.stop() }
-        muxer.release()
-    }
-
-    private fun dequeueInput(): Int {
-        while (true) {
-            val index = codec.dequeueInputBuffer(10_000)
-            if (index >= 0) return index
+        try {
+            val index = dequeueInput()
+            codec.queueInputBuffer(index, 0, 0, lastPtsUs + frameUs, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+            drain(true)
+        } finally {
+            // Release even when the encoder failed, or the next export cannot get one.
+            runCatching { codec.stop() }
+            runCatching { codec.release() }
+            if (muxerStarted) runCatching { muxer.stop() }
+            runCatching { muxer.release() }
         }
     }
 
+    /** A stalled encoder fails the export after [CODEC_STALL_MS] instead of spinning forever. */
+    private fun dequeueInput(): Int {
+        val deadline = System.nanoTime() + CODEC_STALL_MS * 1_000_000L
+        while (System.nanoTime() < deadline) {
+            val index = codec.dequeueInputBuffer(10_000)
+            if (index >= 0) return index
+            drain(false)
+        }
+        error("encoder input stalled")
+    }
+
     private fun drain(endOfStream: Boolean) {
+        val deadline = System.nanoTime() + CODEC_STALL_MS * 1_000_000L
         while (true) {
             val index = codec.dequeueOutputBuffer(info, if (endOfStream) 10_000 else 0)
             when {
-                index == MediaCodec.INFO_TRY_AGAIN_LATER -> if (!endOfStream) return
+                index == MediaCodec.INFO_TRY_AGAIN_LATER -> {
+                    if (!endOfStream) return
+                    if (System.nanoTime() > deadline) error("encoder never signalled end of stream")
+                }
                 index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                     trackIndex = muxer.addTrack(codec.outputFormat)
                     muxer.start()

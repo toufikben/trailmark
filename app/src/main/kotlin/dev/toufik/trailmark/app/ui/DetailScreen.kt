@@ -2,7 +2,6 @@ package dev.toufik.trailmark.app.ui
 
 import android.content.Context
 import android.content.Intent
-import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -96,6 +95,7 @@ import dev.toufik.trailmark.portable.Tcx
 import java.io.File
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -133,6 +133,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
     var segmentCount by remember { mutableStateOf(0) }
     var showCreateSegment by remember { mutableStateOf(false) }
     var flyoverExport by remember { mutableStateOf(false) }
+    var exportedVideo by remember { mutableStateOf<android.net.Uri?>(null) }
     var replaySpeed by remember(activityId) { mutableStateOf(1) }
     var replayFlyover by remember(activityId) { mutableStateOf(false) }
     val packPath = remember(detail) {
@@ -387,6 +388,13 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                         }
                     }
                     val track = remember(d) { ReplayTrack(d.points) }
+                    // Media store moving time, the replay runs on the recorded clock:
+                    // pin each capture to the moment the route reaches its place.
+                    val mediaTimeline = remember(track, d.media) {
+                        d.media
+                            .map { m -> m to track.nanosNear(m.lat, m.lon, m.distanceM) }
+                            .sortedBy { it.second }
+                    }
                     var playing by remember(d) { mutableStateOf(false) }
                     var replayNanos by remember(d) { mutableStateOf(0L) }
                     val sample = track.sampleAt(replayNanos)
@@ -400,7 +408,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                             bearingDeg = it.bearingDeg,
                         )
                     }
-                    LaunchedEffect(playing, replaySpeed, d.media) {
+                    LaunchedEffect(playing, replaySpeed, mediaTimeline) {
                         if (!playing) return@LaunchedEffect
                         var last = withFrameNanos { it }
                         while (playing) {
@@ -408,13 +416,13 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                                 val dt = (now - last).coerceIn(0L, 250_000_000L)
                                 last = now
                                 val next = replayNanos + dt * replaySpeed
-                                val hit = d.media.firstOrNull { m ->
-                                    m.elapsedNanos > replayNanos && m.elapsedNanos <= next
+                                val hit = mediaTimeline.firstOrNull { (_, at) ->
+                                    at > replayNanos && at <= next
                                 }
                                 if (hit != null) {
-                                    replayNanos = hit.elapsedNanos.coerceAtMost(track.totalNanos)
+                                    replayNanos = hit.second.coerceAtMost(track.totalNanos)
                                     playing = false
-                                    if (hit.kind == "PHOTO") viewerMedia = hit
+                                    if (hit.first.kind == "PHOTO") viewerMedia = hit.first
                                 } else {
                                     replayNanos = next.coerceAtMost(track.totalNanos)
                                     if (replayNanos >= track.totalNanos) playing = false
@@ -604,14 +612,42 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                 flyover = replayFlyover,
                 onDone = { file ->
                     flyoverExport = false
-                    val saved = MediaCapture.saveVideoToGallery(context, file)
-                    if (saved != null) {
-                        Toast.makeText(context, t.mediaSaved, Toast.LENGTH_SHORT).show()
+                    scope.launch {
+                        // Copying a long clip takes seconds: off the main thread, and
+                        // finished even if the user leaves this screen meanwhile.
+                        val saved = withContext(NonCancellable + Dispatchers.IO) {
+                            MediaCapture.saveVideoToGallery(context, file)
+                                ?.also { file.delete() }
+                        }
+                        if (saved != null) {
+                            exportedVideo = saved
+                        } else {
+                            // No gallery copy: hand over the rendered file as before.
+                            shareVideo(context, MediaCapture.uriFor(context, file), t.share)
+                        }
                     }
-                    shareVideo(context, file, t.share)
                 },
                 onCancel = { flyoverExport = false },
                 onError = { flyoverExport = false },
+            )
+        }
+        exportedVideo?.let { uri ->
+            // Saved once to the gallery; sharing reuses that copy instead of making another.
+            AlertDialog(
+                onDismissRequest = { exportedVideo = null },
+                containerColor = Palette.surface,
+                title = { Text(t.mediaSaved, color = Palette.text) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        exportedVideo = null
+                        shareVideo(context, uri, t.share)
+                    }) { Text(t.share, color = Palette.accent) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { exportedVideo = null }) {
+                        Text(t.done, color = Palette.textSecondary)
+                    }
+                },
             )
         }
         if (showCreateSegment && dd != null && dd.points.size > 1) {

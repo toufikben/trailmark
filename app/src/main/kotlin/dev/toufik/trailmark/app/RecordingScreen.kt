@@ -34,6 +34,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -163,8 +164,10 @@ fun RecordingScreen(
     val scope = rememberCoroutineScope()
     var sport by remember { mutableStateOf(Sport.RUN) }
 
-    var pendingCapture by remember { mutableStateOf<java.io.File?>(null) }
-    var pendingKind by remember { mutableStateOf<String?>(null) }
+    // Saved across activity recreation: the camera app often outlives our activity,
+    // and the result must still find the file it was told to write.
+    var pendingCapture by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingKind by rememberSaveable { mutableStateOf<String?>(null) }
     var mediaFlash by remember { mutableStateOf(false) }
 
     var route by remember { mutableStateOf<List<StoredPoint>>(emptyList()) }
@@ -375,7 +378,7 @@ fun RecordingScreen(
     ) { }
 
     fun onCaptured(ok: Boolean) {
-        val file = pendingCapture
+        val file = pendingCapture?.let { java.io.File(it) }
         val kind = pendingKind
         pendingCapture = null
         pendingKind = null
@@ -418,7 +421,7 @@ fun RecordingScreen(
 
     fun capturePhoto() {
         val file = MediaCapture.newPhotoFile(context)
-        pendingCapture = file
+        pendingCapture = file.absolutePath
         pendingKind = "PHOTO"
         try {
             photoLauncher.launch(MediaCapture.uriFor(context, file))
@@ -430,7 +433,7 @@ fun RecordingScreen(
 
     fun captureVideo() {
         val file = MediaCapture.newVideoFile(context)
-        pendingCapture = file
+        pendingCapture = file.absolutePath
         pendingKind = "VIDEO"
         try {
             videoLauncher.launch(MediaCapture.uriFor(context, file))

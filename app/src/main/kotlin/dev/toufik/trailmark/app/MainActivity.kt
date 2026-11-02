@@ -40,6 +40,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -75,6 +77,35 @@ sealed interface Screen {
     data object Paywall : Screen
     data class Detail(val id: Long) : Screen
 }
+
+/** Stable text key per screen, so the open screen survives activity recreation. */
+internal fun screenKey(screen: Screen): String = when (screen) {
+    Screen.Record -> "record"
+    Screen.Plan -> "plan"
+    Screen.History -> "history"
+    Screen.Progress -> "progress"
+    Screen.Settings -> "settings"
+    Screen.Regions -> "regions"
+    Screen.Paywall -> "paywall"
+    is Screen.Detail -> "detail:${screen.id}"
+}
+
+internal fun screenFromKey(key: String): Screen = when {
+    key == "plan" -> Screen.Plan
+    key == "history" -> Screen.History
+    key == "progress" -> Screen.Progress
+    key == "settings" -> Screen.Settings
+    key == "regions" -> Screen.Regions
+    key == "paywall" -> Screen.Paywall
+    key.startsWith("detail:") -> key.removePrefix("detail:").toLongOrNull()
+        ?.let { Screen.Detail(it) } ?: Screen.History
+    else -> Screen.Record
+}
+
+private val ScreenSaver = Saver<Screen, String>(
+    save = { screenKey(it) },
+    restore = { screenFromKey(it) },
+)
 
 class MainActivity : ComponentActivity() {
     private var syntheticStarted = false
@@ -120,9 +151,15 @@ class MainActivity : ComponentActivity() {
             ) {
                 TrailmarkTheme {
                     CompositionLocalProvider(LocalLayoutDirection provides direction) {
-                        var screen by remember { mutableStateOf<Screen>(Screen.Record) }
-                        var paywallFrom by remember { mutableStateOf<Screen>(Screen.Settings) }
-                        var detailFrom by remember { mutableStateOf<Screen>(Screen.History) }
+                        var screen by rememberSaveable(stateSaver = ScreenSaver) {
+                            mutableStateOf<Screen>(Screen.Record)
+                        }
+                        var paywallFrom by rememberSaveable(stateSaver = ScreenSaver) {
+                            mutableStateOf<Screen>(Screen.Settings)
+                        }
+                        var detailFrom by rememberSaveable(stateSaver = ScreenSaver) {
+                            mutableStateOf<Screen>(Screen.History)
+                        }
                         var showSplash by remember { mutableStateOf(!splashDone) }
                         val recState by RecordingHolder.state.collectAsState()
                         LaunchedEffect(recState.phase, recState.lastActivityId) {
