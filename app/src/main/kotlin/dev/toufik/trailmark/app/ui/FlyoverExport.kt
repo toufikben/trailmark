@@ -68,13 +68,19 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
+import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.CircleLayer
+import org.maplibre.android.style.layers.FillExtrusionLayer
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.layers.PropertyFactory.circleColor
 import org.maplibre.android.style.layers.PropertyFactory.circleRadius
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeColor
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth
+import org.maplibre.android.style.layers.PropertyFactory.fillExtrusionBase
+import org.maplibre.android.style.layers.PropertyFactory.fillExtrusionColor
+import org.maplibre.android.style.layers.PropertyFactory.fillExtrusionHeight
+import org.maplibre.android.style.layers.PropertyFactory.fillExtrusionOpacity
 import org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap
 import org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement
 import org.maplibre.android.style.layers.PropertyFactory.iconImage
@@ -165,7 +171,7 @@ fun FlyoverOverlay(
                 }
                 suspendCancellableCoroutine<Unit> { cont ->
                     map.setStyle(builder) { style ->
-                        addFlyoverLayers(style, lngLats, context, sport)
+                        addFlyoverLayers(style, lngLats, context, sport, dark)
                         cont.resume(Unit)
                     }
                 }
@@ -312,8 +318,30 @@ private fun isOnline(context: Context): Boolean {
 private const val ATHLETE_SOURCE = "fly-athlete-source"
 private const val ATHLETE_LAYER = "fly-athlete-layer"
 
-private fun addFlyoverLayers(style: Style, lngLats: List<Point>, context: Context, sport: Sport) {
+private fun addFlyoverLayers(
+    style: Style,
+    lngLats: List<Point>,
+    context: Context,
+    sport: Sport,
+    dark: Boolean,
+) {
     if (lngLats.size < 2 || style.getSource("fly-route") != null) return
+    // Same extruded buildings as the replay map, so the tilt reads as a flyover.
+    if (style.getLayer("fly-3d") == null) {
+        val below = style.layers.firstOrNull { it is SymbolLayer }?.id
+        val b3d = FillExtrusionLayer("fly-3d", "openmaptiles").withProperties(
+            fillExtrusionColor(if (dark) "#1E2429" else "#D8DBD6"),
+            fillExtrusionHeight(
+                Expression.coalesce(Expression.get("render_height"), Expression.literal(8f)),
+            ),
+            fillExtrusionBase(
+                Expression.coalesce(Expression.get("render_min_height"), Expression.literal(0f)),
+            ),
+            fillExtrusionOpacity(0.85f),
+        ).apply { minZoom = 14f }
+        b3d.withSourceLayer("building")
+        if (below != null) style.addLayerBelow(b3d, below) else style.addLayer(b3d)
+    }
     style.addSource(
         GeoJsonSource(
             "fly-route",
