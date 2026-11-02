@@ -112,9 +112,19 @@ fun SpeedometerScreen(onBack: () -> Unit) {
                             location.latitude,
                             location.longitude,
                         )
-                        val accurate = !location.hasAccuracy() || location.accuracy <= 40f
-                        if (accurate && step.isFinite() && step in 0.4..180.0) distanceM += step
-                        if (v in 0.5..40.0) movingNanos += dtMs * 1_000_000L
+                        val accurate = !location.hasAccuracy() || location.accuracy <= 30f
+                        val implied = step / (dtMs / 1000.0)
+                        val reported = if (location.hasSpeed() && location.speed >= 0f) {
+                            location.speed.toDouble()
+                        } else {
+                            implied
+                        }
+                        // A jump far quicker than the receiver's own speed is drift.
+                        val plausible = implied <= reported * 2.5 + 1.0
+                        if (accurate && plausible && step in 0.4..180.0) {
+                            distanceM += step
+                            movingNanos += dtMs * 1_000_000L
+                        }
                     }
                     if (v.isFinite() && v in 0.0..70.0) {
                         speedMps = v
