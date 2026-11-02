@@ -119,8 +119,9 @@ fun SpeedometerScreen(onBack: () -> Unit) {
                         } else {
                             implied
                         }
-                        // A jump far quicker than the receiver's own speed is drift.
-                        val plausible = implied <= reported * 2.5 + 1.0
+                        // A jump far quicker than the receiver's own speed is drift,
+                        // and a stationary fix reports almost no speed at all.
+                        val plausible = reported >= 0.7 && implied <= reported * 2.5 + 1.0
                         if (accurate && plausible && step in 0.4..180.0) {
                             distanceM += step
                             movingNanos += dtMs * 1_000_000L
