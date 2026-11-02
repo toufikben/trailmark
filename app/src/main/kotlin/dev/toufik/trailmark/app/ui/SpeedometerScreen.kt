@@ -128,7 +128,8 @@ fun SpeedometerScreen(onBack: () -> Unit) {
             runCatching {
                 lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 1000L, 0f, l, Looper.getMainLooper())
             }
-            runCatching { lm.getLastKnownLocation(LocationManager.GPS_PROVIDER) }?.let { l.onLocationChanged(it) }
+            val last = runCatching { lm.getLastKnownLocation(LocationManager.GPS_PROVIDER) }.getOrNull()
+            if (last != null) l.onLocationChanged(last)
         }
         onDispose {
             if (listener != null && lm != null) runCatching { lm.removeUpdates(listener) }

@@ -83,6 +83,7 @@ import dev.toufik.trailmark.app.ui.MediaMark
 import dev.toufik.trailmark.app.ui.Motion
 import dev.toufik.trailmark.app.ui.PhotoViewer
 import dev.toufik.trailmark.app.ui.ProCta
+import dev.toufik.trailmark.app.ui.SpeedometerScreen
 import dev.toufik.trailmark.app.ui.TrailmarkMap
 import dev.toufik.trailmark.app.ui.WeatherChip
 import dev.toufik.trailmark.app.ui.openVideoPlayer
