@@ -456,6 +456,7 @@ fun RecordingScreen(
                     sport = sport,
                     speedMps = state.currentSpeedMps,
                     planChunks = planRoute,
+                    fitPlan = true,
                     ghostRoute = if (state.phase == Phase.RECORDING || state.phase == Phase.PAUSED) {
                         ghostRoute
                     } else {

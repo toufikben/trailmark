@@ -87,7 +87,10 @@ fun SpeedometerScreen(onBack: () -> Unit) {
                 override fun onLocationChanged(location: Location) {
                     val prev = lastLocation[0]
                     val dtMs = if (prev != null) location.time - prev.time else 0L
-                    val derived = if (dtMs in 1..30_000) {
+                    // Locations arrive from GPS and network providers; only a real
+                    // update interval carries a trustworthy distance/speed sample.
+                    val usable = dtMs in 900..30_000
+                    val derived = if (usable) {
                         haversineMeters(
                             prev!!.latitude,
                             prev.longitude,
@@ -102,15 +105,16 @@ fun SpeedometerScreen(onBack: () -> Unit) {
                         derived != null && derived.isFinite() -> derived
                         else -> 0.0
                     }
-                    if (prev != null && dtMs in 1..30_000) {
+                    if (usable) {
                         val step = haversineMeters(
-                            prev.latitude,
+                            prev!!.latitude,
                             prev.longitude,
                             location.latitude,
                             location.longitude,
                         )
-                        if (step.isFinite() && step in 0.4..250.0) distanceM += step
-                        if (v >= 0.5) movingNanos += dtMs * 1_000_000L
+                        val accurate = !location.hasAccuracy() || location.accuracy <= 40f
+                        if (accurate && step.isFinite() && step in 0.4..180.0) distanceM += step
+                        if (v in 0.5..40.0) movingNanos += dtMs * 1_000_000L
                     }
                     if (v.isFinite() && v in 0.0..70.0) {
                         speedMps = v
@@ -118,7 +122,7 @@ fun SpeedometerScreen(onBack: () -> Unit) {
                     }
                     if (location.hasAccuracy()) accuracyM = location.accuracy.toDouble()
                     lastFixAt = System.currentTimeMillis()
-                    lastLocation[0] = location
+                    if (prev == null || usable) lastLocation[0] = location
                 }
             }
             listener = l

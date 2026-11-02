@@ -258,6 +258,7 @@ fun TrailmarkMap(
     ghostCurrent: StoredPoint? = null,
     speedMps: Double? = null,
     planChunks: List<RouteChunk> = emptyList(),
+    fitPlan: Boolean = false,
     planDest: Pair<Double, Double>? = null,
     planStops: List<Pair<Double, Double>> = emptyList(),
     mediaMarks: List<MediaMark> = emptyList(),
@@ -644,6 +645,20 @@ fun TrailmarkMap(
         s.getSourceAs<GeoJsonSource>("plan-source")?.setGeoJson(
             if (features.isEmpty()) EMPTY else FeatureCollection.fromFeatures(features.toTypedArray()),
         )
+    }
+
+    LaunchedEffect(planChunks, fitPlan) {
+        if (!fitPlan) return@LaunchedEffect
+        val pts = planChunks.flatMap { it.points }
+        if (pts.size < 2) return@LaunchedEffect
+        val bounds = LatLngBounds.Builder()
+            .apply { pts.forEach { include(LatLng(it.lat, it.lon)) } }
+            .build()
+        mapView.getMapAsync { map ->
+            following = false
+            fitted = true
+            map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 140))
+        }
     }
 
     LaunchedEffect(planStops, planDest, style) {
