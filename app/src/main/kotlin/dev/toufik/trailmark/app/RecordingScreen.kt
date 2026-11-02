@@ -180,6 +180,7 @@ fun RecordingScreen(
     var ghostValidated by remember { mutableStateOf(false) }
     var mapFix by remember { mutableStateOf<StoredPoint?>(null) }
     var barHeightPx by remember { mutableStateOf(0) }
+    var showSpeedometer by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.activityId) {
         val id = state.activityId
@@ -684,7 +685,7 @@ fun RecordingScreen(
                         modifier = Modifier.weight(1f),
                         horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally),
                     ) {
-                        StatCell(speedText, t.speed)
+                        StatCell(speedText, t.speed, onClick = { showSpeedometer = true })
                         StatCell(paceText, t.pace)
                     }
                 }
@@ -735,6 +736,10 @@ fun RecordingScreen(
                 }
             }
 
+            if (showSpeedometer) {
+                SpeedometerScreen(onBack = { showSpeedometer = false })
+            }
+
             viewerMedia?.let { m ->
                 if (m.kind == "PHOTO") {
                     BackHandler { viewerMedia = null }
@@ -759,21 +764,41 @@ fun RecordingScreen(
 }
 
 @Composable
-private fun StatCell(value: String, label: String, accent: Boolean = false, desc: String? = null) {
+private fun StatCell(
+    value: String,
+    label: String,
+    accent: Boolean = false,
+    desc: String? = null,
+    onClick: (() -> Unit)? = null,
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = if (desc != null) {
             Modifier.clearAndSetSemantics { contentDescription = desc }
         } else {
             Modifier
-        },
+        }
+            .then(
+                if (onClick != null) {
+                    Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable(onClick = onClick)
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                } else {
+                    Modifier
+                },
+            ),
     ) {
         Text(
             text = value,
             color = if (accent) Palette.accent else Palette.text,
             fontSize = 16.sp,
         )
-        Text(text = label, color = Palette.textSecondary, fontSize = 11.sp)
+        Text(
+            text = if (onClick != null) "$label \u2197" else label,
+            color = Palette.textSecondary,
+            fontSize = 11.sp,
+        )
     }
 }
 

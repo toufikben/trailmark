@@ -207,6 +207,7 @@ class MainActivity : ComponentActivity() {
                                             paywallFrom = s
                                             screen = Screen.Paywall
                                         },
+                                        onStartRoute = { screen = Screen.Record },
                                     )
                                 }
                                 }

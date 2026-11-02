@@ -44,20 +44,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.FileProvider
+import dev.toufik.trailmark.analytics.ReplayTrack
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
+import dev.toufik.trailmark.app.formatDuration
 import dev.toufik.trailmark.app.maps.GlyphStore
 import dev.toufik.trailmark.app.maps.ONLINE_STYLE_URL
 import dev.toufik.trailmark.app.maps.ONLINE_STYLE_URL_LIGHT
-import dev.toufik.trailmark.core.geo.haversineMeters
 import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.core.model.WaypointType
+import dev.toufik.trailmark.engine.Sport
 import java.io.File
 import kotlin.coroutines.resume
-import kotlin.math.atan2
-import kotlin.math.cos
 import kotlin.math.roundToInt
-import kotlin.math.sin
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -71,10 +70,17 @@ import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.layers.PropertyFactory.circleColor
 import org.maplibre.android.style.layers.PropertyFactory.circleRadius
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeColor
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth
+import org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap
+import org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement
+import org.maplibre.android.style.layers.PropertyFactory.iconImage
+import org.maplibre.android.style.layers.PropertyFactory.iconRotate
+import org.maplibre.android.style.layers.PropertyFactory.iconRotationAlignment
+import org.maplibre.android.style.layers.PropertyFactory.iconSize
 import org.maplibre.android.style.layers.PropertyFactory.lineColor
 import org.maplibre.android.style.layers.PropertyFactory.lineOpacity
 import org.maplibre.android.style.layers.PropertyFactory.lineWidth
@@ -87,17 +93,26 @@ import org.maplibre.geojson.Point
 private const val VIDEO_WIDTH = 720
 private const val VIDEO_HEIGHT = 1280
 
+/** Camera values copied from the replay map, so the clip matches what you watched. */
+private const val FLYOVER_TILT = 55.0
+private const val FLYOVER_ZOOM = 15.5
+private const val REPLAY_ZOOM = 16.0
+private const val BEARING_SMOOTHING = 0.35
+
 /**
  * Renders a 9:16 flyover of [points] and hands the finished MP4 to [onDone].
- * The map is driven frame by frame: place camera, wait for the tile frame,
- * snapshot, convert to NV12 and feed the H.264 encoder.
+ * The clip follows the athlete marker like the replay map, honours the chosen
+ * [speed] and [flyover] tilt, and lasts `activity / speed`.
  */
 @Composable
 fun FlyoverOverlay(
     points: List<StoredPoint>,
+    sport: Sport,
     packPath: String?,
     dark: Boolean,
     langCode: String,
+    speed: Int,
+    flyover: Boolean,
     onDone: (File) -> Unit,
     onCancel: () -> Unit,
     onError: () -> Unit,
@@ -132,7 +147,8 @@ fun FlyoverOverlay(
     val route = remember(points) {
         points.filter { it.type != WaypointType.REJECTED && it.lat.isFinite() && it.lon.isFinite() }
     }
-    val frames = remember(route) { sampleTrack(route) }
+    val track = remember(route) { ReplayTrack(route) }
+    val plan = remember(track, speed) { flyoverPlan(track.totalNanos, speed) }
 
     LaunchedEffect(Unit) {
         try {
@@ -149,11 +165,12 @@ fun FlyoverOverlay(
                 }
                 suspendCancellableCoroutine<Unit> { cont ->
                     map.setStyle(builder) { style ->
-                        addFlyoverLayers(style, lngLats)
+                        addFlyoverLayers(style, lngLats, context, sport)
                         cont.resume(Unit)
                     }
                 }
             }
+            val style = map.style
             val file = File(File(context.cacheDir, "exports").apply { mkdirs() }, "trailmark-flyover.mp4")
             val writer = Mp4Writer(file)
             try {
@@ -161,22 +178,42 @@ fun FlyoverOverlay(
                     map.uiSettings.isCompassEnabled = false
                     map.uiSettings.isAttributionEnabled = true
                 }
-                for ((i, f) in frames.withIndex()) {
+                val tilt = if (flyover) FLYOVER_TILT else 0.0
+                val zoom = if (flyover) FLYOVER_ZOOM else REPLAY_ZOOM
+                var smoothBearing = track.sampleAt(0L)?.bearingDeg ?: 0.0
+                for (i in 0 until plan.frames) {
+                    val sample = track.sampleAt(plan.activityNanos(i))
+                    if (sample != null) {
+                        var delta = (sample.bearingDeg - smoothBearing + 540.0) % 360.0 - 180.0
+                        smoothBearing = (smoothBearing + delta * BEARING_SMOOTHING + 360.0) % 360.0
+                    }
+                    val at = sample?.let { LatLng(it.lat, it.lon) }
                     val shot = withContext(Dispatchers.Main) {
-                        map.cameraPosition = CameraPosition.Builder()
-                            .target(LatLng(f.first, f.second))
-                            .zoom(zoomFor(i, frames.size))
-                            .bearing(f.third)
-                            .tilt(55.0)
-                            .build()
+                        if (at != null) {
+                            map.cameraPosition = CameraPosition.Builder()
+                                .target(at)
+                                .zoom(zoom)
+                                .bearing(smoothBearing)
+                                .tilt(tilt)
+                                .build()
+                            style?.getSourceAs<GeoJsonSource>(ATHLETE_SOURCE)?.setGeoJson(
+                                FeatureCollection.fromFeature(
+                                    Feature.fromGeometry(Point.fromLngLat(at.longitude, at.latitude)),
+                                ),
+                            )
+                            style?.getLayerAs<SymbolLayer>(ATHLETE_LAYER)?.setProperties(
+                                iconRotate(smoothBearing.toFloat()),
+                                iconImage(spriteImageId(sport, i % SPRITE_FRAMES)),
+                            )
+                        }
                         awaitMapIdle(map)
                         captureMap(map)
                     }
                     val portrait = withContext(Dispatchers.Default) { scaleToPortrait(shot) }
                     if (portrait !== shot) shot.recycle()
-                    withContext(Dispatchers.Default) { writer.encode(portrait) }
+                    withContext(Dispatchers.Default) { writer.encode(portrait, plan.ptsUs(i)) }
                     portrait.recycle()
-                    progress = (i + 1f) / frames.size
+                    progress = (i + 1f) / plan.frames
                 }
                 withContext(Dispatchers.Default) { writer.finish() }
             } finally {
@@ -227,6 +264,11 @@ fun FlyoverOverlay(
                     color = Palette.textSecondary,
                     fontSize = 11.sp,
                 )
+                Text(
+                    "${formatDuration(plan.durationNanos)} · ×$speed",
+                    color = Palette.textSecondary,
+                    fontSize = 11.sp,
+                )
                 Spacer(Modifier.height(20.dp))
                 CircularProgressIndicator(
                     progress = { progress },
@@ -267,14 +309,10 @@ private fun isOnline(context: Context): Boolean {
     return caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
 }
 
-private fun zoomFor(i: Int, total: Int): Double {
-    val intro = 10
-    if (i >= intro) return 15.4
-    val frac = i.toDouble() / intro
-    return 14.0 + frac * 1.4
-}
+private const val ATHLETE_SOURCE = "fly-athlete-source"
+private const val ATHLETE_LAYER = "fly-athlete-layer"
 
-private fun addFlyoverLayers(style: Style, lngLats: List<Point>) {
+private fun addFlyoverLayers(style: Style, lngLats: List<Point>, context: Context, sport: Sport) {
     if (lngLats.size < 2 || style.getSource("fly-route") != null) return
     style.addSource(
         GeoJsonSource(
@@ -301,51 +339,26 @@ private fun addFlyoverLayers(style: Style, lngLats: List<Point>) {
             circleStrokeWidth(2f),
         ),
     )
-}
-
-/** Interpolates the track into at most 240 camera samples: lat, lon, bearing. */
-private fun sampleTrack(points: List<StoredPoint>): List<Triple<Double, Double, Double>> {
-    if (points.size < 2) return emptyList()
-    val cum = DoubleArray(points.size)
-    for (i in 1 until points.size) {
-        cum[i] = cum[i - 1] + haversineMeters(
-            points[i - 1].lat,
-            points[i - 1].lon,
-            points[i].lat,
-            points[i].lon,
-        )
+    // The athlete puck from the replay map, moved along the track frame by frame.
+    for (f in 0 until SPRITE_FRAMES) {
+        style.addImage(spriteImageId(sport, f), spriteBitmap(context, sport, f))
     }
-    val total = cum.last()
-    if (total < 5.0) return emptyList()
-    val count = (total / 12.0).toInt().coerceIn(48, 240)
-    val out = ArrayList<Triple<Double, Double, Double>>(count)
-    var j = 1
-    var prevBearing = bearingDeg(points[0].lat, points[0].lon, points[1].lat, points[1].lon)
-    for (f in 0 until count) {
-        val target = total * f / (count - 1)
-        while (j < points.size - 1 && cum[j] < target) j++
-        val segStart = cum[j - 1]
-        val segLen = cum[j] - segStart
-        val frac = if (segLen <= 0.0) 0.0 else ((target - segStart) / segLen).coerceIn(0.0, 1.0)
-        val lat = points[j - 1].lat + (points[j].lat - points[j - 1].lat) * frac
-        val lon = points[j - 1].lon + (points[j].lon - points[j - 1].lon) * frac
-        val raw = bearingDeg(points[j - 1].lat, points[j - 1].lon, points[j].lat, points[j].lon)
-        var delta = raw - prevBearing
-        while (delta > 180.0) delta -= 360.0
-        while (delta < -180.0) delta += 360.0
-        prevBearing = (prevBearing + delta * 0.35 + 360.0) % 360.0
-        out.add(Triple(lat, lon, prevBearing))
-    }
-    return out
-}
-
-private fun bearingDeg(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-    val p1 = lat1 * Math.PI / 180.0
-    val p2 = lat2 * Math.PI / 180.0
-    val dl = (lon2 - lon1) * Math.PI / 180.0
-    val y = sin(dl) * cos(p2)
-    val x = cos(p1) * sin(p2) - sin(p1) * cos(p2) * cos(dl)
-    return (atan2(y, x) * 180.0 / Math.PI + 360.0) % 360.0
+    style.addSource(
+        GeoJsonSource(
+            ATHLETE_SOURCE,
+            FeatureCollection.fromFeatures(listOf(Feature.fromGeometry(lngLats.first()))),
+        ),
+    )
+    style.addLayer(
+        SymbolLayer(ATHLETE_LAYER, ATHLETE_SOURCE).withProperties(
+            iconImage(spriteImageId(sport, 0)),
+            iconSize(1f),
+            iconRotate(0f),
+            iconRotationAlignment("map"),
+            iconAllowOverlap(true),
+            iconIgnorePlacement(true),
+        ),
+    )
 }
 
 private suspend fun awaitMapIdle(map: MapLibreMap, timeoutMs: Long = 1600) {
@@ -389,7 +402,7 @@ private class Mp4Writer(private val file: File, fps: Int = 24) {
     private val info = MediaCodec.BufferInfo()
     private var trackIndex = -1
     private var muxerStarted = false
-    private var ptsUs = 0L
+    private var lastPtsUs = 0L
     private var finished = false
     private val colorFormat = pickColorFormat(codec)
     private val frameBytes = VIDEO_WIDTH * VIDEO_HEIGHT * 3 / 2
@@ -409,7 +422,11 @@ private class Mp4Writer(private val file: File, fps: Int = 24) {
         codec.start()
     }
 
-    fun encode(bitmap: Bitmap) {
+    /**
+     * Encodes one frame at [ptsUs]. Frames carry their own timestamps because a
+     * long activity is rendered sparsely but must still play for its full length.
+     */
+    fun encode(bitmap: Bitmap, ptsUs: Long) {
         val index = dequeueInput()
         val image = runCatching { codec.getInputImage(index) }.getOrNull()
         if (image != null) {
@@ -419,7 +436,7 @@ private class Mp4Writer(private val file: File, fps: Int = 24) {
             fillYuv(bitmap, buf)
         }
         codec.queueInputBuffer(index, 0, frameBytes, ptsUs, 0)
-        ptsUs += frameUs
+        lastPtsUs = ptsUs
         drain(false)
     }
 
@@ -427,7 +444,7 @@ private class Mp4Writer(private val file: File, fps: Int = 24) {
         if (finished) return
         finished = true
         val index = dequeueInput()
-        codec.queueInputBuffer(index, 0, 0, ptsUs, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+        codec.queueInputBuffer(index, 0, 0, lastPtsUs + frameUs, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
         drain(true)
         runCatching { codec.stop() }
         codec.release()

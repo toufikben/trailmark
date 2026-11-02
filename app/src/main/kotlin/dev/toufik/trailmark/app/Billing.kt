@@ -85,6 +85,37 @@ class BillingManager(
         _lastError.value = null
     }
 
+    /** Re-reads products and purchases; used by the paywall's retry action. */
+    fun refresh() {
+        val c = client
+        if (c == null) {
+            retryCount = 0
+            connect()
+            return
+        }
+        if (!c.isReady) {
+            c.startConnection(object : BillingClientStateListener {
+                override fun onBillingSetupFinished(result: BillingResult) {
+                    if (result.responseCode == BillingClient.BillingResponseCode.OK) {
+                        _lastError.value = null
+                        queryProducts()
+                        refreshPurchases()
+                    } else {
+                        _lastError.value = "store"
+                    }
+                }
+
+                override fun onBillingServiceDisconnected() {
+                    _lastError.value = "store"
+                }
+            })
+            return
+        }
+        clearError()
+        queryProducts()
+        refreshPurchases()
+    }
+
     /**
      * Product types must be queried separately: Play Billing rejects a single
      * request that mixes subscriptions with one-time products.

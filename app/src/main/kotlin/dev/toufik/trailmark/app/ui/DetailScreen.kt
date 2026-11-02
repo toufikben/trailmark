@@ -78,7 +78,10 @@ import dev.toufik.trailmark.app.formatElevation
 import dev.toufik.trailmark.app.formatPace
 import dev.toufik.trailmark.app.formatSpeed
 import dev.toufik.trailmark.app.matchSegments
+import dev.toufik.trailmark.app.service.PlanRouteHolder
 import dev.toufik.trailmark.app.speedUnit
+import dev.toufik.trailmark.core.geo.ElevPoint
+import dev.toufik.trailmark.core.geo.gradeChunks
 import dev.toufik.trailmark.core.geo.haversineMeters
 import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.core.model.WaypointType
@@ -115,7 +118,7 @@ private data class SegLoad(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit) {
+fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, onStartRoute: () -> Unit) {
     val context = LocalContext.current
     val t = LocalTexts.current
     val langNow = LocalLang.current
@@ -130,6 +133,8 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit) {
     var segmentCount by remember { mutableStateOf(0) }
     var showCreateSegment by remember { mutableStateOf(false) }
     var flyoverExport by remember { mutableStateOf(false) }
+    var replaySpeed by remember(activityId) { mutableStateOf(1) }
+    var replayFlyover by remember(activityId) { mutableStateOf(false) }
     val packPath = remember(detail) {
         val first = detail?.points?.firstOrNull()
         dev.toufik.trailmark.app.maps.MapPacks.packFor(context, first?.lat, first?.lon)?.absolutePath
@@ -318,6 +323,17 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit) {
                                 Text(t.exportVideo, color = Palette.accent)
                             }
                         }
+                        TextButton(onClick = {
+                            val elev = d.points
+                                .filter { it.type != WaypointType.REJECTED }
+                                .map { ElevPoint(it.lat, it.lon, it.altitudeM ?: 0.0) }
+                            if (elev.size > 1) {
+                                PlanRouteHolder.set(gradeChunks(elev))
+                                onStartRoute()
+                            }
+                        }) {
+                            Text("${t.routeLabel} \u25B6", color = Palette.accent)
+                        }
                         TextButton(onClick = { showCreateSegment = true }) {
                             Text(t.createSegment, color = Palette.accent)
                         }
@@ -372,9 +388,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit) {
                     }
                     val track = remember(d) { ReplayTrack(d.points) }
                     var playing by remember(d) { mutableStateOf(false) }
-                    var speed by remember(d) { mutableStateOf(1) }
                     var replayNanos by remember(d) { mutableStateOf(0L) }
-                    var flyover by remember(d) { mutableStateOf(false) }
                     val sample = track.sampleAt(replayNanos)
                     val cursor = sample?.let {
                         StoredPoint(
@@ -386,14 +400,14 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit) {
                             bearingDeg = it.bearingDeg,
                         )
                     }
-                    LaunchedEffect(playing, speed, d.media) {
+                    LaunchedEffect(playing, replaySpeed, d.media) {
                         if (!playing) return@LaunchedEffect
                         var last = withFrameNanos { it }
                         while (playing) {
                             withFrameNanos { now ->
                                 val dt = (now - last).coerceIn(0L, 250_000_000L)
                                 last = now
-                                val next = replayNanos + dt * speed
+                                val next = replayNanos + dt * replaySpeed
                                 val hit = d.media.firstOrNull { m ->
                                     m.elapsedNanos > replayNanos && m.elapsedNanos <= next
                                 }
@@ -424,7 +438,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit) {
                             }
                         },
                         dark = darkMap,
-                        flyover = flyover,
+                        flyover = replayFlyover,
                     )
                     if (d.speedKmh.size >= 2 || d.elevM.size >= 2) {
                         Surface(
@@ -487,12 +501,12 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit) {
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         FilterChip(
-                            selected = flyover,
+                            selected = replayFlyover,
                             onClick = {
-                                val on = !flyover
-                                flyover = on
+                                val on = !replayFlyover
+                                replayFlyover = on
                                 if (on) {
-                                    speed = 16
+                                    replaySpeed = 16
                                     replayNanos = 0L
                                     playing = true
                                 }
@@ -501,8 +515,8 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit) {
                         )
                         listOf(1, 4, 16, 60).forEach { s ->
                             FilterChip(
-                                selected = speed == s,
-                                onClick = { speed = s },
+                                selected = replaySpeed == s,
+                                onClick = { replaySpeed = s },
                                 label = { Text("\u00d7$s", fontSize = 12.sp) },
                             )
                         }
@@ -582,9 +596,12 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit) {
         if (flyoverExport && dd != null) {
             FlyoverOverlay(
                 points = dd.points,
+                sport = sportOf(dd.row.sport),
                 packPath = packPath,
                 dark = darkMap,
                 langCode = langNow.code,
+                speed = replaySpeed,
+                flyover = replayFlyover,
                 onDone = { file ->
                     flyoverExport = false
                     val saved = MediaCapture.saveVideoToGallery(context, file)

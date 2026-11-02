@@ -293,5 +293,24 @@ private val STRINGS: Map<Lang, Map<String, String>> = mapOf(
     ),
 )
 
+private val EXTRA: Map<Lang, Map<String, String>> = mapOf(
+    Lang.AR to mapOf("retry" to "إعادة المحاولة", "priceUnavailable" to "السعر غير متاح"),
+    Lang.EN to mapOf("retry" to "Retry", "priceUnavailable" to "Price unavailable"),
+    Lang.FR to mapOf("retry" to "Réessayer", "priceUnavailable" to "Prix indisponible"),
+    Lang.ES to mapOf("retry" to "Reintentar", "priceUnavailable" to "Precio no disponible"),
+    Lang.PT to mapOf("retry" to "Tentar novamente", "priceUnavailable" to "Preço indisponível"),
+    Lang.DE to mapOf("retry" to "Erneut versuchen", "priceUnavailable" to "Preis nicht verfügbar"),
+    Lang.IT to mapOf("retry" to "Riprova", "priceUnavailable" to "Prezzo non disponibile"),
+    Lang.NL to mapOf("retry" to "Opnieuw", "priceUnavailable" to "Prijs niet beschikbaar"),
+    Lang.PL to mapOf("retry" to "Ponów", "priceUnavailable" to "Cena niedostępna"),
+    Lang.RU to mapOf("retry" to "Повторить", "priceUnavailable" to "Цена недоступна"),
+    Lang.TR to mapOf("retry" to "Tekrar dene", "priceUnavailable" to "Fiyat kullanılamıyor"),
+    Lang.ID to mapOf("retry" to "Coba lagi", "priceUnavailable" to "Harga tidak tersedia"),
+    Lang.HI to mapOf("retry" to "पुनः प्रयास करें", "priceUnavailable" to "मूल्य उपलब्ध नहीं"),
+    Lang.JA to mapOf("retry" to "再試行", "priceUnavailable" to "価格を取得できません"),
+    Lang.KO to mapOf("retry" to "다시 시도", "priceUnavailable" to "가격을 불러올 수 없음"),
+    Lang.ZH to mapOf("retry" to "重试", "priceUnavailable" to "价格不可用"),
+)
+
 fun paywallText(lang: Lang, key: String): String =
-    STRINGS[lang]?.get(key) ?: STRINGS[Lang.EN]?.get(key) ?: key
+    STRINGS[lang]?.get(key) ?: EXTRA[lang]?.get(key) ?: STRINGS[Lang.EN]?.get(key) ?: key
