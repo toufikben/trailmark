@@ -22,7 +22,7 @@ class FlyoverPlanTest {
         assertEquals(45 * FLYOVER_FPS, long.routeFrames)
         assertEquals(FLYOVER_INTRO_FRAMES + 45 * 30 + FLYOVER_OUTRO_FRAMES, long.frames)
         for (i in 1 until long.frames) {
-            assertEquals(33_333L, long.ptsUs(i) - long.ptsUs(i - 1), 1.0)
+            assertEquals(33_333.0, (long.ptsUs(i) - long.ptsUs(i - 1)).toDouble(), 1.0)
         }
     }
 
@@ -60,7 +60,7 @@ class FlyoverPlanTest {
         assertEquals(200.0, path.totalM, 0.5)
         assertEquals(100 * S, path.movingNanos)
         // Halfway along the distance is halfway through the clip, not after the stop.
-        assertEquals(50 * S, path.movingNanosAt(100.0), (S / 100).toDouble())
+        assertEquals((50 * S).toDouble(), path.movingNanosAt(100.0).toDouble(), (S / 100).toDouble())
         assertEquals(2.0, path.speedAt(50.0), 0.05)
     }
 
