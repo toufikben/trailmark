@@ -390,14 +390,14 @@ private suspend fun renderOverview(
     val done = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xFFC6FF3D.toInt()
         strokeWidth = 9f
-        style = Paint.Style.STROKE
+        this.style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
     }
     val puck = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFC6FF3D.toInt() }
     val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xFF0E1113.toInt()
-        style = Paint.Style.STROKE
+        this.style = Paint.Style.STROKE
         strokeWidth = 5f
     }
     val gfxPath = android.graphics.Path()
