@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import dev.toufik.trailmark.app.service.RecordingHolder
 import dev.toufik.trailmark.app.ui.DetailScreen
 import dev.toufik.trailmark.app.ui.HistoryScreen
@@ -109,6 +110,7 @@ private val ScreenSaver = Saver<Screen, String>(
 
 class MainActivity : ComponentActivity() {
     private var syntheticStarted = false
+    private var benchStarted = false
     private var splashDone = false
 
     override fun onResume() {
@@ -121,6 +123,11 @@ class MainActivity : ComponentActivity() {
                 .putExtra(dev.toufik.trailmark.app.service.RecordingService.EXTRA_SPORT, "RUN")
                 .putExtra(dev.toufik.trailmark.app.service.RecordingService.EXTRA_SYNTHETIC, true)
             ContextCompat.startForegroundService(this, svc)
+        }
+        val benchId = intent?.getLongExtra("bench_flyover", -1L) ?: -1L
+        if (debuggable && !benchStarted && benchId > 0) {
+            benchStarted = true
+            dev.toufik.trailmark.app.debug.FlyoverBench.run(this, lifecycleScope, benchId)
         }
     }
 
