@@ -47,21 +47,21 @@ class FlyoverPlanTest {
 
     @Test
     fun pausesTakeNoScreenTimeAndNoMovingTime() {
-        // 100 m in 50 s, a 50-minute stop in place, then 100 m more in 50 s.
+        // 100 m in 15 s, a 50-minute stop in place, then 100 m more in 15 s.
         val path = FlyoverPath(
             listOf(
                 at(0.0, 0),
-                at(100.0, 50),
-                at(100.0, 60, WaypointType.IDLE),
-                at(100.0, 3_050),
-                at(200.0, 3_100),
+                at(100.0, 15),
+                at(100.0, 25, WaypointType.IDLE),
+                at(100.0, 3_015),
+                at(200.0, 3_030),
             ),
         )
         assertEquals(200.0, path.totalM, 0.5)
-        assertEquals(100 * S, path.movingNanos)
-        // Halfway along the distance is halfway through the clip, not after the stop.
-        assertEquals((50 * S).toDouble(), path.movingNanosAt(100.0).toDouble(), (S / 100).toDouble())
-        assertEquals(2.0, path.speedAt(50.0), 0.05)
+        assertEquals(30 * S, path.movingNanos)
+        // Halfway along the distance is halfway through the moving time, not after the stop.
+        assertEquals((15 * S).toDouble(), path.movingNanosAt(100.0).toDouble(), (S / 100).toDouble())
+        assertEquals(110.0 / 16.5, path.speedAt(50.0), 0.05)
     }
 
     @Test
