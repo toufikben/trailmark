@@ -1,10 +1,15 @@
 package dev.toufik.trailmark.app.maps
 
 import android.content.Context
+import dev.toufik.trailmark.core.geo.ElevPoint
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** A route planned in Explore and kept for later reuse. */
+/**
+ * A route planned in Explore and kept for later reuse. A planned route keeps
+ * its [stops] and is routed again on open; an imported one (GPX from Komoot,
+ * Strava, …) keeps its exact [track] instead.
+ */
 data class SavedRoute(
     val id: Long,
     val name: String,
@@ -12,6 +17,7 @@ data class SavedRoute(
     val stops: List<Pair<Double, Double>>,
     val distanceKm: Double,
     val climbM: Int,
+    val track: List<ElevPoint> = emptyList(),
 )
 
 /** Small JSON-backed store for planned routes; newest first, capped. */
@@ -31,6 +37,15 @@ class SavedRoutes(context: Context) {
                 p.optDouble(0) to p.optDouble(1)
             }
             if (stops.size < 2) return@mapNotNull null
+            val trackArr = o.optJSONArray("track")
+            val track = if (trackArr == null) {
+                emptyList()
+            } else {
+                (0 until trackArr.length()).mapNotNull { j ->
+                    val p = trackArr.optJSONArray(j) ?: return@mapNotNull null
+                    ElevPoint(p.optDouble(0), p.optDouble(1), p.optDouble(2, 0.0))
+                }
+            }
             SavedRoute(
                 id = o.optLong("id"),
                 name = o.optString("name"),
@@ -38,6 +53,7 @@ class SavedRoutes(context: Context) {
                 stops = stops,
                 distanceKm = o.optDouble("km", 0.0),
                 climbM = o.optInt("climb", 0),
+                track = track,
             )
         }
     }.getOrDefault(emptyList())
@@ -58,15 +74,19 @@ class SavedRoutes(context: Context) {
             r.stops.forEach { (lat, lon) ->
                 pts.put(JSONArray().put(lat).put(lon))
             }
-            arr.put(
-                JSONObject()
-                    .put("id", r.id)
-                    .put("name", r.name)
-                    .put("sport", r.sport)
-                    .put("km", r.distanceKm)
-                    .put("climb", r.climbM)
-                    .put("stops", pts),
-            )
+            val o = JSONObject()
+                .put("id", r.id)
+                .put("name", r.name)
+                .put("sport", r.sport)
+                .put("km", r.distanceKm)
+                .put("climb", r.climbM)
+                .put("stops", pts)
+            if (r.track.isNotEmpty()) {
+                val track = JSONArray()
+                r.track.forEach { p -> track.put(JSONArray().put(p.lat).put(p.lon).put(p.eleM)) }
+                o.put("track", track)
+            }
+            arr.put(o)
         }
         prefs.edit().putString(KEY, arr.toString()).apply()
     }

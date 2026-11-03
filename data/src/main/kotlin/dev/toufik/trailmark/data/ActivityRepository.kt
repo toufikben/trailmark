@@ -295,6 +295,24 @@ class ActivityRepository(private val db: TrailmarkDb) {
         q.deleteMedia(id = id)
     }
 
+    /**
+     * Removes an activity with its points, media rows, segment efforts and any
+     * resume checkpoint, in one transaction. Returns the media files the caller
+     * should delete from disk.
+     */
+    fun deleteActivity(activityId: Long): List<String> {
+        var files: List<String> = emptyList()
+        db.transaction {
+            files = q.mediaPathsForActivity(activityId).executeAsList()
+            q.deleteMediaForActivity(activityId)
+            q.deleteEffortsForActivity(activityId)
+            q.deletePointsForActivity(activityId)
+            q.clearResume(activity_id = activityId)
+            q.deleteActivityRow(activityId)
+        }
+        return files
+    }
+
     fun setMediaCaption(id: Long, caption: String?) {
         q.setMediaCaption(caption = caption, id = id)
     }

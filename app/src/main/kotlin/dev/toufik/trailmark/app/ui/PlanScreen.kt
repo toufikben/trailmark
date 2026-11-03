@@ -77,6 +77,11 @@ import dev.toufik.trailmark.app.geocode.PlaceSearch
 import dev.toufik.trailmark.app.maps.MapPacks
 import dev.toufik.trailmark.app.maps.SavedRoute
 import dev.toufik.trailmark.app.maps.SavedRoutes
+import dev.toufik.trailmark.app.maps.RouteTransfer
+import dev.toufik.trailmark.core.geo.flattenChunks
+import dev.toufik.trailmark.core.geo.gradeChunks
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Share
 import dev.toufik.trailmark.app.plan.PlannedRoute
 import dev.toufik.trailmark.app.plan.RoutePlanner
 import dev.toufik.trailmark.app.service.PlanRouteHolder
@@ -202,7 +207,32 @@ fun PlanScreen(
             }
         }
     }
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val bytes = runCatching {
+            context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+        }.getOrNull()
+        val route = bytes?.let { RouteTransfer.importGpx(context, it, t.importRoute) }
+        if (route != null) {
+            savedVersion += 1
+            showSaved = true
+        }
+        Toast.makeText(
+            context,
+            if (route != null) t.routeImported else t.routeImportFailed,
+            Toast.LENGTH_SHORT,
+        ).show()
+    }
     val loadSaved: (SavedRoute) -> Unit = { r ->
+        if (r.track.size >= 2) {
+            // An imported route keeps its exact line: no re-routing, straight to navigation.
+            showSaved = false
+            PlanRouteHolder.set(gradeChunks(r.track))
+            onStartRoute()
+            return@loadSaved
+        }
         useAnchor = false
         anchor = null
         stops = r.stops
@@ -254,6 +284,18 @@ fun PlanScreen(
                                                         String.format(java.util.Locale.US, "%.1f", r.distanceKm),
                                                     color = Palette.textSecondary,
                                                     fontSize = 12.sp,
+                                                )
+                                            }
+                                            IconButton(onClick = {
+                                                val pts = r.track.ifEmpty {
+                                                    r.stops.map { (la, lo) -> ElevPoint(la, lo, 0.0) }
+                                                }
+                                                RouteTransfer.share(context, r.name, pts, t.shareRoute)
+                                            }) {
+                                                Icon(
+                                                    Icons.Filled.Share,
+                                                    contentDescription = t.shareRoute,
+                                                    tint = Palette.textSecondary,
                                                 )
                                             }
                                             IconButton(onClick = {
@@ -326,6 +368,16 @@ fun PlanScreen(
                         ) {
                             IconButton(onClick = { showSaved = true }, modifier = Modifier.size(48.dp)) {
                                 Icon(Icons.Filled.List, contentDescription = t.savedRoutes, tint = Palette.text)
+                            }
+                            IconButton(
+                                onClick = {
+                                    importLauncher.launch(
+                                        arrayOf("application/gpx+xml", "application/octet-stream", "text/xml", "*/*"),
+                                    )
+                                },
+                                modifier = Modifier.size(48.dp),
+                            ) {
+                                Icon(Icons.Filled.Add, contentDescription = t.importRoute, tint = Palette.text)
                             }
                         }
                         Row(
@@ -612,6 +664,13 @@ fun PlanScreen(
                                 Spacer(Modifier.width(8.dp))
                                 TextButton(onClick = { saveCurrent() }) {
                                     Text(t.saveRoute, color = Palette.accent, fontSize = 13.sp)
+                                }
+                                IconButton(onClick = {
+                                    val name = sportLabel(t, sport) + " · " +
+                                        formatDistance(p.distanceM) + " " + distanceUnit(t)
+                                    RouteTransfer.share(context, name, flattenChunks(p.chunks), t.shareRoute)
+                                }) {
+                                    Icon(Icons.Filled.Share, contentDescription = t.shareRoute, tint = Palette.accent)
                                 }
                             }
                             Row(

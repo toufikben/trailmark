@@ -168,3 +168,18 @@ SELECT s.id AS segment_id, s.name AS name, count(e.id) AS attempts, min(e.elapse
 FROM segment s LEFT JOIN segment_effort e ON e.segment_id = s.id
 GROUP BY s.id, s.name
 ORDER BY s.id ASC;
+
+mediaPathsForActivity:
+SELECT file_path FROM media WHERE activity_id = ?;
+
+deleteMediaForActivity:
+DELETE FROM media WHERE activity_id = ?;
+
+deleteEffortsForActivity:
+DELETE FROM segment_effort WHERE activity_id = ?;
+
+deletePointsForActivity:
+DELETE FROM track_point WHERE activity_id = ?;
+
+deleteActivityRow:
+DELETE FROM activity WHERE id = ?;

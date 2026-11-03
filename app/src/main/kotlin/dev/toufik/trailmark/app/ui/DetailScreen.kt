@@ -33,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -78,6 +79,7 @@ import dev.toufik.trailmark.app.formatPace
 import dev.toufik.trailmark.app.formatSpeed
 import dev.toufik.trailmark.app.matchSegments
 import dev.toufik.trailmark.app.service.PlanRouteHolder
+import dev.toufik.trailmark.app.service.RecordingHolder
 import dev.toufik.trailmark.app.speedUnit
 import dev.toufik.trailmark.core.geo.ElevPoint
 import dev.toufik.trailmark.core.geo.gradeChunks
@@ -134,6 +136,8 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
     var showCreateSegment by remember { mutableStateOf(false) }
     var flyoverExport by remember { mutableStateOf(false) }
     var exportedVideo by remember { mutableStateOf<android.net.Uri?>(null) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    val recording by RecordingHolder.state.collectAsState()
     var replaySpeed by remember(activityId) { mutableStateOf(1) }
     var replayFlyover by remember(activityId) { mutableStateOf(false) }
     val packPath = remember(detail) {
@@ -197,7 +201,13 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
         ) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onBack) { Text(t.back, color = Palette.accent) }
-                Text(t.details, color = Palette.text, fontSize = 22.sp)
+                Text(t.details, color = Palette.text, fontSize = 22.sp, modifier = Modifier.weight(1f))
+                // The activity being recorded right now cannot be deleted under the recorder.
+                if (detail != null && recording.activityId != activityId) {
+                    TextButton(onClick = { confirmDelete = true }) {
+                        Text(t.deleteActivity, color = Palette.dangerText)
+                    }
+                }
             }
 
             val d = detail
@@ -629,6 +639,31 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                 },
                 onCancel = { flyoverExport = false },
                 onError = { flyoverExport = false },
+            )
+        }
+        if (confirmDelete) {
+            AlertDialog(
+                onDismissRequest = { confirmDelete = false },
+                containerColor = Palette.surface,
+                title = { Text(t.deleteActivity, color = Palette.text) },
+                text = { Text(t.deleteActivityConfirm, color = Palette.textSecondary) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        confirmDelete = false
+                        scope.launch {
+                            withContext(NonCancellable + Dispatchers.IO) {
+                                AppGraph.repository(context).deleteActivity(activityId)
+                                    .forEach { path -> runCatching { File(path).delete() } }
+                            }
+                            onBack()
+                        }
+                    }) { Text(t.deleteActivity, color = Palette.dangerText) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { confirmDelete = false }) {
+                        Text(t.cancel, color = Palette.textSecondary)
+                    }
+                },
             )
         }
         exportedVideo?.let { uri ->

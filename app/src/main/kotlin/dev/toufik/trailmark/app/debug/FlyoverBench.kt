@@ -28,6 +28,14 @@ import org.maplibre.android.snapshotter.MapSnapshotter
 
 private const val TAG = "TM_BENCH"
 
+/** Some ROMs (ColorOS) drop app logcat lines, so results also go to files/bench.txt. */
+private var out: File? = null
+
+private fun report(line: String) {
+    Log.i(TAG, line)
+    runCatching { out?.appendText(line + "\n") }
+}
+
 /**
  * Debug-only timing of the pieces a headless flyover renderer would use:
  * MapSnapshotter frames (cold and warm, 2D and 3D) and surface encoding.
@@ -35,9 +43,11 @@ private const val TAG = "TM_BENCH"
  */
 object FlyoverBench {
     fun run(context: Context, scope: CoroutineScope, activityId: Long) {
+        out = File(context.filesDir, "bench.txt").apply { delete() }
+        report("launched activity=$activityId")
         scope.launch {
             runCatching { bench(context.applicationContext, activityId) }
-                .onFailure { Log.e(TAG, "bench failed", it) }
+                .onFailure { report("bench failed: $it") }
         }
     }
 
@@ -46,11 +56,11 @@ object FlyoverBench {
             AppGraph.repository(context).loadPoints(activityId)
         }.filter { it.type != WaypointType.REJECTED }
         if (points.size < 2) {
-            Log.w(TAG, "activity $activityId has no track")
+            report("activity $activityId has no track")
             return
         }
         val track = ReplayTrack(points)
-        Log.i(TAG, "start activity=$activityId points=${points.size}")
+        report("start activity=$activityId points=${points.size}")
         for (tilt in listOf(0.0, 55.0)) {
             val snapshotter = MapSnapshotter(
                 context,
@@ -79,14 +89,14 @@ object FlyoverBench {
             }
             snapshotter.cancel()
             val warm = times.drop(1).sorted()
-            Log.i(
+            report(
                 TAG,
                 "snapshot tilt=$tilt first=${times[0]}ms warmMedian=${warm[warm.size / 2]}ms " +
                     "warmMax=${warm.last()}ms all=${times.joinToString(",")}",
             )
         }
         benchEncoder(context)
-        Log.i(TAG, "done")
+        report("done")
     }
 
     private suspend fun snapshot(s: MapSnapshotter): MapSnapshot =
@@ -132,6 +142,6 @@ object FlyoverBench {
         codec.release()
         surface.release()
         file.delete()
-        Log.i(TAG, "encoder surface 90 frames ${ms}ms (${ms / 90.0}ms/frame) bytes=$bytes")
+        report("encoder surface 90 frames ${ms}ms (${ms / 90.0}ms/frame) bytes=$bytes")
     }
 }

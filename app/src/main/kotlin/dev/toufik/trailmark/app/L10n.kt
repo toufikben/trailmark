@@ -174,6 +174,14 @@ data class Texts(
     val wRain: String,
     val wSnow: String,
     val wStorm: String,
+    // Later additions carry an English default; languages that translate them
+    // set the value explicitly.
+    val deleteActivity: String = "Delete activity",
+    val deleteActivityConfirm: String = "Delete this activity with its track and photos? This can't be undone.",
+    val importRoute: String = "Import route (GPX)",
+    val routeImported: String = "Route imported into saved routes",
+    val routeImportFailed: String = "No route found in this file",
+    val shareRoute: String = "Share route",
 )
 
 /** Arabic (RTL) — the app's first language. */

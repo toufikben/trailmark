@@ -41,6 +41,28 @@ class GpxTest {
         assertNull(back[0].altitudeM)
         assertNull(back[0].timeMillis)
     }
+
+    @Test
+    fun readsRoutePointsWhenThereIsNoTrack() {
+        val xml = """<gpx><rte><name>Col &amp; lac</name>
+            <rtept lat="45.1" lon="6.1"><ele>1200</ele></rtept>
+            <rtept lat="45.2" lon="6.2"/>
+            </rte></gpx>"""
+        val back = Gpx.read(xml)
+        assertEquals(2, back.size)
+        assertEquals(1200.0, back[0].altitudeM!!, 1e-9)
+        assertEquals(6.2, back[1].lon, 1e-9)
+        assertEquals("Col & lac", Gpx.name(xml))
+    }
+
+    @Test
+    fun routeWriterRoundTrips() {
+        val pts = listOf(ImportedPoint(36.1, 3.1, 100.0, null), ImportedPoint(36.2, 3.2, null, null))
+        val xml = Gpx.writeRoute(pts, "Ridge <loop>")
+        assertEquals(pts, Gpx.read(xml))
+        assertEquals("Ridge <loop>", Gpx.name(xml))
+        assertTrue(xml.contains("<trkpt"))
+    }
 }
 
 class TcxTest {

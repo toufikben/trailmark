@@ -196,4 +196,27 @@ class ActivityRepositoryTest {
         assertEquals(270L, row.weatherWindDeg)
         assertEquals(3L, row.weatherCode)
     }
+
+    @Test
+    fun deleteActivityRemovesEverythingItOwns() {
+        val keep = repo.insertActivity("keep", "RUN", 1000)
+        repo.appendPoints(keep, listOf(p(10), p(20)))
+        val gone = repo.insertActivity("gone", "RUN", 2000)
+        repo.appendPoints(gone, listOf(p(10), p(20), p(30)))
+        repo.insertMedia(gone, "PHOTO", "/m/a.jpg", 36.0, 3.0, null, 10.0, 5, 1, null, null)
+        repo.insertMedia(gone, "VIDEO", "/m/b.mp4", 36.0, 3.0, null, 20.0, 9, 2, 4000, null)
+        val seg = repo.insertSegment("hill", 36.0, 3.0, 36.1, 3.1)
+        repo.insertEffort(seg, gone, 1_000)
+        repo.saveResume(gone, p(30), 12.0, 30)
+
+        val files = repo.deleteActivity(gone)
+
+        assertEquals(setOf("/m/a.jpg", "/m/b.mp4"), files.toSet())
+        assertEquals(listOf(keep), repo.listActivities().map { it.id })
+        assertEquals(0, repo.pointCount(gone))
+        assertTrue(repo.listMedia(gone).isEmpty())
+        assertTrue(repo.effortsForActivity(gone).isEmpty())
+        assertNull(repo.loadResume())
+        assertEquals(2, repo.pointCount(keep))
+    }
 }
