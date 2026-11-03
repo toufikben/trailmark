@@ -90,7 +90,6 @@ object FlyoverBench {
             snapshotter.cancel()
             val warm = times.drop(1).sorted()
             report(
-                TAG,
                 "snapshot tilt=$tilt first=${times[0]}ms warmMedian=${warm[warm.size / 2]}ms " +
                     "warmMax=${warm.last()}ms all=${times.joinToString(",")}",
             )

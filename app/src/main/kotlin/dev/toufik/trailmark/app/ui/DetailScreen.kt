@@ -458,6 +458,13 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                         dark = darkMap,
                         flyover = replayFlyover,
                     )
+                    val zoneTimesHere = remember(d) {
+                        dev.toufik.trailmark.analytics.zoneTimes(
+                            d.points,
+                            dev.toufik.trailmark.analytics.ZoneScale.forSport(d.row.sport),
+                        )
+                    }
+                    ZonesCard(t, t.zonesActivity, d.row.sport, zoneTimesHere)
                     if (d.speedKmh.size >= 2 || d.elevM.size >= 2) {
                         Surface(
                             color = Palette.surface,

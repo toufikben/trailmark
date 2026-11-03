@@ -231,14 +231,14 @@ fun PlanScreen(
             showSaved = false
             PlanRouteHolder.set(gradeChunks(r.track))
             onStartRoute()
-            return@loadSaved
+        } else {
+            useAnchor = false
+            anchor = null
+            stops = r.stops
+            sport = runCatching { Sport.valueOf(r.sport) }.getOrDefault(Sport.RUN)
+            drafting = false
+            showSaved = false
         }
-        useAnchor = false
-        anchor = null
-        stops = r.stops
-        sport = runCatching { Sport.valueOf(r.sport) }.getOrDefault(Sport.RUN)
-        drafting = false
-        showSaved = false
     }
 
     Surface(color = Palette.bg, modifier = modifier.fillMaxSize()) {

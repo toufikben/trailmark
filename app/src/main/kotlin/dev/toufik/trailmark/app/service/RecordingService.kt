@@ -257,19 +257,27 @@ class RecordingService : Service() {
                                 segmentStartedNanos.remove(s.id)
                                 val seconds =
                                     ((st.elapsedNanos - startedAt) / 1_000_000_000L).coerceAtLeast(0L)
-                                if (ttsReady) {
-                                    tts?.speak(
-                                        Coach.message(
-                                            CoachEvent.SegmentFinish(s.name, seconds),
-                                            coachLocale(currentLang()),
-                                            s.name.hashCode(),
-                                        ),
-                                        TextToSpeech.QUEUE_ADD,
-                                        null,
-                                        "segment-finish-${s.id}",
-                                    )
+                                // Efforts are stored when the recording stops, so the
+                                // best on file is still the previous record here.
+                                val bestSeconds = runCatching {
+                                    dev.toufik.trailmark.app.AppGraph.repository(this@RecordingService)
+                                        .bestEffortNanos(s.id)
+                                }.getOrNull()?.let { it / 1_000_000_000L }
+                                val event = if (bestSeconds != null && seconds < bestSeconds) {
+                                    CoachEvent.SegmentRecord(s.name, seconds, bestSeconds - seconds)
+                                } else {
+                                    CoachEvent.SegmentFinish(s.name, seconds)
                                 }
-                                buzz(longArrayOf(0, 120, 80, 120, 80, 120))
+                                val line = Coach.message(event, coachLocale(currentLang()), s.name.hashCode())
+                                if (ttsReady) {
+                                    tts?.speak(line, TextToSpeech.QUEUE_ADD, null, "segment-finish-${s.id}")
+                                }
+                                if (event is CoachEvent.SegmentRecord) {
+                                    notifyRecord(s.id, line)
+                                    buzz(longArrayOf(0, 250, 100, 250, 100, 400))
+                                } else {
+                                    buzz(longArrayOf(0, 120, 80, 120, 80, 120))
+                                }
                             }
                         }
                     }
@@ -504,6 +512,37 @@ class RecordingService : Service() {
         mgr.createNotificationChannel(channel)
     }
 
+    /** A heads-up notification for a new segment record, kept after the run ends. */
+    private fun notifyRecord(segmentId: Long, line: String) {
+        runCatching {
+            val mgr = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                mgr.createNotificationChannel(
+                    NotificationChannel(
+                        RECORDS_CHANNEL_ID,
+                        textsFor(currentLang()).segments,
+                        NotificationManager.IMPORTANCE_HIGH,
+                    ),
+                )
+            }
+            val open = PendingIntent.getActivity(
+                this,
+                3,
+                Intent(this, MainActivity::class.java),
+                PendingIntent.FLAG_IMMUTABLE,
+            )
+            val n = NotificationCompat.Builder(this, RECORDS_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_stat_track)
+                .setContentTitle(textsFor(currentLang()).newRecord)
+                .setContentText(line)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(line))
+                .setAutoCancel(true)
+                .setContentIntent(open)
+                .build()
+            mgr.notify((RECORD_NOTIF_BASE + segmentId).toInt(), n)
+        }
+    }
+
     private fun buildNotification(state: RecordingState? = null): Notification {
         val t = textsFor(currentLang())
         val open = PendingIntent.getActivity(
@@ -555,5 +594,7 @@ class RecordingService : Service() {
         private const val CHANNEL_ID = "recording_v2"
         private const val LEGACY_CHANNEL_ID = "recording"
         private const val NOTIF_ID = 4711
+        private const val RECORDS_CHANNEL_ID = "segment_records"
+        private const val RECORD_NOTIF_BASE = 50_000L
     }
 }

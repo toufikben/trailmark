@@ -182,6 +182,16 @@ data class Texts(
     val routeImported: String = "Route imported into saved routes",
     val routeImportFailed: String = "No route found in this file",
     val shareRoute: String = "Share route",
+    val comparison: String = "Compared with before",
+    val previousPeriod: String = "Previous",
+    val activitiesShort: String = "activities",
+    val bestTimesBoard: String = "Your best times",
+    val noAttemptsYet: String = "No attempts yet",
+    val deleteSegment: String = "Delete segment",
+    val deleteSegmentConfirm: String = "Tap again to delete",
+    val weeklyGoal: String = "Weekly goal",
+    val zonesLast30: String = "Zones · last 30 days",
+    val zonesActivity: String = "Speed zones",
 )
 
 /** Arabic (RTL) — the app's first language. */

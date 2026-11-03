@@ -183,3 +183,14 @@ DELETE FROM track_point WHERE activity_id = ?;
 
 deleteActivityRow:
 DELETE FROM activity WHERE id = ?;
+
+effortsForSegment:
+SELECT e.id, e.activity_id, e.elapsed_nanos, a.start_wall_millis
+FROM segment_effort e JOIN activity a ON a.id = e.activity_id
+WHERE e.segment_id = ? ORDER BY e.elapsed_nanos ASC, a.start_wall_millis ASC;
+
+deleteSegment:
+DELETE FROM segment WHERE id = ?;
+
+deleteEffortsForSegment:
+DELETE FROM segment_effort WHERE segment_id = ?;

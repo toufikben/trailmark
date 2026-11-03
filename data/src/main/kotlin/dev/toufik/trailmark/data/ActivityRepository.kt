@@ -67,6 +67,14 @@ class EffortRow(
     val elapsedNanos: Long,
 )
 
+/** One timed passage of a segment, with when its activity started. */
+class SegmentEffort(
+    val id: Long,
+    val activityId: Long,
+    val elapsedNanos: Long,
+    val startWallMillis: Long,
+)
+
 /** Aggregate per segment: attempt count and the best elapsed time, if any. */
 class SegmentStat(
     val id: Long,
@@ -359,6 +367,19 @@ class ActivityRepository(private val db: TrailmarkDb) {
         q.effortsForActivity(activity_id = activityId).executeAsList().map {
             EffortRow(it.id, it.segment_id, it.name, it.elapsed_nanos)
         }
+
+    /** Every effort on one segment, fastest first: the "your best times" board. */
+    fun effortsForSegment(segmentId: Long): List<SegmentEffort> =
+        q.effortsForSegment(segment_id = segmentId).executeAsList().map {
+            SegmentEffort(it.id, it.activity_id, it.elapsed_nanos, it.start_wall_millis)
+        }
+
+    fun deleteSegment(segmentId: Long) {
+        db.transaction {
+            q.deleteEffortsForSegment(segmentId)
+            q.deleteSegment(segmentId)
+        }
+    }
 
     fun segmentStats(): List<SegmentStat> =
         q.segmentStats().executeAsList().map {

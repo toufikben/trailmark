@@ -219,4 +219,23 @@ class ActivityRepositoryTest {
         assertNull(repo.loadResume())
         assertEquals(2, repo.pointCount(keep))
     }
+
+    @Test
+    fun segmentBoardRanksEffortsFastestFirstAndDeletes() {
+        val a1 = repo.insertActivity("a1", "RUN", 1000)
+        val a2 = repo.insertActivity("a2", "RUN", 2000)
+        val a3 = repo.insertActivity("a3", "RUN", 3000)
+        val seg = repo.insertSegment("climb", 36.0, 3.0, 36.1, 3.1)
+        repo.insertEffort(seg, a1, 400)
+        repo.insertEffort(seg, a2, 300)
+        repo.insertEffort(seg, a3, 500)
+
+        val board = repo.effortsForSegment(seg)
+        assertEquals(listOf(a2, a1, a3), board.map { it.activityId })
+        assertEquals(2000L, board.first().startWallMillis)
+
+        repo.deleteSegment(seg)
+        assertTrue(repo.listSegments().isEmpty())
+        assertTrue(repo.effortsForSegment(seg).isEmpty())
+    }
 }

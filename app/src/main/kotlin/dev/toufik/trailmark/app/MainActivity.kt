@@ -272,6 +272,10 @@ class MainActivity : ComponentActivity() {
                                             paywallFrom = Screen.Progress
                                             screen = Screen.Paywall
                                         },
+                                        onOpenActivity = { id ->
+                                            detailFrom = Screen.Progress
+                                            screen = Screen.Detail(id)
+                                        },
                                     )
                                     Screen.Settings -> SettingsScreen(
                                         lang = lang,
