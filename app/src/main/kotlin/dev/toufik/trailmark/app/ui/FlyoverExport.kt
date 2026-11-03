@@ -3,11 +3,9 @@ package dev.toufik.trailmark.app.ui
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
-import android.media.Image
-import android.media.MediaCodec
-import android.media.MediaCodecInfo
-import android.media.MediaFormat
-import android.media.MediaMuxer
+import android.graphics.Paint
+import android.graphics.PointF
+import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Button
@@ -37,13 +36,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import dev.toufik.trailmark.analytics.ReplayTrack
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.formatDuration
@@ -51,11 +50,10 @@ import dev.toufik.trailmark.app.maps.GlyphStore
 import dev.toufik.trailmark.app.maps.ONLINE_STYLE_URL
 import dev.toufik.trailmark.app.maps.ONLINE_STYLE_URL_LIGHT
 import dev.toufik.trailmark.core.model.StoredPoint
-import dev.toufik.trailmark.core.model.WaypointType
 import dev.toufik.trailmark.engine.Sport
 import java.io.File
 import kotlin.coroutines.resume
-import kotlin.math.roundToInt
+import kotlin.math.exp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -66,6 +64,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
@@ -73,7 +72,7 @@ import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.FillExtrusionLayer
 import org.maplibre.android.style.layers.LineLayer
-import org.maplibre.android.style.layers.SymbolLayer
+import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory.circleColor
 import org.maplibre.android.style.layers.PropertyFactory.circleRadius
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeColor
@@ -88,9 +87,13 @@ import org.maplibre.android.style.layers.PropertyFactory.iconImage
 import org.maplibre.android.style.layers.PropertyFactory.iconRotate
 import org.maplibre.android.style.layers.PropertyFactory.iconRotationAlignment
 import org.maplibre.android.style.layers.PropertyFactory.iconSize
+import org.maplibre.android.style.layers.PropertyFactory.lineCap
 import org.maplibre.android.style.layers.PropertyFactory.lineColor
+import org.maplibre.android.style.layers.PropertyFactory.lineJoin
 import org.maplibre.android.style.layers.PropertyFactory.lineOpacity
 import org.maplibre.android.style.layers.PropertyFactory.lineWidth
+import org.maplibre.android.style.layers.PropertyFactory.visibility
+import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
@@ -100,16 +103,20 @@ import org.maplibre.geojson.Point
 private const val VIDEO_WIDTH = 720
 private const val VIDEO_HEIGHT = 1280
 
-/** Camera values copied from the replay map, so the clip matches what you watched. */
-private const val FLYOVER_TILT = 55.0
-private const val FLYOVER_ZOOM = 15.5
-private const val REPLAY_ZOOM = 16.0
-private const val BEARING_SMOOTHING = 0.35
+private const val FLY_TILT = 55.0
+
+/** The travelled line is resampled to at most this many vertices, so updating it each frame stays cheap. */
+private const val MAX_LINE_VERTICES = 1_500
+
+/** Per-second camera heading smoothing: the heading settles over about half a second. */
+private const val BEARING_TAU_S = 0.5
 
 /**
- * Renders a 9:16 flyover of [points] and hands the finished MP4 to [onDone].
- * The clip follows the athlete marker like the replay map, honours the chosen
- * [speed] and [flyover] tilt, and lasts `activity / speed`.
+ * Renders a 9:16 flyover of [points] at a constant 30 fps and hands the finished
+ * MP4 to [onDone]. Stops take no screen time, the camera eases in from the whole
+ * route and back out to it, and live stats ride along. [options] picks the clip
+ * length and the camera: a 3D flyover, a flat follow, or a fixed overview that
+ * renders the map once and is by far the quickest for long routes.
  */
 @Composable
 fun FlyoverOverlay(
@@ -118,8 +125,8 @@ fun FlyoverOverlay(
     packPath: String?,
     dark: Boolean,
     langCode: String,
-    speed: Int,
-    flyover: Boolean,
+    options: FlyoverOptions,
+    stats: FlyoverStats,
     onDone: (File) -> Unit,
     onCancel: () -> Unit,
     onError: () -> Unit,
@@ -127,7 +134,9 @@ fun FlyoverOverlay(
     val context = LocalContext.current
     val t = LocalTexts.current
     val view = LocalView.current
+    val density = LocalDensity.current
     var progress by remember { mutableStateOf(0f) }
+    var etaNanos by remember { mutableStateOf<Long?>(null) }
 
     BackHandler(onBack = onCancel)
     DisposableEffect(view) {
@@ -151,84 +160,108 @@ fun FlyoverOverlay(
     }
 
     val glyphsBase = remember { GlyphStore.ensure(context).absolutePath }
-    val route = remember(points) {
-        points.filter { it.type != WaypointType.REJECTED && it.lat.isFinite() && it.lon.isFinite() }
-    }
-    val track = remember(route) { ReplayTrack(route) }
-    val plan = remember(track, speed) { flyoverPlan(track.totalNanos, speed) }
+    val path = remember(points) { FlyoverPath(points) }
+    val seconds = if (options.seconds > 0) options.seconds else autoFlyoverSeconds(path.totalM)
+    val timeline = remember(path, seconds) { FlyoverTimeline(path.totalM, seconds) }
 
     LaunchedEffect(Unit) {
         var output: File? = null
         try {
+            if (path.isEmpty || path.totalM < 1.0) error("nothing to fly over")
             while (mapView.width == 0) delay(50)
-            val map = withContext(Dispatchers.Main) {
-                suspendCancellableCoroutine<MapLibreMap> { cont -> mapView.getMapAsync { cont.resume(it) } }
+            val map = suspendCancellableCoroutine<MapLibreMap> { cont -> mapView.getMapAsync { cont.resume(it) } }
+            val line = resample(path)
+            val builder = when {
+                packPath != null && !isOnline(context) ->
+                    Style.Builder().fromJson(vectorStyle(packPath, glyphsBase, dark, langCode))
+                else -> Style.Builder().fromUri(if (dark) ONLINE_STYLE_URL else ONLINE_STYLE_URL_LIGHT)
             }
-            val lngLats = route.map { Point.fromLngLat(it.lon, it.lat) }
-            withContext(Dispatchers.Main) {
-                val builder = when {
-                    packPath != null && !isOnline(context) ->
-                        Style.Builder().fromJson(vectorStyle(packPath, glyphsBase, dark, langCode))
-                    else -> Style.Builder().fromUri(if (dark) ONLINE_STYLE_URL else ONLINE_STYLE_URL_LIGHT)
-                }
-                suspendCancellableCoroutine<Unit> { cont ->
-                    map.setStyle(builder) { style ->
-                        addFlyoverLayers(style, lngLats, context, sport, dark)
-                        cont.resume(Unit)
-                    }
+            val style = suspendCancellableCoroutine<Style> { cont ->
+                map.setStyle(builder) { s ->
+                    addFlyoverLayers(s, line.points, context, sport, dark, options.camera == FlyoverCamera.FLY_3D)
+                    cont.resume(s)
                 }
             }
-            val style = map.style
+            map.uiSettings.isCompassEnabled = false
+            map.uiSettings.isLogoEnabled = false
+            map.uiSettings.isAttributionEnabled = false
+
+            val overview = overviewCamera(map, path)
+            val avgSpeed = if (path.movingNanos > 0) path.totalM / (path.movingNanos / 1e9) else 1.5
+            val tilted = options.camera == FlyoverCamera.FLY_3D
+            val zoom = followZoom(avgSpeed, tilted)
+            val tilt = if (tilted) FLY_TILT else 0.0
+            val lookAhead = (path.totalM / 60.0).coerceIn(60.0, 300.0)
+            val hud = FlyoverHud(t, stats, sport == Sport.RUN, VIDEO_WIDTH, VIDEO_HEIGHT)
+
             val file = withContext(Dispatchers.IO) { newExportFile(context) }
             output = file
-            val writer = Mp4Writer(file)
+            val encoder = withContext(Dispatchers.Default) { FlyoverEncoder(file, VIDEO_WIDTH, VIDEO_HEIGHT) }
             try {
-                withContext(Dispatchers.Main) {
-                    map.uiSettings.isCompassEnabled = false
-                    map.uiSettings.isAttributionEnabled = true
-                }
-                val tilt = if (flyover) FLYOVER_TILT else 0.0
-                val zoom = if (flyover) FLYOVER_ZOOM else REPLAY_ZOOM
-                var smoothBearing = track.sampleAt(0L)?.bearingDeg ?: 0.0
-                for (i in 0 until plan.frames) {
-                    val sample = track.sampleAt(plan.activityNanos(i))
-                    if (sample != null) {
-                        var delta = (sample.bearingDeg - smoothBearing + 540.0) % 360.0 - 180.0
-                        smoothBearing = (smoothBearing + delta * BEARING_SMOOTHING + 360.0) % 360.0
+                val started = SystemClock.elapsedRealtimeNanos()
+                if (options.camera == FlyoverCamera.OVERVIEW) {
+                    renderOverview(map, mapView, style, overview, line, path, timeline, hud, encoder) { i ->
+                        progress = (i + 1f) / timeline.frames
+                        etaNanos = eta(started, i + 1, timeline.frames)
                     }
-                    val at = sample?.let { LatLng(it.lat, it.lon) }
-                    val shot = withContext(Dispatchers.Main) {
-                        if (at != null) {
-                            map.cameraPosition = CameraPosition.Builder()
-                                .target(at)
-                                .zoom(zoom)
-                                .bearing(smoothBearing)
-                                .tilt(tilt)
-                                .build()
-                            style?.getSourceAs<GeoJsonSource>(ATHLETE_SOURCE)?.setGeoJson(
-                                FeatureCollection.fromFeature(
-                                    Feature.fromGeometry(Point.fromLngLat(at.longitude, at.latitude)),
-                                ),
+                } else {
+                    var bearing = path.bearingAt(0.0, lookAhead)
+                    val alpha = 1.0 - exp(-1.0 / FLYOVER_FPS / BEARING_TAU_S)
+                    val startCam = followCamera(path.at(0.0), bearing, zoom, tilt)
+                    var endCam = startCam
+                    var lastCam: CameraPosition? = null
+                    var lastShot: Bitmap? = null
+                    for (i in 0 until timeline.frames) {
+                        val f = timeline.frame(i)
+                        val cam = when (f.phase) {
+                            FlyoverPhase.INTRO -> lerpCamera(overview, startCam, easeInOut(f.t))
+                            FlyoverPhase.ROUTE -> {
+                                val target = path.bearingAt(f.distanceM, lookAhead)
+                                val delta = (target - bearing + 540.0) % 360.0 - 180.0
+                                bearing = (bearing + delta * alpha + 360.0) % 360.0
+                                followCamera(path.at(f.distanceM), bearing, zoom, tilt).also { endCam = it }
+                            }
+                            FlyoverPhase.OUTRO -> lerpCamera(endCam, overview, easeInOut(f.t * 1.6))
+                        }
+                        // The outro ends on a held camera: the map would not redraw, so
+                        // waiting for it would only time out. Reuse the last frame.
+                        val held = lastShot
+                        val shot = if (held != null && f.phase == FlyoverPhase.OUTRO && cam == lastCam) held else awaitRender(mapView) {
+                            map.cameraPosition = cam
+                            val here = path.at(f.distanceM)
+                            style.getSourceAs<GeoJsonSource>(DONE_SOURCE)?.setGeoJson(
+                                lineFeature(line.prefix(f.distanceM, here)),
                             )
-                            style?.getLayerAs<SymbolLayer>(ATHLETE_LAYER)?.setProperties(
-                                iconRotate(smoothBearing.toFloat()),
-                                iconImage(spriteImageId(sport, i % SPRITE_FRAMES)),
+                            style.getSourceAs<GeoJsonSource>(ATHLETE_SOURCE)?.setGeoJson(
+                                Feature.fromGeometry(Point.fromLngLat(here.lon, here.lat)),
+                            )
+                            style.getLayerAs<SymbolLayer>(ATHLETE_LAYER)?.setProperties(
+                                iconRotate(bearing.toFloat()),
+                                iconImage(spriteImageId(sport, (i / 3) % SPRITE_FRAMES)),
+                            )
+                            style.getLayerAs<SymbolLayer>(ATHLETE_LAYER)?.setProperties(
+                                visibility(if (f.phase == FlyoverPhase.INTRO) Property.NONE else Property.VISIBLE),
                             )
                         }
-                        awaitMapIdle(map)
-                        captureMap(map)
+                        withContext(Dispatchers.Default) {
+                            encoder.frame { c ->
+                                c.drawBitmap(shot, null, android.graphics.Rect(0, 0, VIDEO_WIDTH, VIDEO_HEIGHT), BITMAP_PAINT)
+                                drawHudFor(hud, c, f, path, timeline)
+                            }
+                        }
+                        if (shot !== lastShot) lastShot?.recycle()
+                        lastShot = shot
+                        lastCam = cam
+                        progress = (i + 1f) / timeline.frames
+                        etaNanos = eta(started, i + 1, timeline.frames)
                     }
-                    val portrait = withContext(Dispatchers.Default) { scaleToPortrait(shot) }
-                    if (portrait !== shot) shot.recycle()
-                    withContext(Dispatchers.Default) { writer.encode(portrait, plan.ptsUs(i)) }
-                    portrait.recycle()
-                    progress = (i + 1f) / plan.frames
+                    lastShot?.recycle()
                 }
-                withContext(Dispatchers.Default) { writer.finish() }
+                withContext(Dispatchers.Default) { encoder.finish() }
             } finally {
                 // Draining the encoder blocks, so never on the main thread, and it
                 // must still run when the user cancels mid-render.
-                withContext(NonCancellable + Dispatchers.Default) { runCatching { writer.finish() } }
+                withContext(NonCancellable + Dispatchers.Default) { runCatching { encoder.finish() } }
             }
             onDone(file)
         } catch (e: CancellationException) {
@@ -241,7 +274,10 @@ fun FlyoverOverlay(
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-        AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
+        // Exactly the video size, so snapshots need no scaling or cropping.
+        val w = with(density) { VIDEO_WIDTH.toDp() }
+        val h = with(density) { VIDEO_HEIGHT.toDp() }
+        AndroidView(factory = { mapView }, modifier = Modifier.align(Alignment.TopStart).requiredSize(w, h))
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -275,12 +311,12 @@ fun FlyoverOverlay(
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    "720 × 1280 · 24 fps",
+                    "⁦720 × 1280 · $FLYOVER_FPS fps⁩",
                     color = Palette.textSecondary,
                     fontSize = 11.sp,
                 )
                 Text(
-                    "${formatDuration(plan.durationNanos)} · ×$speed",
+                    "${formatDuration(timeline.durationNanos)} · ${etaNanos?.let { "≈ ${formatDuration(it)}" } ?: "…"}",
                     color = Palette.textSecondary,
                     fontSize = 11.sp,
                 )
@@ -304,6 +340,190 @@ fun FlyoverOverlay(
         }
     }
 }
+
+private val BITMAP_PAINT = Paint(Paint.FILTER_BITMAP_FLAG)
+
+private fun drawHudFor(hud: FlyoverHud, c: android.graphics.Canvas, f: FlyoverFrame, path: FlyoverPath, tl: FlyoverTimeline) {
+    when (f.phase) {
+        FlyoverPhase.INTRO -> hud.intro(c, f.t)
+        FlyoverPhase.ROUTE -> hud.route(
+            c,
+            f.distanceM,
+            path.movingNanosAt(f.distanceM),
+            path.speedAt(f.distanceM),
+            f.distanceM / tl.totalM.coerceAtLeast(1.0),
+        )
+        FlyoverPhase.OUTRO -> hud.outro(c, f.t)
+    }
+}
+
+/** Remaining render time from the pace so far. */
+private fun eta(startedNanos: Long, done: Int, total: Int): Long? {
+    if (done < 10) return null
+    val spent = SystemClock.elapsedRealtimeNanos() - startedNanos
+    return spent / done * (total - done)
+}
+
+/**
+ * The fixed-camera mode: the map is rendered once at the overview camera and
+ * every frame only draws the travelled line and the athlete on top, so even
+ * a 100 km ride exports in seconds.
+ */
+private suspend fun renderOverview(
+    map: MapLibreMap,
+    mapView: MapView,
+    style: Style,
+    overview: CameraPosition,
+    line: ResampledLine,
+    path: FlyoverPath,
+    timeline: FlyoverTimeline,
+    hud: FlyoverHud,
+    encoder: FlyoverEncoder,
+    onFrame: (Int) -> Unit,
+) {
+    val base = awaitRender(mapView) {
+        map.cameraPosition = overview
+        style.getLayerAs<LineLayer>(DONE_LAYER)?.setProperties(visibility(Property.NONE))
+        style.getLayerAs<SymbolLayer>(ATHLETE_LAYER)?.setProperties(visibility(Property.NONE))
+    }
+    val screen = line.points.map { map.projection.toScreenLocation(LatLng(it.latitude(), it.longitude())) }
+    val done = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFC6FF3D.toInt()
+        strokeWidth = 9f
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+    val puck = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFC6FF3D.toInt() }
+    val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFF0E1113.toInt()
+        style = Paint.Style.STROKE
+        strokeWidth = 5f
+    }
+    val gfxPath = android.graphics.Path()
+    withContext(Dispatchers.Default) {
+        for (i in 0 until timeline.frames) {
+            val f = timeline.frame(i)
+            val upTo = line.indexAt(f.distanceM)
+            val here = map.projectionSafe(screen, line, f.distanceM, upTo)
+            gfxPath.reset()
+            gfxPath.moveTo(screen[0].x, screen[0].y)
+            for (k in 1..upTo) gfxPath.lineTo(screen[k].x, screen[k].y)
+            gfxPath.lineTo(here.x, here.y)
+            encoder.frame { c ->
+                c.drawBitmap(base, null, android.graphics.Rect(0, 0, VIDEO_WIDTH, VIDEO_HEIGHT), BITMAP_PAINT)
+                if (f.phase != FlyoverPhase.INTRO) {
+                    c.drawPath(gfxPath, done)
+                    c.drawCircle(here.x, here.y, 14f, puck)
+                    c.drawCircle(here.x, here.y, 14f, ring)
+                }
+                drawHudFor(hud, c, f, path, timeline)
+            }
+            withContext(Dispatchers.Main) { onFrame(i) }
+        }
+    }
+    base.recycle()
+}
+
+/** Screen position of the cursor, interpolated between the two projected vertices around it. */
+@Suppress("UnusedReceiverParameter")
+private fun MapLibreMap.projectionSafe(screen: List<PointF>, line: ResampledLine, d: Double, i: Int): PointF {
+    if (i >= screen.size - 1) return screen.last()
+    val f = ((d - line.distances[i]) / (line.distances[i + 1] - line.distances[i]).coerceAtLeast(1e-9))
+        .coerceIn(0.0, 1.0).toFloat()
+    return PointF(
+        screen[i].x + (screen[i + 1].x - screen[i].x) * f,
+        screen[i].y + (screen[i + 1].y - screen[i].y) * f,
+    )
+}
+
+/** The route resampled at even spacing, with each vertex's distance along it. */
+internal class ResampledLine(val points: List<Point>, val distances: DoubleArray) {
+    fun indexAt(d: Double): Int {
+        var lo = 0
+        var hi = distances.size - 1
+        while (lo < hi) {
+            val mid = (lo + hi + 1) / 2
+            if (distances[mid] <= d) lo = mid else hi = mid - 1
+        }
+        return lo
+    }
+
+    fun prefix(d: Double, here: PathSample): List<Point> {
+        val n = indexAt(d)
+        return points.subList(0, n + 1) + Point.fromLngLat(here.lon, here.lat)
+    }
+}
+
+private fun resample(path: FlyoverPath): ResampledLine {
+    val step = (path.totalM / MAX_LINE_VERTICES).coerceAtLeast(4.0)
+    val n = (path.totalM / step).toInt() + 1
+    val pts = ArrayList<Point>(n + 1)
+    val ds = ArrayList<Double>(n + 1)
+    for (k in 0 until n) {
+        val d = k * step
+        val s = path.at(d)
+        pts.add(Point.fromLngLat(s.lon, s.lat))
+        ds.add(d)
+    }
+    val end = path.at(path.totalM)
+    pts.add(Point.fromLngLat(end.lon, end.lat))
+    ds.add(path.totalM)
+    return ResampledLine(pts, ds.toDoubleArray())
+}
+
+private fun lineFeature(points: List<Point>): Feature =
+    Feature.fromGeometry(LineString.fromLngLats(if (points.size >= 2) points else points + points))
+
+private fun followCamera(at: PathSample, bearing: Double, zoom: Double, tilt: Double): CameraPosition =
+    CameraPosition.Builder().target(LatLng(at.lat, at.lon)).zoom(zoom).bearing(bearing).tilt(tilt).build()
+
+/** Straight blend between two cameras, turning the short way round. */
+private fun lerpCamera(a: CameraPosition, b: CameraPosition, k: Double): CameraPosition {
+    val f = k.coerceIn(0.0, 1.0)
+    val ta = a.target ?: return b
+    val tb = b.target ?: return a
+    val db = (b.bearing - a.bearing + 540.0) % 360.0 - 180.0
+    return CameraPosition.Builder()
+        .target(LatLng(ta.latitude + (tb.latitude - ta.latitude) * f, ta.longitude + (tb.longitude - ta.longitude) * f))
+        .zoom(a.zoom + (b.zoom - a.zoom) * f)
+        .bearing((a.bearing + db * f + 360.0) % 360.0)
+        .tilt(a.tilt + (b.tilt - a.tilt) * f)
+        .build()
+}
+
+/** North-up camera fitting the whole route inside the area the stats bar leaves free. */
+private fun overviewCamera(map: MapLibreMap, path: FlyoverPath): CameraPosition {
+    val pts = path.all()
+    val bounds = LatLngBounds.Builder().apply { pts.forEach { include(LatLng(it.lat, it.lon)) } }.build()
+    val fitted = if (pts.size >= 2) {
+        runCatching { map.getCameraForLatLngBounds(bounds, intArrayOf(90, 300, 90, 330)) }.getOrNull()
+    } else {
+        null
+    }
+    return fitted ?: CameraPosition.Builder().target(LatLng(pts.first().lat, pts.first().lon)).zoom(15.0).build()
+}
+
+/**
+ * Applies [change] and waits until the map has loaded what it needs and drawn
+ * it (idle), then snapshots. A plain camera-idle wait fired before tiles were in,
+ * which put half-drawn and stale frames in the clip.
+ */
+private suspend fun awaitRender(mapView: MapView, change: () -> Unit): Bitmap {
+    val idle = CompletableDeferred<Unit>()
+    val listener = MapView.OnDidBecomeIdleListener { idle.complete(Unit) }
+    mapView.addOnDidBecomeIdleListener(listener)
+    try {
+        change()
+        withTimeoutOrNull(RENDER_TIMEOUT_MS) { idle.await() }
+    } finally {
+        mapView.removeOnDidBecomeIdleListener(listener)
+    }
+    val map = suspendCancellableCoroutine<MapLibreMap> { cont -> mapView.getMapAsync { cont.resume(it) } }
+    return captureMap(map)
+}
+
+private const val RENDER_TIMEOUT_MS = 4_000L
 
 /** A finished video (gallery or FileProvider URI) can be handed straight to the system share sheet. */
 fun shareVideo(context: Context, uri: android.net.Uri, chooserTitle: String) {
@@ -336,19 +556,22 @@ private fun isOnline(context: Context): Boolean {
     return caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
 }
 
+private const val REST_SOURCE = "fly-rest-source"
+private const val DONE_SOURCE = "fly-done-source"
+private const val DONE_LAYER = "fly-done-line"
 private const val ATHLETE_SOURCE = "fly-athlete-source"
 private const val ATHLETE_LAYER = "fly-athlete-layer"
 
 private fun addFlyoverLayers(
     style: Style,
-    lngLats: List<Point>,
+    line: List<Point>,
     context: Context,
     sport: Sport,
     dark: Boolean,
+    buildings: Boolean,
 ) {
-    if (lngLats.size < 2 || style.getSource("fly-route") != null) return
-    // Same extruded buildings as the replay map, so the tilt reads as a flyover.
-    if (style.getLayer("fly-3d") == null) {
+    if (line.size < 2 || style.getSource(REST_SOURCE) != null) return
+    if (buildings && style.getLayer("fly-3d") == null) {
         val below = style.layers.firstOrNull { it is SymbolLayer }?.id
         val b3d = FillExtrusionLayer("fly-3d", "openmaptiles").withProperties(
             fillExtrusionColor(if (dark) "#1E2429" else "#D8DBD6"),
@@ -363,62 +586,55 @@ private fun addFlyoverLayers(
         b3d.withSourceLayer("building")
         if (below != null) style.addLayerBelow(b3d, below) else style.addLayer(b3d)
     }
-    style.addSource(
-        GeoJsonSource(
-            "fly-route",
-            FeatureCollection.fromFeature(Feature.fromGeometry(LineString.fromLngLats(lngLats))),
-        ),
-    )
+    // The whole route, dimmed: what is still ahead.
+    style.addSource(GeoJsonSource(REST_SOURCE, FeatureCollection.fromFeature(lineFeature(line))))
     style.addLayer(
-        LineLayer("fly-route-line", "fly-route").withProperties(
-            lineColor("#C6FF3D"),
+        LineLayer("fly-rest-line", REST_SOURCE).withProperties(
+            lineColor(if (dark) "#EEF3EF" else "#0E1113"),
             lineWidth(4f),
-            lineOpacity(0.95f),
+            lineOpacity(0.35f),
+            lineCap(Property.LINE_CAP_ROUND),
+            lineJoin(Property.LINE_JOIN_ROUND),
         ),
     )
-    val ends = listOf(lngLats.first(), lngLats.last())
+    // The travelled part, bright, redrawn every frame.
+    style.addSource(GeoJsonSource(DONE_SOURCE, FeatureCollection.fromFeature(lineFeature(line.take(2)))))
+    style.addLayer(
+        LineLayer(DONE_LAYER, DONE_SOURCE).withProperties(
+            lineColor("#C6FF3D"),
+            lineWidth(6f),
+            lineCap(Property.LINE_CAP_ROUND),
+            lineJoin(Property.LINE_JOIN_ROUND),
+        ),
+    )
+    val ends = listOf(line.first(), line.last())
     style.addSource(
         GeoJsonSource("fly-ends", FeatureCollection.fromFeatures(ends.map { Feature.fromGeometry(it) })),
     )
     style.addLayer(
         CircleLayer("fly-ends-dot", "fly-ends").withProperties(
             circleColor("#C6FF3D"),
-            circleRadius(5f),
+            circleRadius(6f),
             circleStrokeColor("#0E1113"),
             circleStrokeWidth(2f),
         ),
     )
-    // The athlete puck from the replay map, moved along the track frame by frame.
     for (f in 0 until SPRITE_FRAMES) {
         style.addImage(spriteImageId(sport, f), spriteBitmap(context, sport, f))
     }
     style.addSource(
-        GeoJsonSource(
-            ATHLETE_SOURCE,
-            FeatureCollection.fromFeatures(listOf(Feature.fromGeometry(lngLats.first()))),
-        ),
+        GeoJsonSource(ATHLETE_SOURCE, FeatureCollection.fromFeatures(listOf(Feature.fromGeometry(line.first())))),
     )
     style.addLayer(
         SymbolLayer(ATHLETE_LAYER, ATHLETE_SOURCE).withProperties(
             iconImage(spriteImageId(sport, 0)),
-            iconSize(1f),
+            iconSize(1.15f),
             iconRotate(0f),
             iconRotationAlignment("map"),
             iconAllowOverlap(true),
             iconIgnorePlacement(true),
         ),
     )
-}
-
-private suspend fun awaitMapIdle(map: MapLibreMap, timeoutMs: Long = 1600) {
-    val done = CompletableDeferred<Unit>()
-    val listener = MapLibreMap.OnCameraIdleListener { done.complete(Unit) }
-    map.addOnCameraIdleListener(listener)
-    try {
-        withTimeoutOrNull(timeoutMs) { done.await() }
-    } finally {
-        runCatching { map.removeOnCameraIdleListener(listener) }
-    }
 }
 
 /** A snapshot that never arrives (surface gone in the background) fails the export instead of hanging it. */
@@ -434,230 +650,3 @@ private suspend fun captureMap(map: MapLibreMap): Bitmap =
             })
         }
     } ?: error("map snapshot timed out")
-
-/** Center-crops the screen-shaped snapshot to 720x1280. */
-private fun scaleToPortrait(src: Bitmap): Bitmap {
-    val scale = maxOf(VIDEO_WIDTH.toFloat() / src.width, VIDEO_HEIGHT.toFloat() / src.height)
-    val sw = (src.width * scale).roundToInt()
-    val sh = (src.height * scale).roundToInt()
-    val scaled = Bitmap.createScaledBitmap(src, sw, sh, true)
-    val x = ((sw - VIDEO_WIDTH) / 2).coerceAtLeast(0)
-    val y = ((sh - VIDEO_HEIGHT) / 2).coerceAtLeast(0)
-    val out = Bitmap.createBitmap(scaled, x, y, VIDEO_WIDTH, VIDEO_HEIGHT)
-    if (scaled !== src && scaled !== out) scaled.recycle()
-    return out
-}
-
-private const val CODEC_STALL_MS = 5_000L
-
-/** Minimal synchronous H.264 encoder writing an MP4 through MediaMuxer. */
-private class Mp4Writer(private val file: File, fps: Int = 24) {
-    private val frameUs = 1_000_000L / fps
-    private val codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
-    private val muxer = MediaMuxer(file.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-    private val info = MediaCodec.BufferInfo()
-    private var trackIndex = -1
-    private var muxerStarted = false
-    private var lastPtsUs = 0L
-    private var finished = false
-    private val colorFormat = pickColorFormat(codec)
-    private val frameBytes = VIDEO_WIDTH * VIDEO_HEIGHT * 3 / 2
-
-    init {
-        val format = MediaFormat.createVideoFormat(
-            MediaFormat.MIMETYPE_VIDEO_AVC,
-            VIDEO_WIDTH,
-            VIDEO_HEIGHT,
-        ).apply {
-            setInteger(MediaFormat.KEY_COLOR_FORMAT, colorFormat)
-            setInteger(MediaFormat.KEY_BIT_RATE, VIDEO_WIDTH * VIDEO_HEIGHT * 5)
-            setInteger(MediaFormat.KEY_FRAME_RATE, fps)
-            setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
-        }
-        codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-        codec.start()
-    }
-
-    /**
-     * Encodes one frame at [ptsUs]. Frames carry their own timestamps because a
-     * long activity is rendered sparsely but must still play for its full length.
-     */
-    fun encode(bitmap: Bitmap, ptsUs: Long) {
-        val index = dequeueInput()
-        val image = runCatching { codec.getInputImage(index) }.getOrNull()
-        if (image != null) {
-            fillImage(bitmap, image)
-        } else {
-            val buf = codec.getInputBuffer(index) ?: error("missing encoder input buffer")
-            fillYuv(bitmap, buf)
-        }
-        codec.queueInputBuffer(index, 0, frameBytes, ptsUs, 0)
-        lastPtsUs = ptsUs
-        drain(false)
-    }
-
-    fun finish() {
-        if (finished) return
-        finished = true
-        try {
-            val index = dequeueInput()
-            codec.queueInputBuffer(index, 0, 0, lastPtsUs + frameUs, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-            drain(true)
-        } finally {
-            // Release even when the encoder failed, or the next export cannot get one.
-            runCatching { codec.stop() }
-            runCatching { codec.release() }
-            if (muxerStarted) runCatching { muxer.stop() }
-            runCatching { muxer.release() }
-        }
-    }
-
-    /** A stalled encoder fails the export after [CODEC_STALL_MS] instead of spinning forever. */
-    private fun dequeueInput(): Int {
-        val deadline = System.nanoTime() + CODEC_STALL_MS * 1_000_000L
-        while (System.nanoTime() < deadline) {
-            val index = codec.dequeueInputBuffer(10_000)
-            if (index >= 0) return index
-            drain(false)
-        }
-        error("encoder input stalled")
-    }
-
-    private fun drain(endOfStream: Boolean) {
-        val deadline = System.nanoTime() + CODEC_STALL_MS * 1_000_000L
-        while (true) {
-            val index = codec.dequeueOutputBuffer(info, if (endOfStream) 10_000 else 0)
-            when {
-                index == MediaCodec.INFO_TRY_AGAIN_LATER -> {
-                    if (!endOfStream) return
-                    if (System.nanoTime() > deadline) error("encoder never signalled end of stream")
-                }
-                index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
-                    trackIndex = muxer.addTrack(codec.outputFormat)
-                    muxer.start()
-                    muxerStarted = true
-                }
-                index >= 0 -> {
-                    val out = codec.getOutputBuffer(index)
-                    if (out != null && info.size > 0 && muxerStarted) {
-                        out.position(info.offset)
-                        out.limit(info.offset + info.size)
-                        muxer.writeSampleData(trackIndex, out, info)
-                    }
-                    codec.releaseOutputBuffer(index, false)
-                    if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) return
-                }
-            }
-        }
-    }
-
-    /**
-     * Fills the encoder's YUV image plane by plane, honouring row and pixel strides.
-     * Writing raw bytes at fixed offsets produced a green video on devices whose
-     * encoder uses a padded luma stride, so the Image API is the source of truth here.
-     */
-    private fun fillImage(bitmap: Bitmap, image: Image) {
-        val argb = IntArray(VIDEO_WIDTH * VIDEO_HEIGHT)
-        bitmap.getPixels(argb, 0, VIDEO_WIDTH, 0, 0, VIDEO_WIDTH, VIDEO_HEIGHT)
-        val yPlane = image.planes[0]
-        val yBuf = yPlane.buffer
-        yBuf.position(0)
-        val yRowStride = yPlane.rowStride
-        val yPixelStride = yPlane.pixelStride
-        for (row in 0 until VIDEO_HEIGHT) {
-            var c = row * VIDEO_WIDTH
-            var pos = row * yRowStride
-            repeat(VIDEO_WIDTH) {
-                val p = argb[c++]
-                val r = (p shr 16) and 0xFF
-                val g = (p shr 8) and 0xFF
-                val b = p and 0xFF
-                yBuf.position(pos)
-                yBuf.put((((66 * r + 129 * g + 25 * b + 128) shr 8) + 16).toByte())
-                pos += yPixelStride
-            }
-        }
-        val uPlane = image.planes[1]
-        val vPlane = image.planes[2]
-        val uBuf = uPlane.buffer
-        val vBuf = vPlane.buffer
-        uBuf.position(0)
-        vBuf.position(0)
-        val uRowStride = uPlane.rowStride
-        val uPixelStride = uPlane.pixelStride
-        val vRowStride = vPlane.rowStride
-        val vPixelStride = vPlane.pixelStride
-        for (row in 0 until VIDEO_HEIGHT / 2) {
-            var posU = row * uRowStride
-            var posV = row * vRowStride
-            var c = row * 2 * VIDEO_WIDTH
-            repeat(VIDEO_WIDTH / 2) {
-                val p1 = argb[c]
-                val p2 = argb[c + 1]
-                val p3 = argb[c + VIDEO_WIDTH]
-                val p4 = argb[c + VIDEO_WIDTH + 1]
-                c += 2
-                val r = ((p1 shr 16) and 0xFF) + ((p2 shr 16) and 0xFF) +
-                    ((p3 shr 16) and 0xFF) + ((p4 shr 16) and 0xFF)
-                val g = ((p1 shr 8) and 0xFF) + ((p2 shr 8) and 0xFF) +
-                    ((p3 shr 8) and 0xFF) + ((p4 shr 8) and 0xFF)
-                val b = (p1 and 0xFF) + (p2 and 0xFF) + (p3 and 0xFF) + (p4 and 0xFF)
-                uBuf.position(posU)
-                uBuf.put((((-38 * r - 74 * g + 112 * b + 512) shr 10) + 128).toByte())
-                vBuf.position(posV)
-                vBuf.put((((112 * r - 94 * g - 18 * b + 512) shr 10) + 128).toByte())
-                posU += uPixelStride
-                posV += vPixelStride
-            }
-        }
-    }
-
-    private fun fillYuv(bitmap: Bitmap, buf: java.nio.ByteBuffer) {
-        val argb = IntArray(VIDEO_WIDTH * VIDEO_HEIGHT)
-        bitmap.getPixels(argb, 0, VIDEO_WIDTH, 0, 0, VIDEO_WIDTH, VIDEO_HEIGHT)
-        buf.clear()
-        var y = 0
-        for (row in 0 until VIDEO_HEIGHT) {
-            var c = row * VIDEO_WIDTH
-            repeat(VIDEO_WIDTH) {
-                val p = argb[c++]
-                val r = (p shr 16) and 0xFF
-                val g = (p shr 8) and 0xFF
-                val b = p and 0xFF
-                buf.put(y++, (((66 * r + 129 * g + 25 * b + 128) shr 8) + 16).toByte())
-            }
-        }
-        for (row in 0 until VIDEO_HEIGHT step 2) {
-            var c = row * VIDEO_WIDTH
-            repeat(VIDEO_WIDTH / 2) {
-                val p1 = argb[c]
-                val p2 = argb[c + 1]
-                val p3 = argb[c + VIDEO_WIDTH]
-                val p4 = argb[c + VIDEO_WIDTH + 1]
-                c += 2
-                val r = ((p1 shr 16) and 0xFF) + ((p2 shr 16) and 0xFF) +
-                    ((p3 shr 16) and 0xFF) + ((p4 shr 16) and 0xFF)
-                val g = ((p1 shr 8) and 0xFF) + ((p2 shr 8) and 0xFF) +
-                    ((p3 shr 8) and 0xFF) + ((p4 shr 8) and 0xFF)
-                val b = (p1 and 0xFF) + (p2 and 0xFF) + (p3 and 0xFF) + (p4 and 0xFF)
-                buf.put((((-38 * r - 74 * g + 112 * b + 512) shr 10) + 128).toByte())
-                buf.put((((112 * r - 94 * g - 18 * b + 512) shr 10) + 128).toByte())
-            }
-        }
-    }
-}
-
-/** Prefers flexible YUV so frames can be written through [MediaCodec.getInputImage]. */
-private fun pickColorFormat(codec: MediaCodec): Int {
-    val formats = runCatching {
-        codec.codecInfo.getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_AVC).colorFormats
-    }.getOrDefault(IntArray(0))
-    return when {
-        formats.contains(MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible) ->
-            MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible
-        formats.contains(MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar) ->
-            MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar
-        formats.isNotEmpty() -> formats.first()
-        else -> MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible
-    }
-}

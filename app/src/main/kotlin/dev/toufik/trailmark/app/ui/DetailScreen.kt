@@ -135,6 +135,8 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
     var segmentCount by remember { mutableStateOf(0) }
     var showCreateSegment by remember { mutableStateOf(false) }
     var flyoverExport by remember { mutableStateOf(false) }
+    var chooseExport by remember { mutableStateOf(false) }
+    var exportOptions by remember { mutableStateOf(FlyoverOptions()) }
     var exportedVideo by remember { mutableStateOf<android.net.Uri?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
     val recording by RecordingHolder.state.collectAsState()
@@ -329,7 +331,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                         }) { Text(t.storyCard, color = Palette.accent) }
                         if (d.points.size > 1) {
                             TextButton(onClick = {
-                                if (pro) flyoverExport = true else onPaywall()
+                                if (pro) chooseExport = true else onPaywall()
                             }) {
                                 Text(t.exportVideo, color = Palette.accent)
                             }
@@ -618,6 +620,18 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
             }
         }
         val dd = detail
+        if (chooseExport) {
+            FlyoverOptionsDialog(
+                t = t,
+                initial = exportOptions,
+                onStart = { o ->
+                    exportOptions = o
+                    chooseExport = false
+                    flyoverExport = true
+                },
+                onDismiss = { chooseExport = false },
+            )
+        }
         if (flyoverExport && dd != null) {
             FlyoverOverlay(
                 points = dd.points,
@@ -625,8 +639,14 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                 packPath = packPath,
                 dark = darkMap,
                 langCode = langNow.code,
-                speed = replaySpeed,
-                flyover = replayFlyover,
+                options = exportOptions,
+                stats = FlyoverStats(
+                    distanceM = dd.row.distanceM,
+                    movingNanos = dd.row.elapsedNanos,
+                    climbM = dd.analysis.elevationGainM,
+                    title = dev.toufik.trailmark.app.sportLabelOf(t, sportOf(dd.row.sport)),
+                    subtitle = dev.toufik.trailmark.app.formatDate(dd.row.startWallMillis, langNow),
+                ),
                 onDone = { file ->
                     flyoverExport = false
                     scope.launch {

@@ -86,6 +86,9 @@ object FlyoverBench {
                 val snap = snapshot(snapshotter)
                 times[i] = SystemClock.elapsedRealtime() - t0
                 snap.bitmap.recycle()
+                // The snapshotter resets itself only after the callback returns;
+                // on Main.immediate we resumed inside it, so let that reset run first.
+                kotlinx.coroutines.yield()
             }
             snapshotter.cancel()
             val warm = times.drop(1).sorted()
