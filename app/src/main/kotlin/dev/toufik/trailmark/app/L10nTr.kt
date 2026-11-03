@@ -22,6 +22,7 @@ val TR_TEXTS = Texts(
     recordFirst = "Burada görmek için bir rota kaydet",
     loadFailed = "Yüklenemedi",
     share = "GPX paylaş",
+    shareVideo = "Videoyu paylaş",
     storyCard = "Hikaye kartı",
     bestWindow = "En iyi pencere",
     records = "Kişisel rekorlar",

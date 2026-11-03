@@ -22,6 +22,7 @@ val HI_TEXTS = Texts(
     recordFirst = "यहाँ देखने के लिए एक मार्ग रिकॉर्ड करें",
     loadFailed = "लोड नहीं हो सका",
     share = "GPX साझा करें",
+    shareVideo = "वीडियो साझा करें",
     storyCard = "स्टोरी कार्ड",
     bestWindow = "सर्वोत्तम समय",
     records = "व्यक्तिगत रिकॉर्ड",

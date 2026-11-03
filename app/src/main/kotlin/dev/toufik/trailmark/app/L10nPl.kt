@@ -22,6 +22,7 @@ val PL_TEXTS = Texts(
     recordFirst = "Nagraj trasę, aby zobaczyć ją tutaj",
     loadFailed = "Nie udało się wczytać",
     share = "Udostępnij GPX",
+    shareVideo = "Udostępnij wideo",
     storyCard = "Karta story",
     bestWindow = "Najlepsze okno",
     records = "Rekordy osobiste",

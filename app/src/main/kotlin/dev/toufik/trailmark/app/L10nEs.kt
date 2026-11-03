@@ -22,6 +22,7 @@ val ES_TEXTS = Texts(
     recordFirst = "Graba una ruta para verla aquí",
     loadFailed = "Error al cargar",
     share = "Compartir GPX",
+    shareVideo = "Compartir vídeo",
     storyCard = "Tarjeta story",
     bestWindow = "Mejor ventana",
     records = "Récords personales",

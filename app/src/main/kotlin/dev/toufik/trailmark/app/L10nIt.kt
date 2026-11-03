@@ -22,6 +22,7 @@ val IT_TEXTS = Texts(
     recordFirst = "Registra un percorso per vederlo qui",
     loadFailed = "Caricamento non riuscito",
     share = "Condividi GPX",
+    shareVideo = "Condividi video",
     storyCard = "Scheda story",
     bestWindow = "Migliore finestra",
     records = "Record personali",

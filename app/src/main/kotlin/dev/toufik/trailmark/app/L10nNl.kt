@@ -22,6 +22,7 @@ val NL_TEXTS = Texts(
     recordFirst = "Neem een route op om die hier te zien",
     loadFailed = "Laden mislukt",
     share = "GPX delen",
+    shareVideo = "Video delen",
     storyCard = "Story-kaart",
     bestWindow = "Beste venster",
     records = "Persoonlijke records",

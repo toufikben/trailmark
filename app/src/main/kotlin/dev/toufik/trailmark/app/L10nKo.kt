@@ -22,6 +22,7 @@ val KO_TEXTS = Texts(
     recordFirst = "경로를 기록하면 여기에 표시됩니다",
     loadFailed = "불러오기 실패",
     share = "GPX 공유",
+    shareVideo = "동영상 공유",
     storyCard = "스토리 카드",
     bestWindow = "최적 시간대",
     records = "개인 기록",

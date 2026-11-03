@@ -623,7 +623,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                             exportedVideo = saved
                         } else {
                             // No gallery copy: hand over the rendered file as before.
-                            shareVideo(context, MediaCapture.uriFor(context, file), t.share)
+                            shareVideo(context, MediaCapture.uriFor(context, file), t.shareVideo)
                         }
                     }
                 },
@@ -640,8 +640,8 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                 confirmButton = {
                     TextButton(onClick = {
                         exportedVideo = null
-                        shareVideo(context, uri, t.share)
-                    }) { Text(t.share, color = Palette.accent) }
+                        shareVideo(context, uri, t.shareVideo)
+                    }) { Text(t.shareVideo, color = Palette.accent) }
                 },
                 dismissButton = {
                     TextButton(onClick = { exportedVideo = null }) {

@@ -22,6 +22,7 @@ val ZH_TEXTS = Texts(
     recordFirst = "记录一条路线后即可在此查看",
     loadFailed = "加载失败",
     share = "分享 GPX",
+    shareVideo = "分享视频",
     storyCard = "故事卡片",
     bestWindow = "最佳时段",
     records = "个人纪录",

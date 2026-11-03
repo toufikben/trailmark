@@ -22,6 +22,7 @@ val ID_TEXTS = Texts(
     recordFirst = "Rekam rute untuk melihatnya di sini",
     loadFailed = "Gagal memuat",
     share = "Bagikan GPX",
+    shareVideo = "Bagikan video",
     storyCard = "Kartu story",
     bestWindow = "Jendela terbaik",
     records = "Rekor pribadi",

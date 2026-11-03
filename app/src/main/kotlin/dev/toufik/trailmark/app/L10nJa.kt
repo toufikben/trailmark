@@ -22,6 +22,7 @@ val JA_TEXTS = Texts(
     recordFirst = "ルートを記録するとここに表示されます",
     loadFailed = "読み込み失敗",
     share = "GPX を共有",
+    shareVideo = "動画を共有",
     storyCard = "ストーリーカード",
     bestWindow = "ベスト時間帯",
     records = "自己ベスト",

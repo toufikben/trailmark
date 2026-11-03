@@ -22,6 +22,7 @@ val RU_TEXTS = Texts(
     recordFirst = "Запишите маршрут, чтобы увидеть его здесь",
     loadFailed = "Не удалось загрузить",
     share = "Поделиться GPX",
+    shareVideo = "Поделиться видео",
     storyCard = "Карточка истории",
     bestWindow = "Лучшее окно",
     records = "Личные рекорды",

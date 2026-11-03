@@ -22,6 +22,7 @@ val DE_TEXTS = Texts(
     recordFirst = "Zeichne eine Route auf, um sie hier zu sehen",
     loadFailed = "Laden fehlgeschlagen",
     share = "GPX teilen",
+    shareVideo = "Video teilen",
     storyCard = "Story-Karte",
     bestWindow = "Bestes Zeitfenster",
     records = "Bestleistungen",
