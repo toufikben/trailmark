@@ -17,7 +17,13 @@ const val FLYOVER_OUTRO_FRAMES = 3 * FLYOVER_FPS
 enum class FlyoverCamera { FLY_3D, FOLLOW_2D, OVERVIEW }
 
 /** What the user picked before exporting; 0 seconds means "auto". */
-data class FlyoverOptions(val seconds: Int = 0, val camera: FlyoverCamera = FlyoverCamera.FLY_3D)
+data class FlyoverOptions(
+    val seconds: Int = 0,
+    val camera: FlyoverCamera = FlyoverCamera.FLY_3D,
+    val media: dev.toufik.trailmark.app.export.ExportMedia =
+        dev.toufik.trailmark.app.export.ExportMedia.OFF,
+    val galleryCopy: Boolean = true,
+)
 
 /** Length of the route part of the clip when the user leaves it on auto. */
 fun autoFlyoverSeconds(distanceM: Double): Int =

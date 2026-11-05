@@ -144,6 +144,14 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         importSharedRoute(intent)
+        openRequestedScreen(intent)
+    }
+
+    /** A notification ("clip ready") can ask for a screen by name. */
+    private fun openRequestedScreen(intent: Intent?) {
+        val key = intent?.getStringExtra(EXTRA_SCREEN) ?: return
+        intent.removeExtra(EXTRA_SCREEN)
+        pendingScreen.value = screenFromKey(key)
     }
 
     /** A GPX opened or shared from Komoot, Strava or Files becomes a saved route. */
@@ -158,7 +166,8 @@ class MainActivity : ComponentActivity() {
         val t = textsFor(Lang.entries.firstOrNull { it.code == code } ?: Lang.AR)
         lifecycleScope.launch {
             val route = withContext(Dispatchers.IO) {
-                runCatching { contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
+                contentResolver.openInputStream(uri)
+                    ?.let { RouteTransfer.readAtMost(it) }
                     ?.let { RouteTransfer.importGpx(this@MainActivity, it, t.importRoute) }
             }
             Toast.makeText(
@@ -175,11 +184,17 @@ class MainActivity : ComponentActivity() {
         org.maplibre.android.MapLibre.getInstance(this)
         val prefs = getSharedPreferences("trailmark", Context.MODE_PRIVATE)
         dev.toufik.trailmark.app.Units.init(this)
+        lifecycleScope.launch(Dispatchers.IO) {
+            dev.toufik.trailmark.app.maps.SavedRoutes.preload(this@MainActivity)
+        }
         val entitlements = Entitlements(this)
         val billing = BillingManager(this, entitlements)
         billing.connect()
         // A recreated activity already handled the GPX it was opened with.
-        if (savedInstanceState == null) importSharedRoute(intent)
+        if (savedInstanceState == null) {
+            importSharedRoute(intent)
+            openRequestedScreen(intent)
+        }
         setContent {
             var lang by remember {
                 mutableStateOf(
@@ -327,6 +342,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    companion object {
+        /** Intent extra: a screen to open by key (a notification tapping into a clip). */
+        const val EXTRA_SCREEN = "screen"
     }
 }
 
