@@ -209,7 +209,11 @@ internal class HeadlessFlyover(
             runCatching { previousBase?.recycle() }
             runCatching { fixed?.bitmap?.recycle() }
             card.close()
-            runCatching { snapshotter?.cancel() }
+            // The snapshotter belongs to the main thread, cancelling it from a
+            // worker is not safe.
+            withContext(kotlinx.coroutines.NonCancellable + Dispatchers.Main) {
+                runCatching { snapshotter?.cancel() }
+            }
         }
     }
 
@@ -220,31 +224,36 @@ internal class HeadlessFlyover(
      * style. A downloaded pack wins when there is no network, so a render that
      * started indoors still finishes on a plane.
      */
-    private fun openSnapshotter(path: FlyoverPath): MapSnapshotter {
-        val first = path.at(0.0)
-        val pack = MapPacks.packFor(context, first.lat, first.lon)
-        val builder = if (pack != null && !isOnline(context)) {
-            val glyphs = GlyphStore.ensure(context).absolutePath
-            Style.Builder().fromJson(vectorStyle(pack.absolutePath, glyphs, job.dark, job.lang))
-        } else {
-            Style.Builder().fromUri(if (job.dark) ONLINE_STYLE_URL else ONLINE_STYLE_URL_LIGHT)
+    private suspend fun openSnapshotter(path: FlyoverPath): MapSnapshotter =
+        withContext(Dispatchers.Main) {
+            val first = path.at(0.0)
+            val pack = MapPacks.packFor(context, first.lat, first.lon)
+            val builder = if (pack != null && !isOnline(context)) {
+                val glyphs = GlyphStore.ensure(context).absolutePath
+                Style.Builder().fromJson(vectorStyle(pack.absolutePath, glyphs, job.dark, job.lang))
+            } else {
+                Style.Builder().fromUri(if (job.dark) ONLINE_STYLE_URL else ONLINE_STYLE_URL_LIGHT)
+            }
+            val options = MapSnapshotter.Options(VIDEO_WIDTH, VIDEO_HEIGHT)
+                .withStyleBuilder(builder)
+                .withPixelRatio(1f)
+                .withLogo(false)
+            MapSnapshotter(context, options)
         }
-        val options = MapSnapshotter.Options(VIDEO_WIDTH, VIDEO_HEIGHT)
-            .withStyleBuilder(builder)
-            .withPixelRatio(1f)
-            .withLogo(false)
-        return MapSnapshotter(context, options)
-    }
 
     private suspend fun shoot(snapshotter: MapSnapshotter, camera: CameraPosition): MapSnapshot {
-        snapshotter.setCameraPosition(camera)
+        // The snapshotter lives on the main thread; only the drawing is done on
+        // a worker, so the activity stays responsive during a long render.
         val shot = withTimeoutOrNull(SNAPSHOT_TIMEOUT_MS) {
-            suspendCancellableCoroutine { cont ->
-                cont.invokeOnCancellation { runCatching { snapshotter.cancel() } }
-                snapshotter.start(
-                    { snap -> if (cont.isActive) cont.resume(snap) else snap.bitmap.recycle() },
-                    { err -> if (cont.isActive) cont.resumeWithException(IllegalStateException(err)) },
-                )
+            withContext(Dispatchers.Main) {
+                snapshotter.setCameraPosition(camera)
+                suspendCancellableCoroutine { cont ->
+                    cont.invokeOnCancellation { runCatching { snapshotter.cancel() } }
+                    snapshotter.start(
+                        { snap -> if (cont.isActive) cont.resume(snap) else snap.bitmap.recycle() },
+                        { err -> if (cont.isActive) cont.resumeWithException(IllegalStateException(err)) },
+                    )
+                }
             }
         }
         // The snapshotter resets itself only after the callback returns; let that

@@ -141,21 +141,25 @@ class ExportService : Service() {
                     )
                 }
                 var lastShown = -1
-                HeadlessFlyover(this@ExportService, job, out).render(points, media, stats) { d, total, eta ->
-                    val progress = if (total > 0) d.toFloat() / total else 0f
-                    val percent = (progress * 100).toInt()
-                    ExportHolder.publish(
-                        ExportState(
-                            ExportPhase.RENDERING,
-                            job.activityId,
-                            job.title,
-                            progress,
-                            eta,
-                        ),
-                    )
-                    if (percent != lastShown) {
-                        lastShown = percent
-                        notify(NOTIF_ID, progressNotification(job, progress, eta))
+                // The render is minutes of bitmap work; it must not run on the
+                // main thread or the whole app freezes while it draws.
+                withContext(Dispatchers.Default) {
+                    HeadlessFlyover(this@ExportService, job, out).render(points, media, stats) { d, total, eta ->
+                        val progress = if (total > 0) d.toFloat() / total else 0f
+                        val percent = (progress * 100).toInt()
+                        ExportHolder.publish(
+                            ExportState(
+                                ExportPhase.RENDERING,
+                                job.activityId,
+                                job.title,
+                                progress,
+                                eta,
+                            ),
+                        )
+                        if (percent != lastShown) {
+                            lastShown = percent
+                            notify(NOTIF_ID, progressNotification(job, progress, eta))
+                        }
                     }
                 }
                 withContext(Dispatchers.Main) {

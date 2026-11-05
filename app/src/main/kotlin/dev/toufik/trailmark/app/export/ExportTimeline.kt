@@ -72,14 +72,16 @@ internal class ExportTimeline(
             .sortedBy { it.atDistanceM }
             .take(MAX_PHOTOS + MAX_VIDEOS)
 
-        // Where the route is cut. Two clips within two metres share a cut.
-        val ends = ArrayList<Double>(placed.size + 1)
+        // Where the route is cut. The route always starts at zero, otherwise a
+        // route without clips has no chunk to render and the flight is empty.
+        // Two clips within two metres share a cut.
+        val ends = ArrayList<Double>(placed.size + 2)
+        ends.add(0.0)
         placed.forEach { c ->
             val d = c.atDistanceM.coerceIn(0.0, total)
-            if (ends.isEmpty() || d - ends.last() > 2.0) ends.add(d)
+            if (d - ends.last() > 2.0) ends.add(d)
         }
-        if (ends.isEmpty() || total - ends.last() > 2.0) ends.add(total)
-        while (ends.size < 2) ends.add(total)
+        if (total - ends.last() > 2.0 || ends.size < 2) ends.add(total)
         ends[ends.size - 1] = total
         for (i in 1 until ends.size) {
             if (ends[i] <= ends[i - 1]) ends[i] = (ends[i - 1] + 0.001).coerceAtMost(total)
@@ -87,17 +89,24 @@ internal class ExportTimeline(
 
         // Frames per chunk, proportional to the distance it covers.
         val weights = DoubleArray(ends.size - 1) { (ends[it + 1] - ends[it]).coerceAtLeast(0.0) }
-        val weightSum = weights.sum().takeIf { it > 0.0 } ?: 1.0
+        val weightSum = weights.sum()
         val counts = IntArray(weights.size)
-        for (i in weights.indices) counts[i] = (routeFrames * weights[i] / weightSum).toInt()
-        var extra = routeFrames - counts.sum()
-        var k = 0
-        while (extra > 0 && weights.isNotEmpty()) {
-            if (weights[k % weights.size] > 0.0) {
-                counts[k % weights.size]++
-                extra--
+        if (weightSum > 0.0) {
+            for (i in weights.indices) counts[i] = (routeFrames * weights[i] / weightSum).toInt()
+            var extra = routeFrames - counts.sum()
+            var k = 0
+            // Every extra frame goes to a chunk with distance, so the loop
+            // always removes one; the bound is a guard, not the exit condition.
+            while (extra > 0 && k <= weights.size * routeFrames) {
+                if (weights[k % weights.size] > 0.0) {
+                    counts[k % weights.size]++
+                    extra--
+                }
+                k++
             }
-            k++
+        } else if (counts.isNotEmpty()) {
+            // A degenerate path: keep the whole route in the first chunk.
+            counts[0] = routeFrames
         }
 
         val out = ArrayList<Seg>(ends.size * 2 + 2)
