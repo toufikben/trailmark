@@ -64,7 +64,7 @@ object RouteTransfer {
     internal fun sportFor(type: String?): String {
         val t = type?.lowercase() ?: return "HIKE"
         return when {
-            listOf("cycl", "bike", "bicycl", "mtb", "velo", "vélo").any(t::contains) -> "BIKE"
+            listOf("cycl", "bik", "bicycl", "mtb", "velo", "vélo").any(t::contains) -> "BIKE"
             listOf("run", "jog", "course à pied").any(t::contains) -> "RUN"
             listOf("walk", "marche", "foot").any(t::contains) -> "WALK"
             else -> "HIKE"
