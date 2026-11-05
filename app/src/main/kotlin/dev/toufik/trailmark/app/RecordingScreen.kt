@@ -725,7 +725,9 @@ fun RecordingScreen(
                     .align(Alignment.BottomCenter)
                     .padding(bottom = with(LocalDensity.current) { barHeightPx.toDp() } + 12.dp),
             ) {
-                if (state.phase == Phase.PAUSED && state.activityId != null) {
+                if (state.activityId != null &&
+                    (state.phase == Phase.RECORDING || state.phase == Phase.PAUSED)
+                ) {
                     MediaCaptureRow(
                         t = t,
                         onPhoto = { capturePhoto() },
