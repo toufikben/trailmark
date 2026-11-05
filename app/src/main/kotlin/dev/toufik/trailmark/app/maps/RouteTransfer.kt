@@ -20,14 +20,19 @@ object RouteTransfer {
     /** Detailed planner tracks run to tens of thousands of points. */
     private const val MAX_TRACK_POINTS = 2_000
 
+    /** A GPX with a full day of 1 Hz points is a few MB; anything larger is not a route. */
+    const val MAX_GPX_BYTES = 8 * 1024 * 1024
+
     /** Parses and saves a GPX route; null when the file holds no usable path. */
     fun importGpx(context: Context, bytes: ByteArray, fallbackName: String): SavedRoute? {
+        if (bytes.size > MAX_GPX_BYTES) return null
         val route = parseGpx(bytes, fallbackName, System.currentTimeMillis()) ?: return null
         SavedRoutes(context).save(route)
         return route
     }
 
     internal fun parseGpx(bytes: ByteArray, fallbackName: String, id: Long): SavedRoute? {
+        if (bytes.size > MAX_GPX_BYTES) return null
         val xml = bytes.toString(Charsets.UTF_8)
         if (!xml.contains("<gpx", ignoreCase = true)) return null
         val raw = Gpx.read(xml)
@@ -42,7 +47,7 @@ object RouteTransfer {
         return SavedRoute(
             id = id,
             name = Gpx.name(xml) ?: fallbackName,
-            sport = "HIKE",
+            sport = sportFor(Gpx.type(xml)),
             stops = listOf(track.first().lat to track.first().lon, track.last().lat to track.last().lon),
             distanceKm = polylineLengthMeters(track) / 1000.0,
             climbM = climb.toInt(),
@@ -50,8 +55,41 @@ object RouteTransfer {
         )
     }
 
-    /** Opens the share sheet with the route as a GPX file and a map link. */
-    fun share(context: Context, name: String, points: List<ElevPoint>, chooserTitle: String) {
+    /**
+     * The GPX `<type>` hint in the app's sport names. Planners write free text
+     * ("cycling", "E-Bike", "hiking", "trail running"), so match on substrings;
+     * a file that says nothing stays a hike, which is the safest default for a
+     * planned route in this app.
+     */
+    internal fun sportFor(type: String?): String {
+        val t = type?.lowercase() ?: return "HIKE"
+        return when {
+            listOf("cycl", "bike", "bicycl", "mtb", "velo", "vélo").any(t::contains) -> "BIKE"
+            listOf("run", "jog", "course à pied").any(t::contains) -> "RUN"
+            listOf("walk", "marche", "foot").any(t::contains) -> "WALK"
+            else -> "HIKE"
+        }
+    }
+
+    /**
+     * Reads a shared route without trusting its size: a renamed archive or a
+     * video shared as octet-stream must not be loaded into memory.
+     */
+    fun readAtMost(input: java.io.InputStream): ByteArray? = runCatching {
+        input.use { stream ->
+            val out = java.io.ByteArrayOutputStream()
+            val buffer = ByteArray(16 * 1024)
+            while (true) {
+                val n = stream.read(buffer)
+                if (n < 0) break
+                out.write(buffer, 0, n)
+                if (out.size() > MAX_GPX_BYTES) return null
+            }
+            out.toByteArray()
+        }
+    }.getOrNull()
+
+    /** Opens the share sheet with the route as a GPX file and a map link. */    fun share(context: Context, name: String, points: List<ElevPoint>, chooserTitle: String) {
         if (points.size < 2) return
         val dir = File(context.cacheDir, "exports").apply { mkdirs() }
         val safe = name.replace(Regex("[^A-Za-z0-9_-]+"), "-").trim('-').take(40).ifEmpty { "route" }

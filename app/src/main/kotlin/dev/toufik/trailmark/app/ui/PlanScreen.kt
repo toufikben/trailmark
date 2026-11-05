@@ -43,6 +43,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -93,6 +94,7 @@ import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.engine.Sport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 
@@ -120,7 +122,13 @@ fun PlanScreen(
     var useAnchor by remember { mutableStateOf(true) }
     var showSaved by remember { mutableStateOf(false) }
     var savedVersion by remember { mutableStateOf(0) }
-    val savedRoutes = remember(savedVersion) { SavedRoutes(context).all() }
+    val scope = rememberCoroutineScope()
+    var savedRoutes by remember { mutableStateOf<List<SavedRoute>>(emptyList()) }
+    // Reading (and, on first launch, migrating) a multi-megabyte route file is
+    // IO work; the composition must never do it.
+    LaunchedEffect(savedVersion) {
+        savedRoutes = withContext(Dispatchers.IO) { SavedRoutes(context).all() }
+    }
     val packPath = remember(anchor, stops) {
         val lat = anchor?.lat ?: stops.firstOrNull()?.first
         val lon = anchor?.lon ?: stops.firstOrNull()?.second
@@ -192,18 +200,19 @@ fun PlanScreen(
             }
             if (pts.size >= 2) {
                 val name = sportLabel(t, sport) + " · " + formatDistance(p.distanceM) + " " + distanceUnit(t)
-                SavedRoutes(context).save(
-                    SavedRoute(
-                        id = System.currentTimeMillis(),
-                        name = name,
-                        sport = sport.name,
-                        stops = pts,
-                        distanceKm = p.distanceM / 1000.0,
-                        climbM = p.ascentM.toInt(),
-                    ),
+                val route = SavedRoute(
+                    id = System.currentTimeMillis(),
+                    name = name,
+                    sport = sport.name,
+                    stops = pts,
+                    distanceKm = p.distanceM / 1000.0,
+                    climbM = p.ascentM.toInt(),
                 )
-                savedVersion += 1
-                Toast.makeText(context, t.routeSaved, Toast.LENGTH_SHORT).show()
+                scope.launch {
+                    withContext(Dispatchers.IO) { SavedRoutes(context).save(route) }
+                    savedVersion += 1
+                    Toast.makeText(context, t.routeSaved, Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
@@ -211,19 +220,22 @@ fun PlanScreen(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        val bytes = runCatching {
-            context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-        }.getOrNull()
-        val route = bytes?.let { RouteTransfer.importGpx(context, it, t.importRoute) }
-        if (route != null) {
-            savedVersion += 1
-            showSaved = true
+        scope.launch {
+            val route = withContext(Dispatchers.IO) {
+                val bytes = context.contentResolver.openInputStream(uri)
+                    ?.let { RouteTransfer.readAtMost(it) }
+                bytes?.let { RouteTransfer.importGpx(context, it, t.importRoute) }
+            }
+            if (route != null) {
+                savedVersion += 1
+                showSaved = true
+            }
+            Toast.makeText(
+                context,
+                if (route != null) t.routeImported else t.routeImportFailed,
+                Toast.LENGTH_SHORT,
+            ).show()
         }
-        Toast.makeText(
-            context,
-            if (route != null) t.routeImported else t.routeImportFailed,
-            Toast.LENGTH_SHORT,
-        ).show()
     }
     val loadSaved: (SavedRoute) -> Unit = { r ->
         if (r.track.size >= 2) {
@@ -299,8 +311,10 @@ fun PlanScreen(
                                                 )
                                             }
                                             IconButton(onClick = {
-                                                SavedRoutes(context).delete(r.id)
-                                                savedVersion += 1
+                                                scope.launch {
+                                                    withContext(Dispatchers.IO) { SavedRoutes(context).delete(r.id) }
+                                                    savedVersion += 1
+                                                }
                                             }) {
                                                 Icon(
                                                     Icons.Filled.Delete,

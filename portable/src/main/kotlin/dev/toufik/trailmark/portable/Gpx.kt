@@ -27,6 +27,7 @@ object Gpx {
         setOf(RegexOption.DOT_MATCHES_ALL),
     )
     private val NAME = Regex("""<name>([^<]*)</name>""")
+    private val TYPE = Regex("""<type>([^<]*)</type>""")
     private val ATTR = Regex("""(\w+)="([^"]*)"""")
     private val ELE = Regex("""<ele>([^<]*)</ele>""")
     private val TIME = Regex("""<time>([^<]*)</time>""")
@@ -62,6 +63,13 @@ object Gpx {
     /** The first `<name>` in the file (track or route name), if any. */
     fun name(xml: String): String? =
         NAME.find(xml)?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() }?.let(::unescape)
+
+    /**
+     * The first `<type>` in the file, the free-text activity hint Komoot, Strava
+     * and Garmin write ("cycling", "hiking", "Running", …). Null when absent.
+     */
+    fun type(xml: String): String? =
+        TYPE.find(xml)?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() }?.let(::unescape)
 
     /** A timeless track, for sharing a planned route. */
     fun writeRoute(points: List<ImportedPoint>, name: String): String {

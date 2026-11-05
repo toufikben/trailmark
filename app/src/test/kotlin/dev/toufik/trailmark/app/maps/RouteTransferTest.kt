@@ -51,4 +51,34 @@ class RouteTransferTest {
         assertTrue(link.contains("&destination=36.04900,3.00000"))
         assertEquals(8, link.substringAfter("&waypoints=").substringBefore("&").split("%7C").size)
     }
+
+    @Test
+    fun readsTheActivityTypePlannersWrite() {
+        val gpx = """<?xml version="1.0"?><gpx><trk><name>Loop</name><type>cycling</type><trkseg>
+            <trkpt lat="45.000" lon="6.000"></trkpt>
+            <trkpt lat="45.010" lon="6.000"></trkpt>
+            </trkseg></trk></gpx>"""
+        val r = RouteTransfer.parseGpx(gpx.toByteArray(), "fallback", 7L)!!
+        assertEquals("BIKE", r.sport)
+    }
+
+    @Test
+    fun everyPlannerTypeWordMapsToASport() {
+        assertEquals("BIKE", RouteTransfer.sportFor("E-Bike"))
+        assertEquals("BIKE", RouteTransfer.sportFor("Mountain Biking"))
+        assertEquals("BIKE", RouteTransfer.sportFor("Vélo"))
+        assertEquals("RUN", RouteTransfer.sportFor("Trail Running"))
+        assertEquals("RUN", RouteTransfer.sportFor("jog"))
+        assertEquals("WALK", RouteTransfer.sportFor("Walking"))
+        assertEquals("WALK", RouteTransfer.sportFor("Marche"))
+        assertEquals("HIKE", RouteTransfer.sportFor("Hiking"))
+        assertEquals("HIKE", RouteTransfer.sportFor(null))
+        assertEquals("HIKE", RouteTransfer.sportFor(""))
+    }
+
+    @Test
+    fun refusesAFileTooLargeToBeARoute() {
+        val huge = ByteArray(RouteTransfer.MAX_GPX_BYTES + 1)
+        assertNull(RouteTransfer.parseGpx(huge, "x", 1L))
+    }
 }

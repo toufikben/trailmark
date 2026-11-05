@@ -11,6 +11,7 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.speech.tts.TextToSpeech
@@ -84,13 +85,43 @@ class RecordingService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_START -> startRecording(intent)
+            ACTION_START -> startRecording(
+                sportHint = intent.getStringExtra(EXTRA_SPORT),
+                synthetic = intent.getBooleanExtra(EXTRA_SYNTHETIC, false),
+                userInitiated = true,
+            )
             ACTION_STOP -> stopRecording()
             ACTION_PAUSE -> scope.launch { controller?.pause() }
             ACTION_RESUME -> scope.launch { controller?.resume() }
+            // No action means Android restarted us after killing the process
+            // (START_STICKY): continue the session from its checkpoint.
+            null -> resumeAfterKill()
             else -> stopSelf()
         }
-        return START_NOT_STICKY
+        return START_STICKY
+    }
+
+    /**
+     * The system killed the process mid-run (low memory, or a crash in the UI
+     * thread — same process). The checkpoint is already on disk, so the run
+     * continues instead of silently ending. A crash loop is not retried: after
+     * three crashes the session stays interrupted and the app offers it back.
+     */
+    private fun resumeAfterKill() {
+        val repo = runCatching { dev.toufik.trailmark.app.AppGraph.repository(this) }.getOrNull()
+        val resume = repo?.loadResume()
+        if (resume == null) {
+            stopSelf()
+            return
+        }
+        val prefs = getSharedPreferences("trailmark", MODE_PRIVATE)
+        if (prefs.getInt(KEY_CRASHES, 0) >= 3) {
+            prefs.edit().putBoolean(KEY_INTERRUPTED, true).apply()
+            stopSelf()
+            return
+        }
+        val sport = repo.activityById(resume.activityId)?.sport
+        startRecording(sportHint = sport, synthetic = false, userInitiated = false)
     }
 
     private fun currentLang(): Lang {
@@ -120,11 +151,10 @@ class RecordingService : Service() {
         TurnKind.UTURN -> TurnDirection.UTURN
     }
 
-    private fun startRecording(intent: Intent) {
+    private fun startRecording(sportHint: String?, synthetic: Boolean, userInitiated: Boolean) {
         if (controller != null) return
         WeatherHolder.update(null)
         createChannel()
-        val synthetic = intent.getBooleanExtra(EXTRA_SYNTHETIC, false)
         ServiceCompat.startForeground(
             this,
             NOTIF_ID,
@@ -134,17 +164,35 @@ class RecordingService : Service() {
         )
         acquireWakeLock()
 
-        val sport = intent.getStringExtra(EXTRA_SPORT)
-            ?.let { runCatching { Sport.valueOf(it) }.getOrNull() } ?: Sport.RUN
+        val repo = dev.toufik.trailmark.app.AppGraph.repository(this)
+        val resume = runCatching { repo.loadResume() }.getOrNull()
+        val sport = sportHint
+            ?.let { runCatching { Sport.valueOf(it) }.getOrNull() }
+            ?: Sport.RUN
         sportName = sport.name
-        val source: FixSource = if (intent.getBooleanExtra(EXTRA_SYNTHETIC, false)) {
+        val prefs = getSharedPreferences("trailmark", MODE_PRIVATE)
+        if (userInitiated) {
+            prefs.edit().putInt(KEY_CRASHES, 0).putBoolean(KEY_INTERRUPTED, false).apply()
+        } else {
+            // A resumed run is visible in the UI as a normal one; the flag is only
+            // used to tell the user why it restarted.
+            prefs.edit().putBoolean(KEY_RESUMED, true).apply()
+        }
+        val source: FixSource = if (synthetic) {
             SyntheticFixSource()
         } else {
             AndroidLocationFixSource(this)
         }
+        // A reboot resets elapsedRealtimeNanos; shift the new fixes above the
+        // checkpoint so the resumed activity's timeline never goes backwards.
+        val nowRealtime = SystemClock.elapsedRealtimeNanos()
+        val offset = resume
+            ?.takeIf { nowRealtime < it.lastStored.timeNanos }
+            ?.let { it.lastStored.timeNanos - nowRealtime + 1_000_000_000L }
+            ?: 0L
         val c = RecordingController(
-            repo = dev.toufik.trailmark.app.AppGraph.repository(this),
-            source = source,
+            repo = repo,
+            source = OffsetFixSource(source, offset),
             scope = scope,
             sport = sport,
         )
@@ -596,5 +644,8 @@ class RecordingService : Service() {
         private const val NOTIF_ID = 4711
         private const val RECORDS_CHANNEL_ID = "segment_records"
         private const val RECORD_NOTIF_BASE = 50_000L
+        const val KEY_CRASHES = "recording_crashes"
+        const val KEY_INTERRUPTED = "recording_interrupted"
+        const val KEY_RESUMED = "recording_resumed"
     }
 }
