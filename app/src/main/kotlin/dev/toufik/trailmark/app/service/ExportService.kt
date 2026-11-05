@@ -104,7 +104,17 @@ class ExportService : Service() {
         running?.cancel()
         val t = textsFor(lang())
         createChannels(t.exportRunning)
-        startAsForeground(NOTIF_ID, progressNotification(job, 0f, null))
+        if (!startAsForeground(NOTIF_ID, progressNotification(job, 0f, null))) {
+            // The platform refused every declared type. Rendering without a
+            // foreground service would be killed as soon as the screen locks,
+            // so report the failure instead of crashing the app.
+            ExportStore.clearPending(this)
+            ExportHolder.publish(
+                ExportState(ExportPhase.FAILED, job.activityId, job.title, error = t.exportFailed),
+            )
+            stopSelf()
+            return
+        }
         val wake = acquireWakeLock()
         running = scope.launch {
             ExportHolder.publish(
@@ -341,15 +351,31 @@ class ExportService : Service() {
         }
     }
 
-    private fun startAsForeground(id: Int, n: Notification) {
-        // mediaProcessing exists from Android 15; older platforms take the type
-        // from the manifest, and passing an unknown bit is a crash.
-        val type = if (Build.VERSION.SDK_INT >= 35) {
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING
-        } else {
-            0
+    private fun startAsForeground(id: Int, n: Notification): Boolean {
+        // mediaProcessing exists from Android 15, but some ROMs refuse it even
+        // when it is declared; dataSync is declared next to it as a fallback so
+        // a long render still finishes instead of crashing the app.
+        val sdk = Build.VERSION.SDK_INT
+        val declared = runCatching {
+            packageManager.getServiceInfo(
+                android.content.ComponentName(this, ExportService::class.java),
+                0,
+            ).foregroundServiceType
+        }.getOrDefault(0)
+        val candidates = buildList {
+            if (sdk >= 35) add(ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
+            add(ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         }
-        ServiceCompat.startForeground(this, id, n, type)
+        for (type in candidates) {
+            val error = runCatching { ServiceCompat.startForeground(this, id, n, type) }.exceptionOrNull()
+            android.util.Log.i(
+                "TrailmarkExport",
+                "startForeground sdk=$sdk type=0x${type.toString(16)} declared=0x${declared.toString(16)} ok=${error == null}",
+                error,
+            )
+            if (error == null) return true
+        }
+        return false
     }
 
     companion object {
