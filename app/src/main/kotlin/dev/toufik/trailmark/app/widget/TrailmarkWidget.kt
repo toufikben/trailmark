@@ -8,13 +8,17 @@ import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
 import dev.toufik.trailmark.R
+import dev.toufik.trailmark.app.Lang
 import dev.toufik.trailmark.app.MainActivity
+import dev.toufik.trailmark.app.Texts
+import dev.toufik.trailmark.app.textsFor
 import java.util.Locale
 
 /**
- * Home-screen widget: the last finished activity's sport, distance and time.
- * The data is written to preferences by the recording service on finish; the
- * widget only renders it and opens the app on tap.
+ * Home-screen widget. While a run is going it shows the live distance and time;
+ * when nothing is being recorded it falls back to the last finished activity.
+ * The service writes those numbers to preferences every few seconds, and the
+ * widget only renders them, so it never touches the database from a broadcast.
  */
 class TrailmarkWidget : AppWidgetProvider() {
 
@@ -24,6 +28,12 @@ class TrailmarkWidget : AppWidgetProvider() {
     }
 
     companion object {
+
+        /** Preferences the recording service writes for the live branch. */
+        const val KEY_LIVE_ACTIVE = "live_active"
+        const val KEY_LIVE_DIST = "live_dist_m"
+        const val KEY_LIVE_TIME = "live_time_s"
+        const val KEY_LIVE_SPORT = "live_sport"
 
         fun refresh(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
@@ -38,15 +48,24 @@ class TrailmarkWidget : AppWidgetProvider() {
         private fun build(context: Context): RemoteViews {
             val prefs = context.getSharedPreferences("trailmark", Context.MODE_PRIVATE)
             val views = RemoteViews(context.packageName, R.layout.widget_trailmark)
-            val distM = prefs.getFloat("last_dist_m", -1f)
+            val live = prefs.getBoolean(KEY_LIVE_ACTIVE, false)
+            val distM = if (live) {
+                prefs.getFloat(KEY_LIVE_DIST, 0f)
+            } else {
+                prefs.getFloat("last_dist_m", -1f)
+            }
             if (distM < 0f) {
-                views.setTextViewText(R.id.widget_value, "—")
+                views.setTextViewText(R.id.widget_value, "\u2014")
                 views.setTextViewText(R.id.widget_sub, context.getString(R.string.app_name))
             } else {
                 val imperial = prefs.getBoolean("units_imperial", false)
                 val dist = if (imperial) distM / 1609.344 else distM / 1000.0
                 val unit = if (imperial) "mi" else "km"
-                val secs = prefs.getLong("last_time_s", 0L)
+                val secs = if (live) {
+                    prefs.getLong(KEY_LIVE_TIME, 0L)
+                } else {
+                    prefs.getLong("last_time_s", 0L)
+                }
                 val h = secs / 3600
                 val m = (secs % 3600) / 60
                 val s = secs % 60
@@ -55,12 +74,14 @@ class TrailmarkWidget : AppWidgetProvider() {
                 } else {
                     String.format(Locale.US, "%d:%02d", m, s)
                 }
-                val sport = prefs.getString("last_sport", "") ?: ""
+                val sport = prefs.getString(if (live) KEY_LIVE_SPORT else "last_sport", "") ?: ""
+                val label = sportLabel(context, sport)
                 views.setTextViewText(
                     R.id.widget_value,
                     String.format(Locale.US, "%.2f %s", dist, unit),
                 )
-                views.setTextViewText(R.id.widget_sub, "$sport · $time")
+                val prefix = if (live) "\u25cf " else ""
+                views.setTextViewText(R.id.widget_sub, "$prefix$label \u00b7 $time")
             }
             val intent = Intent(context, MainActivity::class.java)
             val pending = PendingIntent.getActivity(
@@ -71,6 +92,22 @@ class TrailmarkWidget : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.widget_root, pending)
             return views
+        }
+
+        /** Sport names are stored as enum names; the widget shows the app language. */
+        private fun sportLabel(context: Context, sport: String): String {
+            val code = context.getSharedPreferences("trailmark", Context.MODE_PRIVATE)
+                .getString("lang_code", null)
+            val lang = Lang.entries.firstOrNull { it.code == code } ?: Lang.AR
+            return labelFor(textsFor(lang), sport)
+        }
+
+        private fun labelFor(t: Texts, sport: String): String = when (sport) {
+            "RUN" -> t.run
+            "WALK" -> t.walk
+            "BIKE" -> t.bike
+            "HIKE" -> t.hike
+            else -> sport
         }
     }
 }

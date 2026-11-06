@@ -108,4 +108,5 @@ runtimeOnly(libs.slf4j.nop)
     implementation(libs.compose.ui.tooling.preview)
     debugImplementation(libs.compose.ui.tooling)
     testImplementation(libs.junit.jupiter)
+    testImplementation(libs.org.json)
 }

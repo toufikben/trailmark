@@ -222,6 +222,7 @@ class RecordingService : Service() {
                 val st = c.state.value
                 if (st.phase == Phase.RECORDING || st.phase == Phase.PAUSED) {
                     mgr.notify(NOTIF_ID, buildNotification(st))
+                    publishLive(st)
                     delay(5_000L)
                 } else {
                     delay(2_000L)
@@ -453,6 +454,10 @@ class RecordingService : Service() {
             WeatherHolder.update(null)
             if (finished != null && endState != null) {
                 getSharedPreferences("trailmark", MODE_PRIVATE).edit()
+                    .putBoolean(
+                        dev.toufik.trailmark.app.widget.TrailmarkWidget.KEY_LIVE_ACTIVE,
+                        false,
+                    )
                     .putFloat("last_dist_m", endState.distanceM.toFloat())
                     .putLong("last_time_s", endState.elapsedNanos / 1_000_000_000L)
                     .putString("last_sport", sportName)
@@ -518,6 +523,7 @@ class RecordingService : Service() {
 
     override fun onDestroy() {
         releaseWakeLock()
+        clearLive()
         scope.cancel()
         super.onDestroy()
     }
@@ -541,6 +547,34 @@ class RecordingService : Service() {
             val v = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator ?: return
             v.vibrate(VibrationEffect.createWaveform(timings, -1))
         }
+    }
+
+    /**
+     * Mirrors the session into preferences so the home-screen widget can show a
+     * live distance and time without binding to the service or reading the
+     * database from a widget broadcast.
+     */
+    private fun publishLive(st: RecordingState) {
+        getSharedPreferences("trailmark", MODE_PRIVATE).edit()
+            .putBoolean(dev.toufik.trailmark.app.widget.TrailmarkWidget.KEY_LIVE_ACTIVE, true)
+            .putFloat(
+                dev.toufik.trailmark.app.widget.TrailmarkWidget.KEY_LIVE_DIST,
+                st.distanceM.toFloat(),
+            )
+            .putLong(
+                dev.toufik.trailmark.app.widget.TrailmarkWidget.KEY_LIVE_TIME,
+                st.elapsedNanos / 1_000_000_000L,
+            )
+            .putString(dev.toufik.trailmark.app.widget.TrailmarkWidget.KEY_LIVE_SPORT, sportName)
+            .apply()
+        dev.toufik.trailmark.app.widget.TrailmarkWidget.refresh(this)
+    }
+
+    private fun clearLive() {
+        getSharedPreferences("trailmark", MODE_PRIVATE).edit()
+            .putBoolean(dev.toufik.trailmark.app.widget.TrailmarkWidget.KEY_LIVE_ACTIVE, false)
+            .apply()
+        dev.toufik.trailmark.app.widget.TrailmarkWidget.refresh(this)
     }
 
     private fun createChannel() {
@@ -615,11 +649,26 @@ class RecordingService : Service() {
             .setOnlyAlertOnce(true)
             .setContentIntent(open)
         if (live != null) {
+            val speed = live.currentSpeedMps?.let { mps ->
+                val kmh = mps * 3.6
+                String.format(java.util.Locale.US, "%.1f %s", kmh, t.kmh)
+            }
+            val detail = buildString {
+                append(
+                    "${dev.toufik.trailmark.app.formatDistance(live.distanceM)} " +
+                        "${dev.toufik.trailmark.app.distanceUnit(t)} \u00b7 ",
+                )
+                append(dev.toufik.trailmark.app.formatDuration(live.elapsedNanos))
+                if (speed != null) append(" \u00b7 $speed")
+                if (live.autoPaused) append(" \u00b7 ${t.paused}")
+            }
+            builder.setStyle(NotificationCompat.BigTextStyle().bigText(detail))
             if (live.phase == Phase.RECORDING) {
                 builder.addAction(0, t.pause, actionIntent(ACTION_PAUSE, 1))
             } else {
                 builder.addAction(0, t.resume, actionIntent(ACTION_RESUME, 2))
             }
+            builder.addAction(0, t.stop, actionIntent(ACTION_STOP, 3))
         }
         return builder.build()
     }
