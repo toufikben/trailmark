@@ -166,8 +166,7 @@ fun RecordingScreen(
 
     // Saved across activity recreation: the camera app often outlives our activity,
     // and the result must still find the file it was told to write.
-    var pendingCapture by rememberSaveable { mutableStateOf<String?>(null) }
-    var pendingKind by rememberSaveable { mutableStateOf<String?>(null) }
+    var cameraMode by rememberSaveable { mutableStateOf<String?>(null) }
     var mediaFlash by remember { mutableStateOf(false) }
 
     var route by remember { mutableStateOf<List<StoredPoint>>(emptyList()) }
@@ -377,13 +376,9 @@ fun RecordingScreen(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { }
 
-    fun onCaptured(ok: Boolean) {
-        val file = pendingCapture?.let { java.io.File(it) }
-        val kind = pendingKind
-        pendingCapture = null
-        pendingKind = null
+    fun attachCaptured(file: java.io.File, kind: String) {
         val activityId = state.activityId
-        if (!ok || file == null || kind == null || activityId == null) return
+        if (activityId == null) return
         val lat = state.currentLat
         val lon = state.currentLon
         val bearing = state.currentBearing
@@ -411,36 +406,12 @@ fun RecordingScreen(
         }
     }
 
-    val photoLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.TakePicture(),
-    ) { ok -> onCaptured(ok) }
-
-    val videoLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CaptureVideo(),
-    ) { ok -> onCaptured(ok) }
-
     fun capturePhoto() {
-        val file = MediaCapture.newPhotoFile(context)
-        pendingCapture = file.absolutePath
-        pendingKind = "PHOTO"
-        try {
-            photoLauncher.launch(MediaCapture.uriFor(context, file))
-        } catch (_: Exception) {
-            pendingCapture = null
-            pendingKind = null
-        }
+        cameraMode = "PHOTO"
     }
 
     fun captureVideo() {
-        val file = MediaCapture.newVideoFile(context)
-        pendingCapture = file.absolutePath
-        pendingKind = "VIDEO"
-        try {
-            videoLauncher.launch(MediaCapture.uriFor(context, file))
-        } catch (_: Exception) {
-            pendingCapture = null
-            pendingKind = null
-        }
+        cameraMode = "VIDEO"
     }
 
     Surface(color = Palette.bg, modifier = Modifier.fillMaxSize()) {
@@ -765,6 +736,23 @@ fun RecordingScreen(
                         onDismiss = { viewerMedia = null },
                     )
                 }
+            }
+
+            cameraMode?.let { mode ->
+                CameraCaptureScreen(
+                    title = if (mode == "PHOTO") t.photo else t.video,
+                    photoLabel = t.photo,
+                    videoLabel = t.video,
+                    recordingLabel = t.stop,
+                    closeLabel = t.cancel,
+                    permissionLabel = t.cameraPermission,
+                    errorLabel = t.captureFailed,
+                    onCaptured = { file, kind ->
+                        cameraMode = null
+                        attachCaptured(file, kind)
+                    },
+                    onClose = { cameraMode = null },
+                )
             }
         }
     }
