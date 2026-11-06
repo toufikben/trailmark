@@ -61,6 +61,7 @@ val NL_TEXTS = Texts(
     poiLayer = "Bezienswaardigheden",
     cameraPermission = "Sta de camera toe voor foto's en clips",
     captureFailed = "Opname kon niet worden opgeslagen",
+    fromGallery = "Kies uit galerij",
     exportHistory = "Exportgeschiedenis",
     exportHistoryEmpty = "Nog geen exports",
     openClip = "Openen",

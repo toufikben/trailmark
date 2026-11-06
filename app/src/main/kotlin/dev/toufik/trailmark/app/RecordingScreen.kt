@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -376,7 +377,7 @@ fun RecordingScreen(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { }
 
-    fun attachCaptured(file: java.io.File, kind: String) {
+    fun attachCaptured(file: java.io.File, kind: String, keepGalleryCopy: Boolean = true) {
         val activityId = state.activityId
         if (activityId == null) return
         val lat = state.currentLat
@@ -399,6 +400,13 @@ fun RecordingScreen(
                     durationMs = if (kind == "VIDEO") MediaCapture.videoDurationMs(file) else null,
                     caption = null,
                 )
+                if (keepGalleryCopy) {
+                    if (kind == "VIDEO") {
+                        MediaCapture.saveVideoToGallery(context, file)
+                    } else {
+                        MediaCapture.savePhotoToGallery(context, file)
+                    }
+                }
             }
             mediaFlash = true
             delay(2500)
@@ -412,6 +420,32 @@ fun RecordingScreen(
 
     fun captureVideo() {
         cameraMode = "VIDEO"
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        if (uri != null) {
+            val kind = if (context.contentResolver.getType(uri)?.startsWith("video") == true) {
+                "VIDEO"
+            } else {
+                "PHOTO"
+            }
+            scope.launch {
+                val file = withContext(Dispatchers.IO) {
+                    MediaCapture.importFromGallery(context, uri, kind)
+                }
+                if (file != null) attachCaptured(file, kind, keepGalleryCopy = false)
+            }
+        }
+    }
+
+    fun importFromGallery() {
+        runCatching {
+            importLauncher.launch(
+                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
+            )
+        }
     }
 
     Surface(color = Palette.bg, modifier = Modifier.fillMaxSize()) {
@@ -703,6 +737,7 @@ fun RecordingScreen(
                         t = t,
                         onPhoto = { capturePhoto() },
                         onVideo = { captureVideo() },
+                        onGallery = { importFromGallery() },
                     )
                 } else {
                     SportPicker(
@@ -725,12 +760,22 @@ fun RecordingScreen(
                         media = m,
                         description = t.photo,
                         captionLabel = t.caption,
+                        deleteLabel = t.delete,
                         onSaveCaption = { cap ->
                             scope.launch {
                                 withContext(Dispatchers.IO) {
                                     AppGraph.repository(context).setMediaCaption(m.id, cap)
                                 }
                                 viewerMedia = m.copy(caption = cap)
+                            }
+                        },
+                        onDelete = {
+                            scope.launch {
+                                withContext(Dispatchers.IO) {
+                                    AppGraph.repository(context).deleteMedia(m.id)
+                                    MediaCapture.delete(m.filePath)
+                                }
+                                viewerMedia = null
                             }
                         },
                         onDismiss = { viewerMedia = null },
@@ -953,12 +998,13 @@ private fun bearingDeg(lat1: Double, lon1: Double, lat2: Double, lon2: Double): 
     return (Math.toDegrees(Math.atan2(y, x)) + 360.0) % 360.0
 }
 
-/** Photo and video buttons shown while the recording is paused. */
+/** Photo, video and gallery-pick buttons shown while the recording is paused. */
 @Composable
 private fun MediaCaptureRow(
     t: Texts,
     onPhoto: () -> Unit,
     onVideo: () -> Unit,
+    onGallery: () -> Unit,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
         CaptureRoundButton(description = t.photo, onClick = onPhoto) { color ->
@@ -1003,6 +1049,28 @@ private fun MediaCaptureRow(
                 close()
             }
             drawPath(path, color)
+        }
+        CaptureRoundButton(description = t.fromGallery, onClick = onGallery) { color ->
+            val w = size.width
+            val h = size.height
+            drawRoundRect(
+                color = color,
+                topLeft = Offset(w * 0.14f, h * 0.22f),
+                size = Size(w * 0.72f, h * 0.56f),
+                cornerRadius = CornerRadius(w * 0.08f),
+                style = Stroke(width = w * 0.08f),
+            )
+            // A small sun and a ridge, so it reads as a picture rather than a box.
+            drawCircle(color = color, radius = w * 0.07f, center = Offset(w * 0.34f, h * 0.40f))
+            val ridge = Path().apply {
+                moveTo(w * 0.20f, h * 0.72f)
+                lineTo(w * 0.42f, h * 0.50f)
+                lineTo(w * 0.58f, h * 0.66f)
+                lineTo(w * 0.70f, h * 0.56f)
+                lineTo(w * 0.80f, h * 0.72f)
+                close()
+            }
+            drawPath(ridge, color)
         }
     }
 }

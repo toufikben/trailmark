@@ -617,6 +617,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                     media = m,
                     description = t.photo,
                     captionLabel = t.caption,
+                    deleteLabel = t.delete,
                     onSaveCaption = { cap ->
                         scope.launch {
                             withContext(Dispatchers.IO) {
@@ -627,6 +628,18 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                                 dd.copy(
                                     media = dd.media.map { if (it.id == m.id) it.copy(caption = cap) else it },
                                 )
+                            }
+                        }
+                    },
+                    onDelete = {
+                        scope.launch {
+                            withContext(Dispatchers.IO) {
+                                AppGraph.repository(context).deleteMedia(m.id)
+                                dev.toufik.trailmark.app.MediaCapture.delete(m.filePath)
+                            }
+                            viewerMedia = null
+                            detail = detail?.let { dd ->
+                                dd.copy(media = dd.media.filterNot { it.id == m.id })
                             }
                         }
                     },

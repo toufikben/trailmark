@@ -61,6 +61,7 @@ val ZH_TEXTS = Texts(
     poiLayer = "兴趣点",
     cameraPermission = "允许相机以拍摄照片和短片",
     captureFailed = "无法保存拍摄内容",
+    fromGallery = "从相册选择",
     exportHistory = "导出历史",
     exportHistoryEmpty = "暂无导出",
     openClip = "打开",

@@ -61,6 +61,7 @@ val KO_TEXTS = Texts(
     poiLayer = "관심 지점",
     cameraPermission = "사진과 클립 촬영을 위해 카메라를 허용하세요",
     captureFailed = "촬영을 저장하지 못했습니다",
+    fromGallery = "갤러리에서 선택",
     exportHistory = "내보내기 기록",
     exportHistoryEmpty = "아직 내보내기가 없습니다",
     openClip = "열기",

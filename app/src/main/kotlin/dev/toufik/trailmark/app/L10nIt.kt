@@ -61,6 +61,7 @@ val IT_TEXTS = Texts(
     poiLayer = "Punti di interesse",
     cameraPermission = "Consenti alla fotocamera per foto e clip",
     captureFailed = "Impossibile salvare la cattura",
+    fromGallery = "Scegli dalla galleria",
     exportHistory = "Cronologia esportazioni",
     exportHistoryEmpty = "Nessuna esportazione",
     openClip = "Apri",

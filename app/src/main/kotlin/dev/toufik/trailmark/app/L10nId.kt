@@ -61,6 +61,7 @@ val ID_TEXTS = Texts(
     poiLayer = "Tempat menarik",
     cameraPermission = "Izinkan kamera untuk mengambil foto dan klip",
     captureFailed = "Gagal menyimpan tangkapan",
+    fromGallery = "Pilih dari galeri",
     exportHistory = "Riwayat ekspor",
     exportHistoryEmpty = "Belum ada ekspor",
     openClip = "Buka",

@@ -61,6 +61,7 @@ val TR_TEXTS = Texts(
     poiLayer = "İlgi çekici yerler",
     cameraPermission = "Fotoğraf ve klip için kameraya izin verin",
     captureFailed = "Çekim kaydedilemedi",
+    fromGallery = "Galeriden seç",
     exportHistory = "Dışa aktarma geçmişi",
     exportHistoryEmpty = "Henüz dışa aktarma yok",
     openClip = "Aç",

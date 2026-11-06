@@ -61,6 +61,7 @@ val ES_TEXTS = Texts(
     poiLayer = "Puntos de interés",
     cameraPermission = "Permite la cámara para hacer fotos y clips",
     captureFailed = "No se pudo guardar la captura",
+    fromGallery = "Elegir de la galería",
     exportHistory = "Historial de exportaciones",
     exportHistoryEmpty = "Aún no hay exportaciones",
     openClip = "Abrir",

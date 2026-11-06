@@ -61,6 +61,7 @@ val RU_TEXTS = Texts(
     poiLayer = "Достопримечательности",
     cameraPermission = "Разрешите камеру для фото и клипов",
     captureFailed = "Не удалось сохранить снимок",
+    fromGallery = "Выбрать из галереи",
     exportHistory = "История экспорта",
     exportHistoryEmpty = "Экспортов пока нет",
     openClip = "Открыть",

@@ -61,6 +61,7 @@ val HI_TEXTS = Texts(
     poiLayer = "रुचि के स्थान",
     cameraPermission = "फ़ोटो और क्लिप के लिए कैमरा अनुमति दें",
     captureFailed = "कैप्चर सहेजा नहीं जा सका",
+    fromGallery = "गैलरी से चुनें",
     exportHistory = "निर्यात इतिहास",
     exportHistoryEmpty = "अभी कोई निर्यात नहीं",
     openClip = "खोलें",

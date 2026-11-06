@@ -61,6 +61,7 @@ val JA_TEXTS = Texts(
     poiLayer = "スポット",
     cameraPermission = "写真とクリップの撮影にカメラを許可してください",
     captureFailed = "撮影を保存できませんでした",
+    fromGallery = "ギャラリーから選ぶ",
     exportHistory = "エクスポート履歴",
     exportHistoryEmpty = "エクスポートはまだありません",
     openClip = "開く",
