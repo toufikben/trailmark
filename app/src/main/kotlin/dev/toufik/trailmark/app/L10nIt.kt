@@ -58,6 +58,7 @@ val IT_TEXTS = Texts(
     mediaPhotos = "Foto",
     mediaAll = "Foto + video",
     galleryCopy = "Salva una copia nella galleria",
+    poiLayer = "Punti di interesse",
     exportHistory = "Cronologia esportazioni",
     exportHistoryEmpty = "Nessuna esportazione",
     openClip = "Apri",

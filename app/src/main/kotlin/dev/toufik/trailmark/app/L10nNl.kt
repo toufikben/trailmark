@@ -58,6 +58,7 @@ val NL_TEXTS = Texts(
     mediaPhotos = "Foto's",
     mediaAll = "Foto's + video's",
     galleryCopy = "Kopie opslaan in de galerij",
+    poiLayer = "Bezienswaardigheden",
     exportHistory = "Exportgeschiedenis",
     exportHistoryEmpty = "Nog geen exports",
     openClip = "Openen",

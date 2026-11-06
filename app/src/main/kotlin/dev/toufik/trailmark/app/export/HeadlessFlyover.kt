@@ -43,6 +43,20 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.Style
 import org.maplibre.android.snapshotter.MapSnapshot
 import org.maplibre.android.snapshotter.MapSnapshotter
+import org.maplibre.android.style.expressions.Expression
+import org.maplibre.android.style.layers.CircleLayer
+import org.maplibre.android.style.layers.PropertyFactory.circleColor
+import org.maplibre.android.style.layers.PropertyFactory.circleRadius
+import org.maplibre.android.style.layers.PropertyFactory.circleStrokeColor
+import org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth
+import org.maplibre.android.style.layers.PropertyFactory.textColor
+import org.maplibre.android.style.layers.PropertyFactory.textField
+import org.maplibre.android.style.layers.PropertyFactory.textFont
+import org.maplibre.android.style.layers.PropertyFactory.textHaloColor
+import org.maplibre.android.style.layers.PropertyFactory.textHaloWidth
+import org.maplibre.android.style.layers.PropertyFactory.textMaxWidth
+import org.maplibre.android.style.layers.PropertyFactory.textSize
+import org.maplibre.android.style.layers.SymbolLayer
 
 internal const val VIDEO_WIDTH = 720
 internal const val VIDEO_HEIGHT = 1280
@@ -59,6 +73,10 @@ private const val TRAIL_BEHIND_M = 260.0
 private const val BEARING_TAU_S = 0.5
 
 private const val SNAPSHOT_TIMEOUT_MS = 25_000L
+
+/** Point-of-interest classes worth a label on a flyover, as the live map uses. */
+private const val POI_FILTER =
+    """["in","class","shop","restaurant","cafe","fast_food","bakery","bar","bank","pharmacy","hospital","fuel","supermarket","grocery","convenience","marketplace","hotel","station","bus","railway","transit","attraction","museum","theatre","cinema"]"""
 
 private val FULL_RECT = Rect(0, 0, VIDEO_WIDTH, VIDEO_HEIGHT)
 private val BITMAP_PAINT = Paint(Paint.FILTER_BITMAP_FLAG)
@@ -228,18 +246,58 @@ internal class HeadlessFlyover(
         withContext(Dispatchers.Main) {
             val first = path.at(0.0)
             val pack = MapPacks.packFor(context, first.lat, first.lon)
-            val builder = if (pack != null && !isOnline(context)) {
+            val offlineVector = pack != null && !isOnline(context)
+            val builder = if (offlineVector) {
                 val glyphs = GlyphStore.ensure(context).absolutePath
-                Style.Builder().fromJson(vectorStyle(pack.absolutePath, glyphs, job.dark, job.lang))
+                Style.Builder().fromJson(vectorStyle(pack!!.absolutePath, glyphs, job.dark, job.lang))
             } else {
                 Style.Builder().fromUri(if (job.dark) ONLINE_STYLE_URL else ONLINE_STYLE_URL_LIGHT)
             }
+            if (job.pois) addPoiLayers(builder, offlineVector)
             val options = MapSnapshotter.Options(VIDEO_WIDTH, VIDEO_HEIGHT)
                 .withStyleBuilder(builder)
                 .withPixelRatio(1f)
                 .withLogo(false)
             MapSnapshotter(context, options)
         }
+
+    /**
+     * Shops, cafés, stations and the like, the same classes the live map shows
+     * behind its POI button. They only exist from zoom 14, so a far overview
+     * stays clean.
+     */
+    private fun addPoiLayers(builder: Style.Builder, offlineVector: Boolean) {
+        val filter = Expression.raw(POI_FILTER)
+        val dot = CircleLayer("poi-dot", "openmaptiles").withProperties(
+            circleColor(if (job.dark) "#AEB6BF" else "#8A929B"),
+            circleRadius(3.0f),
+            circleStrokeColor(if (job.dark) "#0E1113" else "#FFFFFF"),
+            circleStrokeWidth(1.2f),
+        )
+        dot.withSourceLayer("poi")
+        dot.setFilter(filter)
+        dot.minZoom = 14f
+        builder.withLayer(dot)
+
+        val label = SymbolLayer("poi-label", "openmaptiles").withProperties(
+            textField(
+                Expression.coalesce(
+                    Expression.get("name:" + job.lang),
+                    Expression.get("name"),
+                ),
+            ),
+            textFont(arrayOf(if (offlineVector) "TrailmarkSans" else "Noto Sans Regular")),
+            textSize(10f),
+            textMaxWidth(8f),
+            textColor(if (job.dark) "#C9D2CC" else "#3F464E"),
+            textHaloColor(if (job.dark) "#0E1113" else "#FFFFFF"),
+            textHaloWidth(1.0f),
+        )
+        label.withSourceLayer("poi")
+        label.setFilter(filter)
+        label.minZoom = 14f
+        builder.withLayer(label)
+    }
 
     private suspend fun shoot(snapshotter: MapSnapshotter, camera: CameraPosition): MapSnapshot {
         // The snapshotter lives on the main thread; only the drawing is done on

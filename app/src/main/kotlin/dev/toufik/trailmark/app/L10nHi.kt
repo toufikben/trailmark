@@ -58,6 +58,7 @@ val HI_TEXTS = Texts(
     mediaPhotos = "फ़ोटो",
     mediaAll = "फ़ोटो + वीडियो",
     galleryCopy = "गैलरी में एक प्रति सहेजें",
+    poiLayer = "रुचि के स्थान",
     exportHistory = "निर्यात इतिहास",
     exportHistoryEmpty = "अभी कोई निर्यात नहीं",
     openClip = "खोलें",

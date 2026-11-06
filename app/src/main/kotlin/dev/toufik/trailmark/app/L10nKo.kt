@@ -58,6 +58,7 @@ val KO_TEXTS = Texts(
     mediaPhotos = "사진",
     mediaAll = "사진 + 동영상",
     galleryCopy = "갤러리에 사본 저장",
+    poiLayer = "관심 지점",
     exportHistory = "내보내기 기록",
     exportHistoryEmpty = "아직 내보내기가 없습니다",
     openClip = "열기",

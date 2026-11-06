@@ -58,6 +58,7 @@ val RU_TEXTS = Texts(
     mediaPhotos = "Фото",
     mediaAll = "Фото + видео",
     galleryCopy = "Сохранить копию в галерее",
+    poiLayer = "Достопримечательности",
     exportHistory = "История экспорта",
     exportHistoryEmpty = "Экспортов пока нет",
     openClip = "Открыть",

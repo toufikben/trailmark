@@ -58,6 +58,7 @@ val DE_TEXTS = Texts(
     mediaPhotos = "Fotos",
     mediaAll = "Fotos + Videos",
     galleryCopy = "Kopie in der Galerie speichern",
+    poiLayer = "Orte von Interesse",
     exportHistory = "Exportverlauf",
     exportHistoryEmpty = "Noch keine Exporte",
     openClip = "Öffnen",

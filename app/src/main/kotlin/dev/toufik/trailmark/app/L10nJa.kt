@@ -58,6 +58,7 @@ val JA_TEXTS = Texts(
     mediaPhotos = "写真",
     mediaAll = "写真 + 動画",
     galleryCopy = "ギャラリーにコピーを保存",
+    poiLayer = "スポット",
     exportHistory = "エクスポート履歴",
     exportHistoryEmpty = "エクスポートはまだありません",
     openClip = "開く",

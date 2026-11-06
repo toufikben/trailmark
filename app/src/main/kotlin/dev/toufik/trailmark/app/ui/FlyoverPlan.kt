@@ -23,6 +23,8 @@ data class FlyoverOptions(
     val media: dev.toufik.trailmark.app.export.ExportMedia =
         dev.toufik.trailmark.app.export.ExportMedia.OFF,
     val galleryCopy: Boolean = true,
+    /** Draw shops, cafés, stations and other points of interest on the map. */
+    val pois: Boolean = false,
 )
 
 /** Length of the route part of the clip when the user leaves it on auto. */

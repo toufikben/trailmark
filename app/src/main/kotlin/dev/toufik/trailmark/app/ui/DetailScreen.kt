@@ -651,6 +651,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                                 camera = o.camera,
                                 media = o.media,
                                 galleryCopy = o.galleryCopy,
+                                pois = o.pois,
                                 dark = darkMap,
                                 lang = langNow.code,
                                 sport = dd.row.sport,

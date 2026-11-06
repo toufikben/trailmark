@@ -38,6 +38,7 @@ internal fun FlyoverOptionsDialog(
     var camera by remember { mutableStateOf(initial.camera) }
     var media by remember { mutableStateOf(initial.media) }
     var gallery by remember { mutableStateOf(initial.galleryCopy) }
+    var pois by remember { mutableStateOf(initial.pois) }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Palette.surface,
@@ -97,6 +98,18 @@ internal fun FlyoverOptionsDialog(
                     )
                     Switch(checked = gallery, onCheckedChange = { gallery = it })
                 }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        t.poiLayer,
+                        color = Palette.textSecondary,
+                        fontSize = 12.sp,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Switch(checked = pois, onCheckedChange = { pois = it })
+                }
                 Text(t.exportInBackground, color = Palette.textSecondary, fontSize = 11.sp)
                 TextButton(onClick = onHistory) {
                     Text(t.exportHistory, color = Palette.accent, fontSize = 12.sp)
@@ -112,6 +125,7 @@ internal fun FlyoverOptionsDialog(
                             camera = camera,
                             media = media,
                             galleryCopy = gallery,
+                            pois = pois,
                         ),
                     )
                 },

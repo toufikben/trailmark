@@ -58,6 +58,7 @@ val TR_TEXTS = Texts(
     mediaPhotos = "Fotoğraflar",
     mediaAll = "Fotoğraflar + videolar",
     galleryCopy = "Galeriye bir kopya kaydet",
+    poiLayer = "İlgi çekici yerler",
     exportHistory = "Dışa aktarma geçmişi",
     exportHistoryEmpty = "Henüz dışa aktarma yok",
     openClip = "Aç",

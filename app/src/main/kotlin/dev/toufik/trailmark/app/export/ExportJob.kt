@@ -23,6 +23,7 @@ data class ExportJob(
     val media: ExportMedia,
     val galleryCopy: Boolean,
     val dark: Boolean,
+    val pois: Boolean = false,
     val lang: String,
     val sport: String,
     val title: String,
@@ -35,6 +36,7 @@ data class ExportJob(
         .put("media", media.name)
         .put("galleryCopy", galleryCopy)
         .put("dark", dark)
+        .put("pois", pois)
         .put("lang", lang)
         .put("sport", sport)
         .put("title", title)
@@ -53,6 +55,7 @@ data class ExportJob(
                     ?: ExportMedia.OFF,
                 galleryCopy = o.optBoolean("galleryCopy", true),
                 dark = o.optBoolean("dark", true),
+                pois = o.optBoolean("pois", false),
                 lang = o.optString("lang", "en"),
                 sport = o.optString("sport", "RUN"),
                 title = o.optString("title"),

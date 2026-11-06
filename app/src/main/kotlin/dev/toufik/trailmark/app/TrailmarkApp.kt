@@ -20,6 +20,9 @@ import dev.toufik.trailmark.recording.Phase
 class TrailmarkApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        // The export service can be restarted by the system without any
+        // activity, and MapLibre must already be initialised then.
+        org.maplibre.android.MapLibre.getInstance(this)
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
             runCatching {

@@ -58,6 +58,7 @@ val ZH_TEXTS = Texts(
     mediaPhotos = "照片",
     mediaAll = "照片 + 视频",
     galleryCopy = "在相册中保存副本",
+    poiLayer = "兴趣点",
     exportHistory = "导出历史",
     exportHistoryEmpty = "暂无导出",
     openClip = "打开",

@@ -58,6 +58,7 @@ val ID_TEXTS = Texts(
     mediaPhotos = "Foto",
     mediaAll = "Foto + video",
     galleryCopy = "Simpan salinan di galeri",
+    poiLayer = "Tempat menarik",
     exportHistory = "Riwayat ekspor",
     exportHistoryEmpty = "Belum ada ekspor",
     openClip = "Buka",
