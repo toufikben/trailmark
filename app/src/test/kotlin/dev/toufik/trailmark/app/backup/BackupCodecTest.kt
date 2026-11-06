@@ -3,7 +3,6 @@ package dev.toufik.trailmark.app.backup
 import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.core.model.WaypointType
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -69,7 +68,7 @@ class BackupCodecTest {
             ),
         )
 
-        val decoded = assertNotNull(BackupCodec.decode(BackupCodec.encode(file)))
+        val decoded = requireNotNull(BackupCodec.decode(BackupCodec.encode(file)))
         assertEquals(file.version, decoded.version)
         assertEquals(file.createdWallMillis, decoded.createdWallMillis)
         assertEquals(1, decoded.activities.size)
@@ -113,7 +112,7 @@ class BackupCodecTest {
 
     @Test
     fun emptyBackupIsStillReadable() {
-        val decoded = assertNotNull(
+        val decoded = requireNotNull(
             BackupCodec.decode(
                 BackupCodec.encode(BackupFile(createdWallMillis = 1L, activities = emptyList())),
             ),
