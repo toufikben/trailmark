@@ -18,6 +18,7 @@ slf4j = "2.0.16"
 wear-compose = "1.4.0"
 play-services-wearable = "20.0.1"
 camera = "1.4.1"
+guava = "33.3.1-android"
 
 [libraries]
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
@@ -50,6 +51,7 @@ play-services-wearable = { module = "com.google.android.gms:play-services-wearab
 camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camera" }
 camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camera" }
 camera-view = { module = "androidx.camera:camera-view", version.ref = "camera" }
+guava = { module = "com.google.guava:guava", version.ref = "guava" }
 camera-video = { module = "androidx.camera:camera-video", version.ref = "camera" }
 
 [plugins]

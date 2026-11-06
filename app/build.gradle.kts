@@ -99,6 +99,7 @@ dependencies {
     implementation(libs.camera.lifecycle)
     implementation(libs.camera.view)
     implementation(libs.camera.video)
+    implementation(libs.guava)
 runtimeOnly(libs.slf4j.nop)
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
