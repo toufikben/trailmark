@@ -138,6 +138,7 @@ internal fun CameraCaptureScreen(
     }
 
     fun takePhoto() {
+        failed = false
         val file = MediaCapture.newPhotoFile(context)
         val options = ImageCapture.OutputFileOptions.Builder(file).build()
         imageCapture.takePicture(
@@ -157,6 +158,7 @@ internal fun CameraCaptureScreen(
     }
 
     fun startVideo() {
+        failed = false
         val file = MediaCapture.newVideoFile(context)
         recordingFile = file
         val pending = videoCapture.output
