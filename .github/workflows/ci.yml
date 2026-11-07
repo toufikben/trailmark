@@ -79,6 +79,15 @@ jobs:
             "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk
             "$APKSIGNER" verify --print-certs wear/build/outputs/apk/release/wear-release.apk
           fi
+      - name: Attach the release APK and AAB to the QA pre-release
+        # The QA release is what reaches the test phone, so the R8 build has to
+        # land there too - a release that is never installed is never checked.
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="qa-${GITHUB_RUN_NUMBER}"
+          gh release upload "$tag"             app/build/outputs/apk/release/app-release.apk             app/build/outputs/bundle/release/app-release.aab             --clobber
       - uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
