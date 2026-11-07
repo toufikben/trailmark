@@ -24,3 +24,15 @@
 -dontwarn org.conscrypt.**
 -dontwarn org.bouncycastle.**
 -dontwarn org.openjsse.**
+
+# GraphHopper drags in its desktop XML stack (Jackson XML, XMLGraphics,
+# StAX, AWT). The Android build never calls it, but R8 still resolves the
+# references, so they are declared as optional.
+-dontwarn java.awt.**
+-dontwarn javax.imageio.**
+-dontwarn javax.xml.stream.**
+-dontwarn aQute.bnd.annotation.**
+-dontwarn com.fasterxml.jackson.**
+-dontwarn org.apache.xmlgraphics.**
+-dontwarn org.codehaus.stax2.**
+-dontwarn com.ctc.wstx.**
