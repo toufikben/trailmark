@@ -65,6 +65,7 @@ internal fun CameraCaptureScreen(
     closeLabel: String,
     permissionLabel: String,
     errorLabel: String,
+    startInVideo: Boolean = false,
     onCaptured: (File, String) -> Unit,
     onClose: () -> Unit,
 ) {
@@ -112,7 +113,7 @@ internal fun CameraCaptureScreen(
     val videoCapture = remember { VideoCapture.withOutput(recorder) }
     var recording by remember { mutableStateOf<Recording?>(null) }
     var recordingFile by remember { mutableStateOf<File?>(null) }
-    var videoMode by remember { mutableStateOf(false) }
+    var videoMode by remember { mutableStateOf(startInVideo) }
     var failed by remember { mutableStateOf(false) }
 
     LaunchedEffect(owner, previewView) {

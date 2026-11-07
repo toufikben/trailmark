@@ -792,6 +792,7 @@ fun RecordingScreen(
                     closeLabel = t.cancel,
                     permissionLabel = t.cameraPermission,
                     errorLabel = t.captureFailed,
+                    startInVideo = mode == "VIDEO",
                     onCaptured = { file, kind ->
                         cameraMode = null
                         attachCaptured(file, kind)
