@@ -23,6 +23,7 @@ class ActivityRow(
     val startWallMillis: Long,
     val distanceM: Double,
     val elapsedNanos: Long,
+    val climbM: Double,
     val fixCount: Long,
     val rejectedCount: Long,
     val mockDetected: Boolean,
@@ -191,6 +192,7 @@ class ActivityRepository(private val db: TrailmarkDb) {
             startWallMillis = r.start_wall_millis,
             distanceM = r.distance_m,
             elapsedNanos = r.elapsed_nanos,
+            climbM = r.climb_m,
             fixCount = r.fix_count,
             rejectedCount = r.rejected_count,
             mockDetected = r.mock_detected != 0L,
@@ -202,7 +204,8 @@ class ActivityRepository(private val db: TrailmarkDb) {
         )
     }
 
-    fun listActivities(): List<ActivityRow> {        val resume = q.selectResume().executeAsOneOrNull()
+    fun listActivities(): List<ActivityRow> {
+        val resume = q.selectResume().executeAsOneOrNull()
         return q.listActivities().executeAsList().map { r ->
             val open = resume?.activity_id == r.id
             ActivityRow(
@@ -211,6 +214,7 @@ class ActivityRepository(private val db: TrailmarkDb) {
                 startWallMillis = r.start_wall_millis,
                 distanceM = if (open) resume!!.distance_m else r.distance_m,
                 elapsedNanos = if (open) resume!!.last_elapsed_nanos else r.elapsed_nanos,
+                climbM = r.climb_m,
                 fixCount = r.fix_count,
                 rejectedCount = r.rejected_count,
                 mockDetected = r.mock_detected != 0L,

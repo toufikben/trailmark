@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.media.MediaMetadataRetriever
@@ -11,10 +12,17 @@ import dev.toufik.trailmark.app.Texts
 import dev.toufik.trailmark.app.formatDuration
 import java.io.File
 
+private const val CARD_RADIUS = 40f
+private const val CAPTION_HEIGHT = 104f
+
 /**
- * Draws a photo or a video frame over the whole clip frame, with a fade and the
- * moment it was taken. Photos are decoded once and kept only while their clip
- * plays; video frames are pulled from the file along the clip's own timebase.
+ * Draws a photo or a video frame as a rounded card floating over the map, with
+ * a caption band and the moment it was taken. Photos are decoded once and kept
+ * only while their clip plays; video frames are pulled from the file along the
+ * clip's own timebase.
+ *
+ * The card is transparent where the map shows through, so the caller must draw
+ * the map frame first.
  *
  * Bitmaps are recycled one frame late: the encoder uploads a frame on its input
  * surface asynchronously, so freeing the pixels the frame was drawn from in the
@@ -29,8 +37,25 @@ internal class MediaCard(private val texts: Texts) {
     private var videoFrame: Bitmap? = null
     private var pendingRecycle: Bitmap? = null
 
+    private val full = RectF(0f, 0f, VIDEO_WIDTH.toFloat(), VIDEO_HEIGHT.toFloat())
+    private val cardRect = RectF(56f, 140f, VIDEO_WIDTH - 56f, VIDEO_HEIGHT - 250f)
+    private val imageArea =
+        RectF(cardRect.left, cardRect.top, cardRect.right, cardRect.bottom - CAPTION_HEIGHT)
+    private val captionArea =
+        RectF(cardRect.left, cardRect.bottom - CAPTION_HEIGHT, cardRect.right, cardRect.bottom)
+    private val cardPath = Path().apply {
+        addRoundRect(cardRect, CARD_RADIUS, CARD_RADIUS, Path.Direction.CW)
+    }
+
     private val image = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-    private val scrim = Paint().apply { color = 0xCC0B0F0E.toInt() }
+    private val vignette = Paint().apply { color = 0x70000000.toInt() }
+    private val cardBg = Paint().apply { color = 0xF2101412.toInt() }
+    private val captionBg = Paint().apply { color = 0xB0000000.toInt() }
+    private val border = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0x33FFFFFF
+        style = Paint.Style.STROKE
+        strokeWidth = 3f
+    }
     private val title = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xFFEEF3EF.toInt()
         textSize = 44f
@@ -46,26 +71,48 @@ internal class MediaCard(private val texts: Texts) {
         if (clip.isVideo) videoFrameFor(clip, progress) else photoFor(clip)
 
     fun draw(canvas: Canvas, bitmap: Bitmap?, clip: MediaClip, progress: Double) {
-        canvas.drawColor(0xFF0B0F0E.toInt())
         // A short fade in and out, so the cut does not flash.
         val edge = minOf(progress.coerceIn(0.0, 1.0), 1.0 - progress.coerceIn(0.0, 1.0))
         val alpha = (edge / 0.05).coerceIn(0.0, 1.0).toFloat()
+        if (alpha <= 0.02f) return
+
+        // Dim the map a little behind the card so the card reads as a card.
+        vignette.alpha = (120 * alpha).toInt()
+        canvas.drawRect(full, vignette)
+
+        canvas.save()
+        canvas.clipPath(cardPath)
+        cardBg.alpha = (242 * alpha).toInt()
+        canvas.drawRect(cardRect, cardBg)
         if (bitmap != null && !bitmap.isRecycled) {
             image.alpha = (255 * alpha).toInt()
-            canvas.drawBitmap(bitmap, null, fit(bitmap.width, bitmap.height), image)
+            canvas.drawBitmap(bitmap, null, fitIn(bitmap.width, bitmap.height, imageArea), image)
         }
-        if (alpha <= 0.05f) return
-        val y = VIDEO_HEIGHT - 210f
-        scrim.alpha = (204 * alpha).toInt()
-        canvas.drawRoundRect(RectF(28f, y, VIDEO_WIDTH - 28f, VIDEO_HEIGHT - 70f), 28f, 28f, scrim)
+        captionBg.alpha = (170 * alpha).toInt()
+        canvas.drawRect(captionArea, captionBg)
+
         val label = clip.media.caption?.takeIf { it.isNotBlank() }
             ?: if (clip.isVideo) "" else texts.photo
         title.alpha = (255 * alpha).toInt()
         sub.alpha = (255 * alpha).toInt()
         if (label.isNotEmpty()) {
-            canvas.drawText(ellipsize(label, title, VIDEO_WIDTH - 88f), 56f, y + 76f, title)
+            canvas.drawText(
+                ellipsize(label, title, cardRect.width() - 64f),
+                cardRect.left + 32f,
+                captionArea.top + 52f,
+                title,
+            )
         }
-        canvas.drawText(formatDuration(clip.media.elapsedNanos.coerceAtLeast(0L)), 56f, y + 122f, sub)
+        canvas.drawText(
+            formatDuration(clip.media.elapsedNanos.coerceAtLeast(0L)),
+            cardRect.left + 32f,
+            captionArea.top + 92f,
+            sub,
+        )
+        canvas.restore()
+
+        border.alpha = (96 * alpha).toInt()
+        canvas.drawRoundRect(cardRect, CARD_RADIUS, CARD_RADIUS, border)
     }
 
     fun close() {
@@ -141,14 +188,14 @@ internal class MediaCard(private val texts: Texts) {
         return runCatching { BitmapFactory.decodeFile(path, opts) }.getOrNull()
     }
 
-    /** The image centred in the frame, never stretched and never cropped. */
-    private fun fit(w: Int, h: Int): RectF {
-        if (w <= 0 || h <= 0) return RectF(0f, 0f, VIDEO_WIDTH.toFloat(), VIDEO_HEIGHT.toFloat())
-        val scale = minOf(VIDEO_WIDTH.toFloat() / w, VIDEO_HEIGHT.toFloat() / h)
+    /** The image centred inside [area], never stretched and never cropped. */
+    private fun fitIn(w: Int, h: Int, area: RectF): RectF {
+        if (w <= 0 || h <= 0) return RectF(area)
+        val scale = minOf(area.width() / w, area.height() / h)
         val dw = w * scale
         val dh = h * scale
-        val left = (VIDEO_WIDTH - dw) / 2f
-        val top = (VIDEO_HEIGHT - dh) / 2f
+        val left = area.left + (area.width() - dw) / 2f
+        val top = area.top + (area.height() - dh) / 2f
         return RectF(left, top, left + dw, top + dh)
     }
 

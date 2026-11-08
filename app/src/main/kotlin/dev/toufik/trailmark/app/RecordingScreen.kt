@@ -728,7 +728,7 @@ fun RecordingScreen(
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = with(LocalDensity.current) { barHeightPx.toDp() } + 12.dp),
+                    .padding(bottom = with(LocalDensity.current) { barHeightPx.toDp() } + 4.dp),
             ) {
                 if (state.activityId != null &&
                     (state.phase == Phase.RECORDING || state.phase == Phase.PAUSED)
@@ -833,12 +833,12 @@ private fun StatCell(
         Text(
             text = value,
             color = if (accent) Palette.accent else Palette.text,
-            fontSize = 16.sp,
+            fontSize = 15.sp,
         )
         Text(
             text = if (onClick != null) "$label \u2197" else label,
             color = Palette.textSecondary,
-            fontSize = 11.sp,
+            fontSize = 10.sp,
         )
     }
 }
@@ -1007,7 +1007,7 @@ private fun MediaCaptureRow(
     onVideo: () -> Unit,
     onGallery: () -> Unit,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         CaptureRoundButton(description = t.photo, onClick = onPhoto) { color ->
             val w = size.width
             val h = size.height
@@ -1087,13 +1087,13 @@ private fun CaptureRoundButton(
         shape = CircleShape,
         color = Palette.surface.copy(alpha = 0.94f),
         modifier = Modifier
-            .size(52.dp)
+            .size(44.dp)
             .semantics { contentDescription = description },
     ) {
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(13.dp),
+                .padding(11.dp),
         ) {
             icon(Palette.text)
         }
