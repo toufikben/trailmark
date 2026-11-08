@@ -54,6 +54,7 @@ import dev.toufik.trailmark.core.geo.splitRuns
 import dev.toufik.trailmark.core.geo.haversineMeters
 import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.core.model.WaypointType
+import dev.toufik.trailmark.core.model.displayablePoints
 import dev.toufik.trailmark.engine.Sport
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -699,12 +700,14 @@ fun TrailmarkMap(
     }
 
     val routeRuns = remember(route) {
-        splitRuns(route) { it.type == WaypointType.IDLE }
+        // Rejected fixes are kept so the engine can re-anchor, but they are not
+        // the path: drawing them is what makes the line jump across buildings.
+        splitRuns(displayablePoints(route)) { it.type == WaypointType.IDLE }
             .map { douglasPeucker(it, 4.0, { it.lat }, { it.lon }) }
             .filter { it.size >= 2 }
     }
     val ghostRuns = remember(ghost) {
-        splitRuns(ghost) { it.type == WaypointType.IDLE }
+        splitRuns(displayablePoints(ghost)) { it.type == WaypointType.IDLE }
             .map { douglasPeucker(it, 4.0, { it.lat }, { it.lon }) }
             .filter { it.size >= 2 }
     }
