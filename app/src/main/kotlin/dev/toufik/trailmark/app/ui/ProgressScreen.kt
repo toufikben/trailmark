@@ -295,14 +295,23 @@ private fun SportFilterRow(t: Texts, selected: String?, onSelect: (String?) -> U
 private fun NextGoalCard(t: Texts, rows: List<ActivityRow>) {
     val lang = LocalLang.current
     val states = remember(rows) {
-        evaluateAchievements(rows.map { ActivityStat(it.startWallMillis, it.distanceM) })
+        evaluateAchievements(
+            rows.map {
+                ActivityStat(
+                    startWallMillis = it.startWallMillis,
+                    distanceM = it.distanceM,
+                    elapsedNanos = it.elapsedNanos,
+                    climbM = it.climbM,
+                    sport = it.sport,
+                )
+            },
+        )
     }
     val next = remember(states) {
-        states.filter { !it.unlocked }
-            .maxByOrNull { if (it.target > 0.0) it.current / it.target else 0.0 }
+        states.filter { !it.unlocked }.maxByOrNull { it.fraction() }
     } ?: return
     val unlocked = states.count { it.unlocked }
-    val frac = (next.current / next.target).toFloat().coerceIn(0f, 1f)
+    val frac = next.fraction().toFloat().coerceIn(0f, 1f)
     var shown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { shown = true }
     val grow by animateFloatAsState(
