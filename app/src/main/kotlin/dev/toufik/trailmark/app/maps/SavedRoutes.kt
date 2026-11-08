@@ -1,10 +1,17 @@
 package dev.toufik.trailmark.app.maps
 
 import android.content.Context
+import dev.toufik.trailmark.core.geo.ElevPoint
+import java.io.File
+import java.util.concurrent.atomic.AtomicReference
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** A route planned in Explore and kept for later reuse. */
+/**
+ * A route planned in Explore and kept for later reuse. A planned route keeps
+ * its [stops] and is routed again on open; an imported one (GPX from Komoot,
+ * Strava, …) keeps its exact [track] instead.
+ */
 data class SavedRoute(
     val id: Long,
     val name: String,
@@ -12,35 +19,30 @@ data class SavedRoute(
     val stops: List<Pair<Double, Double>>,
     val distanceKm: Double,
     val climbM: Int,
+    val track: List<ElevPoint> = emptyList(),
 )
 
-/** Small JSON-backed store for planned routes; newest first, capped. */
+/**
+ * JSON-backed store for planned routes; newest first, capped.
+ *
+ * The file lives in `filesDir/routes`, not in SharedPreferences: a route with
+ * two thousand points is hundreds of kilobytes, and rewriting a multi-megabyte
+ * preferences XML on the main thread is exactly how an ANR happens. The parsed
+ * list is cached, so the composition only pays for the first read; [preload]
+ * warms it from a background thread at startup.
+ */
 class SavedRoutes(context: Context) {
 
-    private val prefs =
-        context.applicationContext.getSharedPreferences("trailmark", Context.MODE_PRIVATE)
+    private val app = context.applicationContext
 
-    fun all(): List<SavedRoute> = runCatching {
-        val raw = prefs.getString(KEY, null) ?: return@runCatching emptyList()
-        val arr = JSONArray(raw)
-        (0 until arr.length()).mapNotNull { i ->
-            val o = arr.optJSONObject(i) ?: return@mapNotNull null
-            val pts = o.optJSONArray("stops") ?: return@mapNotNull null
-            val stops = (0 until pts.length()).mapNotNull { j ->
-                val p = pts.optJSONArray(j) ?: return@mapNotNull null
-                p.optDouble(0) to p.optDouble(1)
-            }
-            if (stops.size < 2) return@mapNotNull null
-            SavedRoute(
-                id = o.optLong("id"),
-                name = o.optString("name"),
-                sport = o.optString("sport", "RUN"),
-                stops = stops,
-                distanceKm = o.optDouble("km", 0.0),
-                climbM = o.optInt("climb", 0),
-            )
-        }
-    }.getOrDefault(emptyList())
+    /** Reads the routes; call from a background thread when the cache is cold. */
+    fun all(): List<SavedRoute> {
+        val cached = cache.get()
+        if (cached != null) return cached
+        val loaded = read()
+        cache.compareAndSet(null, loaded)
+        return cache.get() ?: loaded
+    }
 
     fun save(route: SavedRoute) {
         val next = (listOf(route) + all().filter { it.id != route.id }).take(MAX)
@@ -58,21 +60,94 @@ class SavedRoutes(context: Context) {
             r.stops.forEach { (lat, lon) ->
                 pts.put(JSONArray().put(lat).put(lon))
             }
-            arr.put(
-                JSONObject()
-                    .put("id", r.id)
-                    .put("name", r.name)
-                    .put("sport", r.sport)
-                    .put("km", r.distanceKm)
-                    .put("climb", r.climbM)
-                    .put("stops", pts),
-            )
+            val o = JSONObject()
+                .put("id", r.id)
+                .put("name", r.name)
+                .put("sport", r.sport)
+                .put("km", r.distanceKm)
+                .put("climb", r.climbM)
+                .put("stops", pts)
+            if (r.track.isNotEmpty()) {
+                val track = JSONArray()
+                r.track.forEach { p -> track.put(JSONArray().put(p.lat).put(p.lon).put(p.eleM)) }
+                o.put("track", track)
+            }
+            arr.put(o)
         }
-        prefs.edit().putString(KEY, arr.toString()).apply()
+        val file = file(app).apply { parentFile?.mkdirs() }
+        val tmp = File(file.parentFile, file.name + ".tmp")
+        tmp.writeText(arr.toString())
+        if (!tmp.renameTo(file)) {
+            file.writeText(arr.toString())
+            tmp.delete()
+        }
+        cache.set(routes)
     }
 
-    private companion object {
-        const val KEY = "saved_routes"
-        const val MAX = 50
+    private fun read(): List<SavedRoute> {
+        val file = file(app)
+        val raw = when {
+            file.isFile -> runCatching { file.readText() }.getOrNull()
+            // One-time migration from the SharedPreferences store used before 0.1.10.
+            else -> legacy(app)
+        } ?: return emptyList()
+        if (raw.isBlank()) return emptyList()
+        return runCatching {
+            val arr = JSONArray(raw)
+            (0 until arr.length()).mapNotNull { i ->
+                val o = arr.optJSONObject(i) ?: return@mapNotNull null
+                val pts = o.optJSONArray("stops") ?: return@mapNotNull null
+                val stops = (0 until pts.length()).mapNotNull { j ->
+                    val p = pts.optJSONArray(j) ?: return@mapNotNull null
+                    p.optDouble(0) to p.optDouble(1)
+                }
+                if (stops.size < 2) return@mapNotNull null
+                val trackArr = o.optJSONArray("track")
+                val track = if (trackArr == null) {
+                    emptyList()
+                } else {
+                    (0 until trackArr.length()).mapNotNull { j ->
+                        val p = trackArr.optJSONArray(j) ?: return@mapNotNull null
+                        ElevPoint(p.optDouble(0), p.optDouble(1), p.optDouble(2, 0.0))
+                    }
+                }
+                SavedRoute(
+                    id = o.optLong("id"),
+                    name = o.optString("name"),
+                    sport = o.optString("sport", "RUN"),
+                    stops = stops,
+                    distanceKm = o.optDouble("km", 0.0),
+                    climbM = o.optInt("climb", 0),
+                    track = track,
+                )
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    /** Moves the old preferences blob to the file store once, then drops it. */
+    private fun legacy(context: Context): String? {
+        val prefs = context.getSharedPreferences("trailmark", Context.MODE_PRIVATE)
+        val raw = prefs.getString(LEGACY_KEY, null) ?: return null
+        runCatching {
+            val file = file(context).apply { parentFile?.mkdirs() }
+            file.writeText(raw)
+        }
+        prefs.edit().remove(LEGACY_KEY).apply()
+        return raw
+    }
+
+    companion object {
+        private const val MAX = 50
+        private const val LEGACY_KEY = "saved_routes"
+        private val cache = AtomicReference<List<SavedRoute>?>(null)
+
+        private fun file(context: Context): File = File(context.filesDir, "routes/saved-routes.json")
+
+        /** Warms the cache off the main thread; safe to call on every start. */
+        fun preload(context: Context) {
+            val app = context.applicationContext
+            if (cache.get() != null) return
+            runCatching { SavedRoutes(app).all() }
+        }
     }
 }

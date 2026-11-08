@@ -67,6 +67,14 @@ class EffortRow(
     val elapsedNanos: Long,
 )
 
+/** One timed passage of a segment, with when its activity started. */
+class SegmentEffort(
+    val id: Long,
+    val activityId: Long,
+    val elapsedNanos: Long,
+    val startWallMillis: Long,
+)
+
 /** Aggregate per segment: attempt count and the best elapsed time, if any. */
 class SegmentStat(
     val id: Long,
@@ -295,6 +303,24 @@ class ActivityRepository(private val db: TrailmarkDb) {
         q.deleteMedia(id = id)
     }
 
+    /**
+     * Removes an activity with its points, media rows, segment efforts and any
+     * resume checkpoint, in one transaction. Returns the media files the caller
+     * should delete from disk.
+     */
+    fun deleteActivity(activityId: Long): List<String> {
+        var files: List<String> = emptyList()
+        db.transaction {
+            files = q.mediaPathsForActivity(activityId).executeAsList()
+            q.deleteMediaForActivity(activityId)
+            q.deleteEffortsForActivity(activityId)
+            q.deletePointsForActivity(activityId)
+            q.clearResume(activity_id = activityId)
+            q.deleteActivityRow(activityId)
+        }
+        return files
+    }
+
     fun setMediaCaption(id: Long, caption: String?) {
         q.setMediaCaption(caption = caption, id = id)
     }
@@ -341,6 +367,19 @@ class ActivityRepository(private val db: TrailmarkDb) {
         q.effortsForActivity(activity_id = activityId).executeAsList().map {
             EffortRow(it.id, it.segment_id, it.name, it.elapsed_nanos)
         }
+
+    /** Every effort on one segment, fastest first: the "your best times" board. */
+    fun effortsForSegment(segmentId: Long): List<SegmentEffort> =
+        q.effortsForSegment(segment_id = segmentId).executeAsList().map {
+            SegmentEffort(it.id, it.activity_id, it.elapsed_nanos, it.start_wall_millis)
+        }
+
+    fun deleteSegment(segmentId: Long) {
+        db.transaction {
+            q.deleteEffortsForSegment(segmentId)
+            q.deleteSegment(segmentId)
+        }
+    }
 
     fun segmentStats(): List<SegmentStat> =
         q.segmentStats().executeAsList().map {

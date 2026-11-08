@@ -2,6 +2,7 @@
 kotlin = "2.0.21"
 agp = "8.13.2"
 junit = "5.10.2"
+org-json = "20240303"
 sqldelight = "2.0.2"
 compose-bom = "2024.10.01"
 activity-compose = "1.9.3"
@@ -17,9 +18,12 @@ graphhopper = "10.0"
 slf4j = "2.0.16"
 wear-compose = "1.4.0"
 play-services-wearable = "20.0.1"
+camera = "1.4.1"
+guava = "33.3.1-android"
 
 [libraries]
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+org-json = { module = "org.json:json", version.ref = "org-json" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
@@ -46,6 +50,11 @@ compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
 wear-compose-foundation = { module = "androidx.wear.compose:compose-foundation", version.ref = "wear-compose" }
 wear-compose-material = { module = "androidx.wear.compose:compose-material", version.ref = "wear-compose" }
 play-services-wearable = { module = "com.google.android.gms:play-services-wearable", version.ref = "play-services-wearable" }
+camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camera" }
+camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camera" }
+camera-view = { module = "androidx.camera:camera-view", version.ref = "camera" }
+guava = { module = "com.google.guava:guava", version.ref = "guava" }
+camera-video = { module = "androidx.camera:camera-video", version.ref = "camera" }
 
 [plugins]
 android-library = { id = "com.android.library", version.ref = "agp" }

@@ -380,7 +380,7 @@ fun TrailmarkMap(
             delay(ms)
             if (kmh >= 1.0) frameIndex = (frameIndex + 1) % SPRITE_FRAMES
             val size = 0.96f + (kmh.coerceIn(0.0, 30.0) / 30.0 * 0.10).toFloat()
-            style?.getLayerAs<SymbolLayer>("current-layer")?.setProperties(iconSize(size))
+            style.live()?.getLayerAs<SymbolLayer>("current-layer")?.setProperties(iconSize(size))
         }
     }
 
@@ -439,6 +439,8 @@ fun TrailmarkMap(
                     Style.Builder().fromJson(vectorStyle(packPath, glyphsBase, dark, lang.code))
                 else -> Style.Builder().fromUri(if (dark) ONLINE_STYLE_URL else ONLINE_STYLE_URL_LIGHT)
             }
+            // Effects must not touch the old style once a new one starts loading.
+            style = null
             map.setStyle(builder) { s ->
                 if (online && s.getLayer("3d-buildings") == null) {
                     val b3d = FillExtrusionLayer("3d-buildings", "openmaptiles")
@@ -621,7 +623,7 @@ fun TrailmarkMap(
     }
 
     LaunchedEffect(pois, style) {
-        val s = style ?: return@LaunchedEffect
+        val s = style.live() ?: return@LaunchedEffect
         val v = visibility(if (pois) Property.VISIBLE else Property.NONE)
         s.getLayerAs<CircleLayer>("poi-dot")?.setProperties(v)
         s.getLayerAs<SymbolLayer>("poi-label")?.setProperties(v)
@@ -629,12 +631,12 @@ fun TrailmarkMap(
 
     LaunchedEffect(sport) {
         val ghostImg = "me-ghost-" + sport.name
-        style?.getLayerAs<SymbolLayer>("current-layer")?.setProperties(iconImage(frameIconExpr(sport)))
-        style?.getLayerAs<SymbolLayer>("ghost-current-layer")?.setProperties(iconImage(ghostImg))
+        style.live()?.getLayerAs<SymbolLayer>("current-layer")?.setProperties(iconImage(frameIconExpr(sport)))
+        style.live()?.getLayerAs<SymbolLayer>("ghost-current-layer")?.setProperties(iconImage(ghostImg))
     }
 
     LaunchedEffect(planChunks, style) {
-        val s = style ?: return@LaunchedEffect
+        val s = style.live() ?: return@LaunchedEffect
         val features = planChunks.map { chunk ->
             val f = Feature.fromGeometry(
                 LineString.fromLngLats(chunk.points.map { Point.fromLngLat(it.lon, it.lat) }),
@@ -662,7 +664,7 @@ fun TrailmarkMap(
     }
 
     LaunchedEffect(planStops, planDest, style) {
-        val s = style ?: return@LaunchedEffect
+        val s = style.live() ?: return@LaunchedEffect
         val stops = if (planStops.isNotEmpty()) {
             planStops
         } else {
@@ -679,7 +681,7 @@ fun TrailmarkMap(
     }
 
     LaunchedEffect(mediaMarks, style) {
-        val s = style ?: return@LaunchedEffect
+        val s = style.live() ?: return@LaunchedEffect
         val features = mediaMarks.mapNotNull { m ->
             val la = m.lat
             val lo = m.lon
@@ -707,7 +709,7 @@ fun TrailmarkMap(
             .filter { it.size >= 2 }
     }
     LaunchedEffect(routeRuns, ghostRuns, style) {
-        val s = style ?: return@LaunchedEffect
+        val s = style.live() ?: return@LaunchedEffect
         val routeFc = if (routeRuns.isNotEmpty()) {
             FeatureCollection.fromFeatures(
                 routeRuns.map { run ->
@@ -735,7 +737,7 @@ fun TrailmarkMap(
     }
 
     LaunchedEffect(current, ghostCurrent, userFix, style, frameIndex) {
-        val s = style ?: return@LaunchedEffect
+        val s = style.live() ?: return@LaunchedEffect
         val curFc = current?.let {
             val f = Feature.fromGeometry(Point.fromLngLat(it.lon, it.lat))
             f.addNumberProperty("frame", (frameIndex % SPRITE_FRAMES).toDouble())
@@ -975,3 +977,6 @@ fun TrailmarkMap(
     }
 }
 
+
+/** The style only while usable: MapLibre throws when a newer style replaced it mid-load. */
+private fun Style?.live(): Style? = this?.takeIf { it.isFullyLoaded }

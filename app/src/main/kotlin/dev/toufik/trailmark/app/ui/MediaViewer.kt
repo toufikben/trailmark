@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Icon
@@ -48,7 +49,9 @@ internal fun PhotoViewer(
     media: MediaRow,
     description: String,
     captionLabel: String,
+    deleteLabel: String = "",
     onSaveCaption: (String?) -> Unit,
+    onDelete: (() -> Unit)? = null,
     onDismiss: () -> Unit,
 ) {
     val bitmap by produceState<android.graphics.Bitmap?>(null, media.filePath) {
@@ -116,6 +119,11 @@ internal fun PhotoViewer(
                 )
                 IconButton(onClick = { editing = true }) {
                     Icon(Icons.Filled.Edit, contentDescription = captionLabel, tint = Palette.textSecondary)
+                }
+                if (onDelete != null) {
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Filled.Delete, contentDescription = deleteLabel, tint = Palette.danger)
+                    }
                 }
             }
         }

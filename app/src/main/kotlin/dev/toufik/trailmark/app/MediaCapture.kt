@@ -27,35 +27,88 @@ object MediaCapture {
      * Copies a finished MP4 into the public Movies collection so it survives the
      * share sheet and shows up in the phone's gallery / Files app.
      */
-    fun saveVideoToGallery(context: Context, file: File): Uri? {
+    fun saveVideoToGallery(context: Context, file: File): Uri? =
+        saveToGallery(context, file, "video/mp4", Environment.DIRECTORY_MOVIES, ".mp4")
+
+    /**
+     * Copies a finished JPEG into the public Pictures collection so the phone's
+     * gallery shows the shot even if the activity is deleted later.
+     */
+    fun savePhotoToGallery(context: Context, file: File): Uri? =
+        saveToGallery(context, file, "image/jpeg", Environment.DIRECTORY_PICTURES, ".jpg")
+
+    /** One MediaStore insert for both kinds; returns null when the insert fails. */
+    private fun saveToGallery(
+        context: Context,
+        file: File,
+        mime: String,
+        relative: String,
+        suffix: String,
+    ): Uri? {
         val resolver = context.contentResolver
         val values = ContentValues().apply {
-            put(MediaStore.Video.Media.DISPLAY_NAME, "Trailmark-${System.currentTimeMillis()}.mp4")
-            put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+            put(MediaStore.MediaColumns.DISPLAY_NAME, "Trailmark-${System.currentTimeMillis()}$suffix")
+            put(MediaStore.MediaColumns.MIME_TYPE, mime)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/Trailmark")
-                put(MediaStore.Video.Media.IS_PENDING, 1)
+                put(MediaStore.MediaColumns.RELATIVE_PATH, "$relative/Trailmark")
+                put(MediaStore.MediaColumns.IS_PENDING, 1)
             }
         }
-        val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        val collection = if (mime.startsWith("image")) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+            } else {
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            }
         } else {
-            MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+            } else {
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            }
         }
         val uri = runCatching { resolver.insert(collection, values) }.getOrNull() ?: return null
         return try {
-            resolver.openOutputStream(uri)?.use { out ->
-                file.inputStream().use { it.copyTo(out) }
-            } ?: return null
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val done = ContentValues().apply { put(MediaStore.Video.Media.IS_PENDING, 0) }
-                resolver.update(uri, done, null, null)
+            val out = resolver.openOutputStream(uri)
+            if (out == null) {
+                runCatching { resolver.delete(uri, null, null) }
+                null
+            } else {
+                out.use { stream -> file.inputStream().use { it.copyTo(stream) } }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val done = ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }
+                    resolver.update(uri, done, null, null)
+                }
+                uri
             }
-            uri
         } catch (_: Exception) {
             runCatching { resolver.delete(uri, null, null) }
             null
         }
+    }
+
+    /**
+     * Pulls a picture the user picked from the gallery into the app's own
+     * folder, so the activity keeps working when the original is moved or the
+     * grant expires.
+     */
+    fun importFromGallery(context: Context, uri: Uri, kind: String): File? = try {
+        val photo = kind == "PHOTO"
+        val target = if (photo) newPhotoFile(context) else newVideoFile(context)
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            target.outputStream().use { input.copyTo(it) }
+        } ?: run {
+            target.delete()
+            null
+        }
+        target.takeIf { it.length() > 0L } ?: run { target.delete(); null }
+    } catch (_: Exception) {
+        null
+    }
+
+    /** Deletes a capture from app storage; a gallery copy the user asked for stays. */
+    fun delete(filePath: String) {
+        runCatching { File(filePath).delete() }
     }
 
     /** Video length from the container header; null when unreadable. */

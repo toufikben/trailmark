@@ -64,6 +64,12 @@ import dev.toufik.trailmark.app.formatDistance
 import dev.toufik.trailmark.app.formatDuration
 import dev.toufik.trailmark.data.ActivityRow
 import dev.toufik.trailmark.data.SegmentStat
+import dev.toufik.trailmark.data.SegmentEffort
+import dev.toufik.trailmark.analytics.ZoneScale
+import dev.toufik.trailmark.analytics.zoneTimes
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.clickable
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Calendar
@@ -80,7 +86,7 @@ private class Totals {
 
 /** Merged stats + charts page: period cards, sport filter, weekly bars, sport split. */
 @Composable
-fun ProgressScreen(onPaywall: () -> Unit) {
+fun ProgressScreen(onPaywall: () -> Unit, onOpenActivity: (Long) -> Unit = {}) {
     val context = LocalContext.current
     val t = LocalTexts.current
     val prefs = remember { context.getSharedPreferences("trailmark", Context.MODE_PRIVATE) }
@@ -89,6 +95,34 @@ fun ProgressScreen(onPaywall: () -> Unit) {
     var records by remember { mutableStateOf<PersonalRecords?>(null) }
     var segments by remember { mutableStateOf<List<SegmentStat>>(emptyList()) }
     var sport by remember { mutableStateOf<String?>(null) }
+    var weekGoalKm by remember { mutableStateOf(prefs.getInt("goal_week_km", (goalKm / 4).coerceAtLeast(1))) }
+    var editWeekGoal by remember { mutableStateOf(false) }
+    var boardFor by remember { mutableStateOf<SegmentStat?>(null) }
+    var board by remember { mutableStateOf<List<SegmentEffort>>(emptyList()) }
+    var zones by remember { mutableStateOf<Pair<String, LongArray>?>(null) }
+    val scope = rememberCoroutineScope()
+
+    // Time in zones over the last 30 days, for the selected sport (or the most used one).
+    LaunchedEffect(rows, sport) {
+        val list = rows ?: return@LaunchedEffect
+        val since = System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000
+        val recent = list.filter { !it.isOpen && it.startWallMillis >= since }
+        val zoneSport = sport ?: recent.groupingBy { it.sport }.eachCount().maxByOrNull { it.value }?.key
+        if (zoneSport == null) {
+            zones = null
+            return@LaunchedEffect
+        }
+        zones = withContext(Dispatchers.IO) {
+            val repo = AppGraph.repository(context)
+            val scale = ZoneScale.forSport(zoneSport)
+            val acc = LongArray(scale.count)
+            recent.filter { it.sport == zoneSport }.take(40).forEach { r ->
+                val z = zoneTimes(repo.loadPoints(r.id), scale)
+                for (i in acc.indices) acc[i] += z[i]
+            }
+            zoneSport to acc
+        }
+    }
 
     LaunchedEffect(Unit) {
         val list = withContext(Dispatchers.IO) { AppGraph.repository(context).listActivities() }
@@ -105,6 +139,40 @@ fun ProgressScreen(onPaywall: () -> Unit) {
         segments = withContext(Dispatchers.IO) { AppGraph.repository(context).segmentStats() }
     }
 
+    if (editWeekGoal) {
+        WeekGoalDialog(
+            t,
+            weekGoalKm,
+            onSave = { v ->
+                prefs.edit().putInt("goal_week_km", v).apply()
+                weekGoalKm = v
+                editWeekGoal = false
+            },
+            onDismiss = { editWeekGoal = false },
+        )
+    }
+    boardFor?.let { seg ->
+        SegmentBoardDialog(
+            t,
+            seg,
+            board,
+            onOpenActivity = { id ->
+                boardFor = null
+                onOpenActivity(id)
+            },
+            onDelete = {
+                boardFor = null
+                scope.launch {
+                    segments = withContext(Dispatchers.IO) {
+                        val repo = AppGraph.repository(context)
+                        repo.deleteSegment(seg.id)
+                        repo.segmentStats()
+                    }
+                }
+            },
+            onDismiss = { boardFor = null },
+        )
+    }
     Surface(color = Palette.bg, modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
@@ -162,12 +230,24 @@ fun ProgressScreen(onPaywall: () -> Unit) {
                             WeekGoalCard(
                                 t,
                                 totalsSince(list, startOfWeek(System.currentTimeMillis())).distanceM,
-                                (goalKm / 4).coerceAtLeast(1),
+                                weekGoalKm,
+                                onEdit = { editWeekGoal = true },
                             )
+                            ComparisonCard(t, filtered)
                             WeeklyCard(t, filtered)
+                            zones?.let { (zs, times) -> ZonesCard(t, t.zonesLast30, zs, times) }
                             if (sport == null) {
                                 records?.let { RecordsCard(t, it) }
-                                if (segments.isNotEmpty()) SegmentsCard(t, segments)
+                                if (segments.isNotEmpty()) {
+                                    SegmentsCard(t, segments) { seg ->
+                                        scope.launch {
+                                            board = withContext(Dispatchers.IO) {
+                                                AppGraph.repository(context).effortsForSegment(seg.id)
+                                            }
+                                            boardFor = seg
+                                        }
+                                    }
+                                }
                                 SportSplitCard(t, list)
                             }
                             AchievementsCard(t, list)
@@ -285,7 +365,7 @@ private fun NextGoalCard(t: Texts, rows: List<ActivityRow>) {
 }
 
 @Composable
-private fun WeekGoalCard(t: Texts, weekM: Double, goalKm: Int) {
+private fun WeekGoalCard(t: Texts, weekM: Double, goalKm: Int, onEdit: () -> Unit) {
     val goalM = goalKm.coerceAtLeast(1) * 1000.0
     val frac = (weekM / goalM).coerceIn(0.0, 1.0)
     var shown by remember { mutableStateOf(false) }
@@ -301,7 +381,9 @@ private fun WeekGoalCard(t: Texts, weekM: Double, goalKm: Int) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 12.dp)
-            .appearIn(1),
+            .appearIn(1)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onEdit),
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -441,7 +523,7 @@ private fun RecordsCard(t: Texts, records: PersonalRecords) {
 }
 
 @Composable
-private fun SegmentsCard(t: Texts, segments: List<SegmentStat>) {
+private fun SegmentsCard(t: Texts, segments: List<SegmentStat>, onOpen: (SegmentStat) -> Unit) {
     Surface(
         color = Palette.surface,
         shape = RoundedCornerShape(16.dp),
@@ -456,6 +538,8 @@ private fun SegmentsCard(t: Texts, segments: List<SegmentStat>) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onOpen(s) }
                         .padding(top = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
@@ -823,7 +907,7 @@ private fun sumsInRange(rows: List<ActivityRow>, fromMillis: Long, toMillis: Lon
 }
 
 /** Week starts on Monday; computed from the day-of-week offset so it never crosses into a neighbour week. */
-private fun startOfWeek(millis: Long): Long {
+internal fun startOfWeek(millis: Long): Long {
     val c = Calendar.getInstance()
     c.timeInMillis = millis
     val daysFromMonday = (c.get(Calendar.DAY_OF_WEEK) + 5) % 7
@@ -832,7 +916,7 @@ private fun startOfWeek(millis: Long): Long {
     return c.timeInMillis
 }
 
-private fun startOfMonth(millis: Long): Long {
+internal fun startOfMonth(millis: Long): Long {
     val c = Calendar.getInstance()
     c.timeInMillis = millis
     c.set(Calendar.DAY_OF_MONTH, 1)

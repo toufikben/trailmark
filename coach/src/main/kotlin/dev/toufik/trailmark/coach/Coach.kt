@@ -25,6 +25,7 @@ sealed interface CoachEvent {
     data class Milestone(val km: Int) : CoachEvent
     data class SegmentStart(val name: String) : CoachEvent
     data class SegmentFinish(val name: String, val seconds: Long) : CoachEvent
+    data class SegmentRecord(val name: String, val seconds: Long, val improvedBySeconds: Long) : CoachEvent
     data class Turn(val direction: TurnDirection, val metres: Int) : CoachEvent
     data object OffRoute : CoachEvent
     data class Finish(val distanceM: Double, val seconds: Long, val isRecord: Boolean) : CoachEvent
@@ -74,6 +75,12 @@ object Coach {
                 pick,
                 "name" to event.name,
                 "time" to clock(event.seconds),
+            )
+            is CoachEvent.SegmentRecord -> fill(
+                pick,
+                "name" to event.name,
+                "time" to clock(event.seconds),
+                "gain" to clock(event.improvedBySeconds),
             )
             is CoachEvent.Turn -> fill(pick, "m" to event.metres.toString())
             is CoachEvent.OffRoute -> pick
@@ -144,6 +151,20 @@ object Coach {
             Locale.AR -> listOf("أنهيت مقطع {name} في {time} — أحسنت!", "نهاية {name}: {time}. عمل رائع.")
             Locale.FR -> listOf("Segment {name} terminé en {time} !", "Fin du segment {name} — {time}.")
             Locale.EN -> listOf("Segment {name} done in {time}!", "Finished {name} — {time}.")
+        }
+        is CoachEvent.SegmentRecord -> when (locale) {
+            Locale.AR -> listOf(
+                "رقم قياسي جديد على {name}: {time}، أسرع بـ {gain}!",
+                "حطّمت رقمك على {name} — {time}، تحسّن {gain}.",
+            )
+            Locale.FR -> listOf(
+                "Nouveau record sur {name} : {time}, {gain} de mieux !",
+                "Record battu sur {name} — {time}, {gain} gagnées.",
+            )
+            Locale.EN -> listOf(
+                "New record on {name}: {time}, {gain} faster!",
+                "You beat your best on {name} — {time}, {gain} quicker.",
+            )
         }
         is CoachEvent.Turn -> when (event.direction) {
             TurnDirection.LEFT -> when (locale) {

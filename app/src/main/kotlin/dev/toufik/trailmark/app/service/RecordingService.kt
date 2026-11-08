@@ -11,6 +11,7 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.speech.tts.TextToSpeech
@@ -84,13 +85,43 @@ class RecordingService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_START -> startRecording(intent)
+            ACTION_START -> startRecording(
+                sportHint = intent.getStringExtra(EXTRA_SPORT),
+                synthetic = intent.getBooleanExtra(EXTRA_SYNTHETIC, false),
+                userInitiated = true,
+            )
             ACTION_STOP -> stopRecording()
             ACTION_PAUSE -> scope.launch { controller?.pause() }
             ACTION_RESUME -> scope.launch { controller?.resume() }
+            // No action means Android restarted us after killing the process
+            // (START_STICKY): continue the session from its checkpoint.
+            null -> resumeAfterKill()
             else -> stopSelf()
         }
-        return START_NOT_STICKY
+        return START_STICKY
+    }
+
+    /**
+     * The system killed the process mid-run (low memory, or a crash in the UI
+     * thread — same process). The checkpoint is already on disk, so the run
+     * continues instead of silently ending. A crash loop is not retried: after
+     * three crashes the session stays interrupted and the app offers it back.
+     */
+    private fun resumeAfterKill() {
+        val repo = runCatching { dev.toufik.trailmark.app.AppGraph.repository(this) }.getOrNull()
+        val resume = repo?.loadResume()
+        if (resume == null) {
+            stopSelf()
+            return
+        }
+        val prefs = getSharedPreferences("trailmark", MODE_PRIVATE)
+        if (prefs.getInt(KEY_CRASHES, 0) >= 3) {
+            prefs.edit().putBoolean(KEY_INTERRUPTED, true).apply()
+            stopSelf()
+            return
+        }
+        val sport = repo.activityById(resume.activityId)?.sport
+        startRecording(sportHint = sport, synthetic = false, userInitiated = false)
     }
 
     private fun currentLang(): Lang {
@@ -120,11 +151,10 @@ class RecordingService : Service() {
         TurnKind.UTURN -> TurnDirection.UTURN
     }
 
-    private fun startRecording(intent: Intent) {
+    private fun startRecording(sportHint: String?, synthetic: Boolean, userInitiated: Boolean) {
         if (controller != null) return
         WeatherHolder.update(null)
         createChannel()
-        val synthetic = intent.getBooleanExtra(EXTRA_SYNTHETIC, false)
         ServiceCompat.startForeground(
             this,
             NOTIF_ID,
@@ -134,17 +164,35 @@ class RecordingService : Service() {
         )
         acquireWakeLock()
 
-        val sport = intent.getStringExtra(EXTRA_SPORT)
-            ?.let { runCatching { Sport.valueOf(it) }.getOrNull() } ?: Sport.RUN
+        val repo = dev.toufik.trailmark.app.AppGraph.repository(this)
+        val resume = runCatching { repo.loadResume() }.getOrNull()
+        val sport = sportHint
+            ?.let { runCatching { Sport.valueOf(it) }.getOrNull() }
+            ?: Sport.RUN
         sportName = sport.name
-        val source: FixSource = if (intent.getBooleanExtra(EXTRA_SYNTHETIC, false)) {
+        val prefs = getSharedPreferences("trailmark", MODE_PRIVATE)
+        if (userInitiated) {
+            prefs.edit().putInt(KEY_CRASHES, 0).putBoolean(KEY_INTERRUPTED, false).apply()
+        } else {
+            // A resumed run is visible in the UI as a normal one; the flag is only
+            // used to tell the user why it restarted.
+            prefs.edit().putBoolean(KEY_RESUMED, true).apply()
+        }
+        val source: FixSource = if (synthetic) {
             SyntheticFixSource()
         } else {
             AndroidLocationFixSource(this)
         }
+        // A reboot resets elapsedRealtimeNanos; shift the new fixes above the
+        // checkpoint so the resumed activity's timeline never goes backwards.
+        val nowRealtime = SystemClock.elapsedRealtimeNanos()
+        val offset = resume
+            ?.takeIf { nowRealtime < it.lastStored.timeNanos }
+            ?.let { it.lastStored.timeNanos - nowRealtime + 1_000_000_000L }
+            ?: 0L
         val c = RecordingController(
-            repo = dev.toufik.trailmark.app.AppGraph.repository(this),
-            source = source,
+            repo = repo,
+            source = OffsetFixSource(source, offset),
             scope = scope,
             sport = sport,
         )
@@ -174,6 +222,7 @@ class RecordingService : Service() {
                 val st = c.state.value
                 if (st.phase == Phase.RECORDING || st.phase == Phase.PAUSED) {
                     mgr.notify(NOTIF_ID, buildNotification(st))
+                    publishLive(st)
                     delay(5_000L)
                 } else {
                     delay(2_000L)
@@ -257,19 +306,27 @@ class RecordingService : Service() {
                                 segmentStartedNanos.remove(s.id)
                                 val seconds =
                                     ((st.elapsedNanos - startedAt) / 1_000_000_000L).coerceAtLeast(0L)
-                                if (ttsReady) {
-                                    tts?.speak(
-                                        Coach.message(
-                                            CoachEvent.SegmentFinish(s.name, seconds),
-                                            coachLocale(currentLang()),
-                                            s.name.hashCode(),
-                                        ),
-                                        TextToSpeech.QUEUE_ADD,
-                                        null,
-                                        "segment-finish-${s.id}",
-                                    )
+                                // Efforts are stored when the recording stops, so the
+                                // best on file is still the previous record here.
+                                val bestSeconds = runCatching {
+                                    dev.toufik.trailmark.app.AppGraph.repository(this@RecordingService)
+                                        .bestEffortNanos(s.id)
+                                }.getOrNull()?.let { it / 1_000_000_000L }
+                                val event = if (bestSeconds != null && seconds < bestSeconds) {
+                                    CoachEvent.SegmentRecord(s.name, seconds, bestSeconds - seconds)
+                                } else {
+                                    CoachEvent.SegmentFinish(s.name, seconds)
                                 }
-                                buzz(longArrayOf(0, 120, 80, 120, 80, 120))
+                                val line = Coach.message(event, coachLocale(currentLang()), s.name.hashCode())
+                                if (ttsReady) {
+                                    tts?.speak(line, TextToSpeech.QUEUE_ADD, null, "segment-finish-${s.id}")
+                                }
+                                if (event is CoachEvent.SegmentRecord) {
+                                    notifyRecord(s.id, line)
+                                    buzz(longArrayOf(0, 250, 100, 250, 100, 400))
+                                } else {
+                                    buzz(longArrayOf(0, 120, 80, 120, 80, 120))
+                                }
                             }
                         }
                     }
@@ -397,6 +454,10 @@ class RecordingService : Service() {
             WeatherHolder.update(null)
             if (finished != null && endState != null) {
                 getSharedPreferences("trailmark", MODE_PRIVATE).edit()
+                    .putBoolean(
+                        dev.toufik.trailmark.app.widget.TrailmarkWidget.KEY_LIVE_ACTIVE,
+                        false,
+                    )
                     .putFloat("last_dist_m", endState.distanceM.toFloat())
                     .putLong("last_time_s", endState.elapsedNanos / 1_000_000_000L)
                     .putString("last_sport", sportName)
@@ -462,6 +523,7 @@ class RecordingService : Service() {
 
     override fun onDestroy() {
         releaseWakeLock()
+        clearLive()
         scope.cancel()
         super.onDestroy()
     }
@@ -487,6 +549,34 @@ class RecordingService : Service() {
         }
     }
 
+    /**
+     * Mirrors the session into preferences so the home-screen widget can show a
+     * live distance and time without binding to the service or reading the
+     * database from a widget broadcast.
+     */
+    private fun publishLive(st: RecordingState) {
+        getSharedPreferences("trailmark", MODE_PRIVATE).edit()
+            .putBoolean(dev.toufik.trailmark.app.widget.TrailmarkWidget.KEY_LIVE_ACTIVE, true)
+            .putFloat(
+                dev.toufik.trailmark.app.widget.TrailmarkWidget.KEY_LIVE_DIST,
+                st.distanceM.toFloat(),
+            )
+            .putLong(
+                dev.toufik.trailmark.app.widget.TrailmarkWidget.KEY_LIVE_TIME,
+                st.elapsedNanos / 1_000_000_000L,
+            )
+            .putString(dev.toufik.trailmark.app.widget.TrailmarkWidget.KEY_LIVE_SPORT, sportName)
+            .apply()
+        dev.toufik.trailmark.app.widget.TrailmarkWidget.refresh(this)
+    }
+
+    private fun clearLive() {
+        getSharedPreferences("trailmark", MODE_PRIVATE).edit()
+            .putBoolean(dev.toufik.trailmark.app.widget.TrailmarkWidget.KEY_LIVE_ACTIVE, false)
+            .apply()
+        dev.toufik.trailmark.app.widget.TrailmarkWidget.refresh(this)
+    }
+
     private fun createChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val mgr = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -502,6 +592,37 @@ class RecordingService : Service() {
             setShowBadge(false)
         }
         mgr.createNotificationChannel(channel)
+    }
+
+    /** A heads-up notification for a new segment record, kept after the run ends. */
+    private fun notifyRecord(segmentId: Long, line: String) {
+        runCatching {
+            val mgr = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                mgr.createNotificationChannel(
+                    NotificationChannel(
+                        RECORDS_CHANNEL_ID,
+                        textsFor(currentLang()).segments,
+                        NotificationManager.IMPORTANCE_HIGH,
+                    ),
+                )
+            }
+            val open = PendingIntent.getActivity(
+                this,
+                3,
+                Intent(this, MainActivity::class.java),
+                PendingIntent.FLAG_IMMUTABLE,
+            )
+            val n = NotificationCompat.Builder(this, RECORDS_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_stat_track)
+                .setContentTitle(textsFor(currentLang()).newRecord)
+                .setContentText(line)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(line))
+                .setAutoCancel(true)
+                .setContentIntent(open)
+                .build()
+            mgr.notify((RECORD_NOTIF_BASE + segmentId).toInt(), n)
+        }
     }
 
     private fun buildNotification(state: RecordingState? = null): Notification {
@@ -528,11 +649,26 @@ class RecordingService : Service() {
             .setOnlyAlertOnce(true)
             .setContentIntent(open)
         if (live != null) {
+            val speed = live.currentSpeedMps?.let { mps ->
+                val kmh = mps * 3.6
+                String.format(java.util.Locale.US, "%.1f %s", kmh, t.kmh)
+            }
+            val detail = buildString {
+                append(
+                    "${dev.toufik.trailmark.app.formatDistance(live.distanceM)} " +
+                        "${dev.toufik.trailmark.app.distanceUnit(t)} \u00b7 ",
+                )
+                append(dev.toufik.trailmark.app.formatDuration(live.elapsedNanos))
+                if (speed != null) append(" \u00b7 $speed")
+                if (live.autoPaused) append(" \u00b7 ${t.paused}")
+            }
+            builder.setStyle(NotificationCompat.BigTextStyle().bigText(detail))
             if (live.phase == Phase.RECORDING) {
                 builder.addAction(0, t.pause, actionIntent(ACTION_PAUSE, 1))
             } else {
                 builder.addAction(0, t.resume, actionIntent(ACTION_RESUME, 2))
             }
+            builder.addAction(0, t.stop, actionIntent(ACTION_STOP, 3))
         }
         return builder.build()
     }
@@ -555,5 +691,10 @@ class RecordingService : Service() {
         private const val CHANNEL_ID = "recording_v2"
         private const val LEGACY_CHANNEL_ID = "recording"
         private const val NOTIF_ID = 4711
+        private const val RECORDS_CHANNEL_ID = "segment_records"
+        private const val RECORD_NOTIF_BASE = 50_000L
+        const val KEY_CRASHES = "recording_crashes"
+        const val KEY_INTERRUPTED = "recording_interrupted"
+        const val KEY_RESUMED = "recording_resumed"
     }
 }

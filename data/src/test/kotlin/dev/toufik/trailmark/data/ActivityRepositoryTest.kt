@@ -196,4 +196,46 @@ class ActivityRepositoryTest {
         assertEquals(270L, row.weatherWindDeg)
         assertEquals(3L, row.weatherCode)
     }
+
+    @Test
+    fun deleteActivityRemovesEverythingItOwns() {
+        val keep = repo.insertActivity("keep", "RUN", 1000)
+        repo.appendPoints(keep, listOf(p(10), p(20)))
+        val gone = repo.insertActivity("gone", "RUN", 2000)
+        repo.appendPoints(gone, listOf(p(10), p(20), p(30)))
+        repo.insertMedia(gone, "PHOTO", "/m/a.jpg", 36.0, 3.0, null, 10.0, 5, 1, null, null)
+        repo.insertMedia(gone, "VIDEO", "/m/b.mp4", 36.0, 3.0, null, 20.0, 9, 2, 4000, null)
+        val seg = repo.insertSegment("hill", 36.0, 3.0, 36.1, 3.1)
+        repo.insertEffort(seg, gone, 1_000)
+        repo.saveResume(gone, p(30), 12.0, 30)
+
+        val files = repo.deleteActivity(gone)
+
+        assertEquals(setOf("/m/a.jpg", "/m/b.mp4"), files.toSet())
+        assertEquals(listOf(keep), repo.listActivities().map { it.id })
+        assertEquals(0, repo.pointCount(gone))
+        assertTrue(repo.listMedia(gone).isEmpty())
+        assertTrue(repo.effortsForActivity(gone).isEmpty())
+        assertNull(repo.loadResume())
+        assertEquals(2, repo.pointCount(keep))
+    }
+
+    @Test
+    fun segmentBoardRanksEffortsFastestFirstAndDeletes() {
+        val a1 = repo.insertActivity("a1", "RUN", 1000)
+        val a2 = repo.insertActivity("a2", "RUN", 2000)
+        val a3 = repo.insertActivity("a3", "RUN", 3000)
+        val seg = repo.insertSegment("climb", 36.0, 3.0, 36.1, 3.1)
+        repo.insertEffort(seg, a1, 400)
+        repo.insertEffort(seg, a2, 300)
+        repo.insertEffort(seg, a3, 500)
+
+        val board = repo.effortsForSegment(seg)
+        assertEquals(listOf(a2, a1, a3), board.map { it.activityId })
+        assertEquals(2000L, board.first().startWallMillis)
+
+        repo.deleteSegment(seg)
+        assertTrue(repo.listSegments().isEmpty())
+        assertTrue(repo.effortsForSegment(seg).isEmpty())
+    }
 }

@@ -18,6 +18,15 @@ class CoachTest {
     }
 
     @Test
+    fun segmentRecordNamesTheSegmentTimeAndGain() {
+        val ev = CoachEvent.SegmentRecord(name = "Col", seconds = 365, improvedBySeconds = 14)
+        for (locale in Locale.entries) {
+            val msg = Coach.message(ev, locale)
+            assertTrue(msg.contains("Col") && msg.contains("6:05") && msg.contains("0:14"), msg)
+        }
+    }
+
+    @Test
     fun localeSelectsTheLanguage() {
         val ev = CoachEvent.Ahead(seconds = 12)
         assertTrue(Coach.message(ev, Locale.AR).contains("12"))

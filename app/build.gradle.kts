@@ -1,4 +1,4 @@
-plugins {
+﻿plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
@@ -12,8 +12,8 @@ android {
         applicationId = "dev.toufik.trailmark"
         minSdk = 26
         targetSdk = 36
-        versionCode = 10
-        versionName = "0.1.9"
+        versionCode = 11
+        versionName = "0.2.0"
     }
 
     signingConfigs {
@@ -50,7 +50,12 @@ android {
             }
         }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             if (signingConfigs.getByName("release").storeFile != null) {
                 signingConfig = signingConfigs.getByName("release")
             }
@@ -95,6 +100,11 @@ dependencies {
     implementation(libs.health.connect)
     implementation(libs.graphhopper.core)
     implementation(libs.play.services.wearable)
+    implementation(libs.camera.camera2)
+    implementation(libs.camera.lifecycle)
+    implementation(libs.camera.view)
+    implementation(libs.camera.video)
+    implementation(libs.guava)
 runtimeOnly(libs.slf4j.nop)
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
@@ -103,4 +113,5 @@ runtimeOnly(libs.slf4j.nop)
     implementation(libs.compose.ui.tooling.preview)
     debugImplementation(libs.compose.ui.tooling)
     testImplementation(libs.junit.jupiter)
+    testImplementation(libs.org.json)
 }

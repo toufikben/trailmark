@@ -40,6 +40,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -52,6 +54,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
+import android.net.Uri
+import android.widget.Toast
+import dev.toufik.trailmark.app.maps.RouteTransfer
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import dev.toufik.trailmark.app.service.RecordingHolder
 import dev.toufik.trailmark.app.ui.DetailScreen
 import dev.toufik.trailmark.app.ui.HistoryScreen
@@ -76,8 +85,38 @@ sealed interface Screen {
     data class Detail(val id: Long) : Screen
 }
 
+/** Stable text key per screen, so the open screen survives activity recreation. */
+internal fun screenKey(screen: Screen): String = when (screen) {
+    Screen.Record -> "record"
+    Screen.Plan -> "plan"
+    Screen.History -> "history"
+    Screen.Progress -> "progress"
+    Screen.Settings -> "settings"
+    Screen.Regions -> "regions"
+    Screen.Paywall -> "paywall"
+    is Screen.Detail -> "detail:${screen.id}"
+}
+
+internal fun screenFromKey(key: String): Screen = when {
+    key == "plan" -> Screen.Plan
+    key == "history" -> Screen.History
+    key == "progress" -> Screen.Progress
+    key == "settings" -> Screen.Settings
+    key == "regions" -> Screen.Regions
+    key == "paywall" -> Screen.Paywall
+    key.startsWith("detail:") -> key.removePrefix("detail:").toLongOrNull()
+        ?.let { Screen.Detail(it) } ?: Screen.History
+    else -> Screen.Record
+}
+
+private val ScreenSaver = Saver<Screen, String>(
+    save = { screenKey(it) },
+    restore = { screenFromKey(it) },
+)
+
 class MainActivity : ComponentActivity() {
     private var syntheticStarted = false
+    private var benchStarted = false
     private var splashDone = false
 
     override fun onResume() {
@@ -91,6 +130,53 @@ class MainActivity : ComponentActivity() {
                 .putExtra(dev.toufik.trailmark.app.service.RecordingService.EXTRA_SYNTHETIC, true)
             ContextCompat.startForegroundService(this, svc)
         }
+        val benchId = intent?.getLongExtra("bench_flyover", -1L) ?: -1L
+        if (debuggable && !benchStarted && benchId > 0) {
+            benchStarted = true
+            dev.toufik.trailmark.app.debug.FlyoverBench.run(this, lifecycleScope, benchId)
+        }
+    }
+
+    /** Screen to switch to from outside Compose (an imported route opens Explore). */
+    private val pendingScreen = mutableStateOf<Screen?>(null)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        importSharedRoute(intent)
+        openRequestedScreen(intent)
+    }
+
+    /** A notification ("clip ready") can ask for a screen by name. */
+    private fun openRequestedScreen(intent: Intent?) {
+        val key = intent?.getStringExtra(EXTRA_SCREEN) ?: return
+        intent.removeExtra(EXTRA_SCREEN)
+        pendingScreen.value = screenFromKey(key)
+    }
+
+    /** A GPX opened or shared from Komoot, Strava or Files becomes a saved route. */
+    private fun importSharedRoute(intent: Intent?) {
+        val uri = when (intent?.action) {
+            Intent.ACTION_VIEW -> intent.data
+            Intent.ACTION_SEND ->
+                androidx.core.content.IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
+            else -> null
+        } ?: return
+        val code = getSharedPreferences("trailmark", Context.MODE_PRIVATE).getString("lang_code", null)
+        val t = textsFor(Lang.entries.firstOrNull { it.code == code } ?: Lang.AR)
+        lifecycleScope.launch {
+            val route = withContext(Dispatchers.IO) {
+                contentResolver.openInputStream(uri)
+                    ?.let { RouteTransfer.readAtMost(it) }
+                    ?.let { RouteTransfer.importGpx(this@MainActivity, it, t.importRoute) }
+            }
+            Toast.makeText(
+                this@MainActivity,
+                if (route != null) t.routeImported else t.routeImportFailed,
+                Toast.LENGTH_LONG,
+            ).show()
+            if (route != null) pendingScreen.value = Screen.Plan
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -98,9 +184,17 @@ class MainActivity : ComponentActivity() {
         org.maplibre.android.MapLibre.getInstance(this)
         val prefs = getSharedPreferences("trailmark", Context.MODE_PRIVATE)
         dev.toufik.trailmark.app.Units.init(this)
+        lifecycleScope.launch(Dispatchers.IO) {
+            dev.toufik.trailmark.app.maps.SavedRoutes.preload(this@MainActivity)
+        }
         val entitlements = Entitlements(this)
         val billing = BillingManager(this, entitlements)
         billing.connect()
+        // A recreated activity already handled the GPX it was opened with.
+        if (savedInstanceState == null) {
+            importSharedRoute(intent)
+            openRequestedScreen(intent)
+        }
         setContent {
             var lang by remember {
                 mutableStateOf(
@@ -120,11 +214,24 @@ class MainActivity : ComponentActivity() {
             ) {
                 TrailmarkTheme {
                     CompositionLocalProvider(LocalLayoutDirection provides direction) {
-                        var screen by remember { mutableStateOf<Screen>(Screen.Record) }
-                        var paywallFrom by remember { mutableStateOf<Screen>(Screen.Settings) }
-                        var detailFrom by remember { mutableStateOf<Screen>(Screen.History) }
+                        var screen by rememberSaveable(stateSaver = ScreenSaver) {
+                            mutableStateOf<Screen>(Screen.Record)
+                        }
+                        var paywallFrom by rememberSaveable(stateSaver = ScreenSaver) {
+                            mutableStateOf<Screen>(Screen.Settings)
+                        }
+                        var detailFrom by rememberSaveable(stateSaver = ScreenSaver) {
+                            mutableStateOf<Screen>(Screen.History)
+                        }
                         var showSplash by remember { mutableStateOf(!splashDone) }
                         val recState by RecordingHolder.state.collectAsState()
+                        val pending = pendingScreen.value
+                        LaunchedEffect(pending) {
+                            if (pending != null) {
+                                screen = pending
+                                pendingScreen.value = null
+                            }
+                        }
                         LaunchedEffect(recState.phase, recState.lastActivityId) {
                             val id = recState.lastActivityId
                             if (recState.phase == Phase.STOPPED && id != null) {
@@ -180,6 +287,10 @@ class MainActivity : ComponentActivity() {
                                             paywallFrom = Screen.Progress
                                             screen = Screen.Paywall
                                         },
+                                        onOpenActivity = { id ->
+                                            detailFrom = Screen.Progress
+                                            screen = Screen.Detail(id)
+                                        },
                                     )
                                     Screen.Settings -> SettingsScreen(
                                         lang = lang,
@@ -231,6 +342,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    companion object {
+        /** Intent extra: a screen to open by key (a notification tapping into a clip). */
+        const val EXTRA_SCREEN = "screen"
     }
 }
 

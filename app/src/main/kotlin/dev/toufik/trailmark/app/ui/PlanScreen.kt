@@ -43,6 +43,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,6 +78,11 @@ import dev.toufik.trailmark.app.geocode.PlaceSearch
 import dev.toufik.trailmark.app.maps.MapPacks
 import dev.toufik.trailmark.app.maps.SavedRoute
 import dev.toufik.trailmark.app.maps.SavedRoutes
+import dev.toufik.trailmark.app.maps.RouteTransfer
+import dev.toufik.trailmark.core.geo.flattenChunks
+import dev.toufik.trailmark.core.geo.gradeChunks
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Share
 import dev.toufik.trailmark.app.plan.PlannedRoute
 import dev.toufik.trailmark.app.plan.RoutePlanner
 import dev.toufik.trailmark.app.service.PlanRouteHolder
@@ -88,6 +94,7 @@ import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.engine.Sport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 
@@ -115,7 +122,13 @@ fun PlanScreen(
     var useAnchor by remember { mutableStateOf(true) }
     var showSaved by remember { mutableStateOf(false) }
     var savedVersion by remember { mutableStateOf(0) }
-    val savedRoutes = remember(savedVersion) { SavedRoutes(context).all() }
+    val scope = rememberCoroutineScope()
+    var savedRoutes by remember { mutableStateOf<List<SavedRoute>>(emptyList()) }
+    // Reading (and, on first launch, migrating) a multi-megabyte route file is
+    // IO work; the composition must never do it.
+    LaunchedEffect(savedVersion) {
+        savedRoutes = withContext(Dispatchers.IO) { SavedRoutes(context).all() }
+    }
     val packPath = remember(anchor, stops) {
         val lat = anchor?.lat ?: stops.firstOrNull()?.first
         val lon = anchor?.lon ?: stops.firstOrNull()?.second
@@ -187,28 +200,57 @@ fun PlanScreen(
             }
             if (pts.size >= 2) {
                 val name = sportLabel(t, sport) + " · " + formatDistance(p.distanceM) + " " + distanceUnit(t)
-                SavedRoutes(context).save(
-                    SavedRoute(
-                        id = System.currentTimeMillis(),
-                        name = name,
-                        sport = sport.name,
-                        stops = pts,
-                        distanceKm = p.distanceM / 1000.0,
-                        climbM = p.ascentM.toInt(),
-                    ),
+                val route = SavedRoute(
+                    id = System.currentTimeMillis(),
+                    name = name,
+                    sport = sport.name,
+                    stops = pts,
+                    distanceKm = p.distanceM / 1000.0,
+                    climbM = p.ascentM.toInt(),
                 )
-                savedVersion += 1
-                Toast.makeText(context, t.routeSaved, Toast.LENGTH_SHORT).show()
+                scope.launch {
+                    withContext(Dispatchers.IO) { SavedRoutes(context).save(route) }
+                    savedVersion += 1
+                    Toast.makeText(context, t.routeSaved, Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val route = withContext(Dispatchers.IO) {
+                val bytes = context.contentResolver.openInputStream(uri)
+                    ?.let { RouteTransfer.readAtMost(it) }
+                bytes?.let { RouteTransfer.importGpx(context, it, t.importRoute) }
+            }
+            if (route != null) {
+                savedVersion += 1
+                showSaved = true
+            }
+            Toast.makeText(
+                context,
+                if (route != null) t.routeImported else t.routeImportFailed,
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
+    }
     val loadSaved: (SavedRoute) -> Unit = { r ->
-        useAnchor = false
-        anchor = null
-        stops = r.stops
-        sport = runCatching { Sport.valueOf(r.sport) }.getOrDefault(Sport.RUN)
-        drafting = false
-        showSaved = false
+        if (r.track.size >= 2) {
+            // An imported route keeps its exact line: no re-routing, straight to navigation.
+            showSaved = false
+            PlanRouteHolder.set(gradeChunks(r.track))
+            onStartRoute()
+        } else {
+            useAnchor = false
+            anchor = null
+            stops = r.stops
+            sport = runCatching { Sport.valueOf(r.sport) }.getOrDefault(Sport.RUN)
+            drafting = false
+            showSaved = false
+        }
     }
 
     Surface(color = Palette.bg, modifier = modifier.fillMaxSize()) {
@@ -257,8 +299,22 @@ fun PlanScreen(
                                                 )
                                             }
                                             IconButton(onClick = {
-                                                SavedRoutes(context).delete(r.id)
-                                                savedVersion += 1
+                                                val pts = r.track.ifEmpty {
+                                                    r.stops.map { (la, lo) -> ElevPoint(la, lo, 0.0) }
+                                                }
+                                                RouteTransfer.share(context, r.name, pts, t.shareRoute)
+                                            }) {
+                                                Icon(
+                                                    Icons.Filled.Share,
+                                                    contentDescription = t.shareRoute,
+                                                    tint = Palette.textSecondary,
+                                                )
+                                            }
+                                            IconButton(onClick = {
+                                                scope.launch {
+                                                    withContext(Dispatchers.IO) { SavedRoutes(context).delete(r.id) }
+                                                    savedVersion += 1
+                                                }
                                             }) {
                                                 Icon(
                                                     Icons.Filled.Delete,
@@ -326,6 +382,16 @@ fun PlanScreen(
                         ) {
                             IconButton(onClick = { showSaved = true }, modifier = Modifier.size(48.dp)) {
                                 Icon(Icons.Filled.List, contentDescription = t.savedRoutes, tint = Palette.text)
+                            }
+                            IconButton(
+                                onClick = {
+                                    importLauncher.launch(
+                                        arrayOf("application/gpx+xml", "application/octet-stream", "text/xml", "*/*"),
+                                    )
+                                },
+                                modifier = Modifier.size(48.dp),
+                            ) {
+                                Icon(Icons.Filled.Add, contentDescription = t.importRoute, tint = Palette.text)
                             }
                         }
                         Row(
@@ -612,6 +678,13 @@ fun PlanScreen(
                                 Spacer(Modifier.width(8.dp))
                                 TextButton(onClick = { saveCurrent() }) {
                                     Text(t.saveRoute, color = Palette.accent, fontSize = 13.sp)
+                                }
+                                IconButton(onClick = {
+                                    val name = sportLabel(t, sport) + " · " +
+                                        formatDistance(p.distanceM) + " " + distanceUnit(t)
+                                    RouteTransfer.share(context, name, flattenChunks(p.chunks), t.shareRoute)
+                                }) {
+                                    Icon(Icons.Filled.Share, contentDescription = t.shareRoute, tint = Palette.accent)
                                 }
                             }
                             Row(

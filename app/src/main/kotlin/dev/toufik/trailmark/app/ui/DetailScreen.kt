@@ -2,7 +2,6 @@ package dev.toufik.trailmark.app.ui
 
 import android.content.Context
 import android.content.Intent
-import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -15,8 +14,10 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
@@ -34,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -67,6 +69,7 @@ import dev.toufik.trailmark.app.LocalLang
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.MediaCapture
 import dev.toufik.trailmark.app.Palette
+import dev.toufik.trailmark.app.Texts
 import dev.toufik.trailmark.app.WeatherNow
 import dev.toufik.trailmark.app.Units
 import dev.toufik.trailmark.app.backfillSegment
@@ -79,6 +82,7 @@ import dev.toufik.trailmark.app.formatPace
 import dev.toufik.trailmark.app.formatSpeed
 import dev.toufik.trailmark.app.matchSegments
 import dev.toufik.trailmark.app.service.PlanRouteHolder
+import dev.toufik.trailmark.app.service.RecordingHolder
 import dev.toufik.trailmark.app.speedUnit
 import dev.toufik.trailmark.core.geo.ElevPoint
 import dev.toufik.trailmark.core.geo.gradeChunks
@@ -96,6 +100,7 @@ import dev.toufik.trailmark.portable.Tcx
 import java.io.File
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -132,7 +137,13 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
     var segmentsById by remember { mutableStateOf<Map<Long, SegmentRow>>(emptyMap()) }
     var segmentCount by remember { mutableStateOf(0) }
     var showCreateSegment by remember { mutableStateOf(false) }
-    var flyoverExport by remember { mutableStateOf(false) }
+    var chooseExport by remember { mutableStateOf(false) }
+    var showExportHistory by remember { mutableStateOf(false) }
+    var exportOptions by remember { mutableStateOf(FlyoverOptions()) }
+    val exportState by dev.toufik.trailmark.app.export.ExportHolder.state.collectAsState()
+    val exportHere = exportState?.takeIf { it.activityId == activityId }
+    var confirmDelete by remember { mutableStateOf(false) }
+    val recording by RecordingHolder.state.collectAsState()
     var replaySpeed by remember(activityId) { mutableStateOf(1) }
     var replayFlyover by remember(activityId) { mutableStateOf(false) }
     val packPath = remember(detail) {
@@ -196,7 +207,13 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
         ) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onBack) { Text(t.back, color = Palette.accent) }
-                Text(t.details, color = Palette.text, fontSize = 22.sp)
+                Text(t.details, color = Palette.text, fontSize = 22.sp, modifier = Modifier.weight(1f))
+                // The activity being recorded right now cannot be deleted under the recorder.
+                if (detail != null && recording.activityId != activityId) {
+                    TextButton(onClick = { confirmDelete = true }) {
+                        Text(t.deleteActivity, color = Palette.dangerText)
+                    }
+                }
             }
 
             val d = detail
@@ -318,7 +335,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                         }) { Text(t.storyCard, color = Palette.accent) }
                         if (d.points.size > 1) {
                             TextButton(onClick = {
-                                if (pro) flyoverExport = true else onPaywall()
+                                if (pro) chooseExport = true else onPaywall()
                             }) {
                                 Text(t.exportVideo, color = Palette.accent)
                             }
@@ -337,6 +354,17 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                         TextButton(onClick = { showCreateSegment = true }) {
                             Text(t.createSegment, color = Palette.accent)
                         }
+                    }
+                    exportHere?.let { st ->
+                        ExportStatusCard(
+                            t = t,
+                            state = st,
+                            onCancel = { dev.toufik.trailmark.app.service.ExportService.cancel(context) },
+                            onShare = { uri -> shareVideo(context, uri, t.shareVideo) },
+                            onDismiss = {
+                                dev.toufik.trailmark.app.export.ExportHolder.clear(activityId)
+                            },
+                        )
                     }
                     if (efforts.isNotEmpty()) {
                         Surface(
@@ -387,6 +415,13 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                         }
                     }
                     val track = remember(d) { ReplayTrack(d.points) }
+                    // Media store moving time, the replay runs on the recorded clock:
+                    // pin each capture to the moment the route reaches its place.
+                    val mediaTimeline = remember(track, d.media) {
+                        d.media
+                            .map { m -> m to track.nanosNear(m.lat, m.lon, m.distanceM) }
+                            .sortedBy { it.second }
+                    }
                     var playing by remember(d) { mutableStateOf(false) }
                     var replayNanos by remember(d) { mutableStateOf(0L) }
                     val sample = track.sampleAt(replayNanos)
@@ -400,7 +435,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                             bearingDeg = it.bearingDeg,
                         )
                     }
-                    LaunchedEffect(playing, replaySpeed, d.media) {
+                    LaunchedEffect(playing, replaySpeed, mediaTimeline) {
                         if (!playing) return@LaunchedEffect
                         var last = withFrameNanos { it }
                         while (playing) {
@@ -408,13 +443,13 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                                 val dt = (now - last).coerceIn(0L, 250_000_000L)
                                 last = now
                                 val next = replayNanos + dt * replaySpeed
-                                val hit = d.media.firstOrNull { m ->
-                                    m.elapsedNanos > replayNanos && m.elapsedNanos <= next
+                                val hit = mediaTimeline.firstOrNull { (_, at) ->
+                                    at > replayNanos && at <= next
                                 }
                                 if (hit != null) {
-                                    replayNanos = hit.elapsedNanos.coerceAtMost(track.totalNanos)
+                                    replayNanos = hit.second.coerceAtMost(track.totalNanos)
                                     playing = false
-                                    if (hit.kind == "PHOTO") viewerMedia = hit
+                                    if (hit.first.kind == "PHOTO") viewerMedia = hit.first
                                 } else {
                                     replayNanos = next.coerceAtMost(track.totalNanos)
                                     if (replayNanos >= track.totalNanos) playing = false
@@ -440,6 +475,13 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                         dark = darkMap,
                         flyover = replayFlyover,
                     )
+                    val zoneTimesHere = remember(d) {
+                        dev.toufik.trailmark.analytics.zoneTimes(
+                            d.points,
+                            dev.toufik.trailmark.analytics.ZoneScale.forSport(d.row.sport),
+                        )
+                    }
+                    ZonesCard(t, t.zonesActivity, d.row.sport, zoneTimesHere)
                     if (d.speedKmh.size >= 2 || d.elevM.size >= 2) {
                         Surface(
                             color = Palette.surface,
@@ -575,6 +617,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                     media = m,
                     description = t.photo,
                     captionLabel = t.caption,
+                    deleteLabel = t.delete,
                     onSaveCaption = { cap ->
                         scope.launch {
                             withContext(Dispatchers.IO) {
@@ -588,30 +631,82 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                             }
                         }
                     },
+                    onDelete = {
+                        scope.launch {
+                            withContext(Dispatchers.IO) {
+                                AppGraph.repository(context).deleteMedia(m.id)
+                                dev.toufik.trailmark.app.MediaCapture.delete(m.filePath)
+                            }
+                            viewerMedia = null
+                            detail = detail?.let { dd ->
+                                dd.copy(media = dd.media.filterNot { it.id == m.id })
+                            }
+                        }
+                    },
                     onDismiss = { viewerMedia = null },
                 )
             }
         }
         val dd = detail
-        if (flyoverExport && dd != null) {
-            FlyoverOverlay(
-                points = dd.points,
-                sport = sportOf(dd.row.sport),
-                packPath = packPath,
-                dark = darkMap,
-                langCode = langNow.code,
-                speed = replaySpeed,
-                flyover = replayFlyover,
-                onDone = { file ->
-                    flyoverExport = false
-                    val saved = MediaCapture.saveVideoToGallery(context, file)
-                    if (saved != null) {
-                        Toast.makeText(context, t.mediaSaved, Toast.LENGTH_SHORT).show()
+        if (chooseExport) {
+            FlyoverOptionsDialog(
+                t = t,
+                initial = exportOptions,
+                onStart = { o ->
+                    exportOptions = o
+                    chooseExport = false
+                    if (dd != null) {
+                        dev.toufik.trailmark.app.service.ExportService.start(
+                            context,
+                            dev.toufik.trailmark.app.export.ExportJob(
+                                activityId = dd.row.id,
+                                seconds = o.seconds,
+                                camera = o.camera,
+                                media = o.media,
+                                galleryCopy = o.galleryCopy,
+                                pois = o.pois,
+                                dark = darkMap,
+                                lang = langNow.code,
+                                sport = dd.row.sport,
+                                title = dev.toufik.trailmark.app.sportLabelOf(t, sportOf(dd.row.sport)),
+                                subtitle = dev.toufik.trailmark.app.formatDate(dd.row.startWallMillis, langNow),
+                            ),
+                        )
                     }
-                    shareVideo(context, file, t.share)
                 },
-                onCancel = { flyoverExport = false },
-                onError = { flyoverExport = false },
+                onHistory = {
+                    chooseExport = false
+                    showExportHistory = true
+                },
+                onDismiss = { chooseExport = false },
+            )
+        }
+        if (showExportHistory) {
+            ExportHistoryDialog(t = t, onDismiss = { showExportHistory = false })
+        }
+        if (confirmDelete) {
+            AlertDialog(
+                onDismissRequest = { confirmDelete = false },
+                containerColor = Palette.surface,
+                title = { Text(t.deleteActivity, color = Palette.text) },
+                text = { Text(t.deleteActivityConfirm, color = Palette.textSecondary) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        confirmDelete = false
+                        scope.launch {
+                            withContext(NonCancellable + Dispatchers.IO) {
+                                AppGraph.repository(context).deleteActivity(activityId)
+                                    .forEach { path -> runCatching { File(path).delete() } }
+                            }
+                            onBack()
+                        }
+                    }) { Text(t.deleteActivity, color = Palette.dangerText) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { confirmDelete = false }) {
+                        Text(t.cancel, color = Palette.textSecondary)
+                    }
+                },
             )
         }
         if (showCreateSegment && dd != null && dd.points.size > 1) {
@@ -924,4 +1019,148 @@ private fun shareFit(
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
     context.startActivity(Intent.createChooser(send, chooserTitle))
+}
+
+@Composable
+private fun ExportStatusCard(
+    t: Texts,
+    state: dev.toufik.trailmark.app.export.ExportState,
+    onCancel: () -> Unit,
+    onShare: (android.net.Uri) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val running = state.phase == dev.toufik.trailmark.app.export.ExportPhase.RENDERING ||
+        state.phase == dev.toufik.trailmark.app.export.ExportPhase.SAVING
+    val percent = (state.progress.coerceIn(0f, 1f) * 100f).roundToInt()
+    Surface(
+        color = Palette.surface,
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        when (state.phase) {
+                            dev.toufik.trailmark.app.export.ExportPhase.RENDERING -> t.exportRunning
+                            dev.toufik.trailmark.app.export.ExportPhase.SAVING -> t.exportRunning
+                            dev.toufik.trailmark.app.export.ExportPhase.DONE ->
+                                if (state.inGallery) t.exportDone else t.exportReady
+                            dev.toufik.trailmark.app.export.ExportPhase.FAILED -> t.exportFailed
+                            dev.toufik.trailmark.app.export.ExportPhase.CANCELLED -> t.cancel
+                        },
+                        color = Palette.text,
+                        fontSize = 14.sp,
+                    )
+                    if (state.title.isNotBlank()) {
+                        Text(state.title, color = Palette.textSecondary, fontSize = 12.sp)
+                    }
+                }
+                when {
+                    running -> TextButton(onClick = onCancel) {
+                        Text(t.cancel, color = Palette.textSecondary)
+                    }
+                    state.phase == dev.toufik.trailmark.app.export.ExportPhase.DONE &&
+                        state.uri != null -> {
+                        TextButton(onClick = { state.uri?.let(onShare) }) {
+                            Text(t.shareVideo, color = Palette.accent)
+                        }
+                        TextButton(onClick = onDismiss) {
+                            Text(t.done, color = Palette.textSecondary)
+                        }
+                    }
+                    else -> TextButton(onClick = onDismiss) {
+                        Text(t.done, color = Palette.textSecondary)
+                    }
+                }
+            }
+            if (running) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(6.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(Palette.textSecondary.copy(alpha = 0.25f)),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(
+                                if (state.phase == dev.toufik.trailmark.app.export.ExportPhase.SAVING) {
+                                    1f
+                                } else {
+                                    state.progress.coerceIn(0f, 1f)
+                                },
+                            )
+                            .background(Palette.accent),
+                    )
+                }
+                Text(
+                    if (state.etaNanos != null && state.etaNanos > 0) {
+                        "$percent% · ${formatDuration(state.etaNanos)}"
+                    } else {
+                        "$percent%"
+                    },
+                    color = Palette.textSecondary,
+                    fontSize = 12.sp,
+                )
+            }
+            if (state.phase == dev.toufik.trailmark.app.export.ExportPhase.FAILED) {
+                Text(state.error ?: "", color = Palette.dangerText, fontSize = 12.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExportHistoryDialog(t: Texts, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val entries = remember { dev.toufik.trailmark.app.export.ExportLog.all(context) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Palette.surface,
+        title = { Text(t.exportHistory, color = Palette.text) },
+        text = {
+            if (entries.isEmpty()) {
+                Text(t.exportHistoryEmpty, color = Palette.textSecondary)
+            } else {
+                Column(
+                    modifier = Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    entries.forEach { e ->
+                        Column {
+                            Text(
+                                e.title.ifBlank { t.exportVideo },
+                                color = Palette.text,
+                                fontSize = 14.sp,
+                            )
+                            Text(
+                                dev.toufik.trailmark.app.formatDate(e.wallMillis, LocalLang.current) +
+                                    " · " +
+                                    (if (e.seconds == 0) t.autoLength else "${e.seconds} ${t.secondsShort}"),
+                                color = Palette.textSecondary,
+                                fontSize = 11.sp,
+                            )
+                            val uri = videoUriOrNull(e.uri)
+                            if (uri != null) {
+                                Row {
+                                    TextButton(onClick = { openVideoUri(context, uri) }) {
+                                        Text(t.openClip, color = Palette.accent, fontSize = 12.sp)
+                                    }
+                                    TextButton(onClick = { shareVideo(context, uri, t.shareVideo) }) {
+                                        Text(t.shareVideo, color = Palette.accent, fontSize = 12.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(t.done, color = Palette.accent) }
+        },
+    )
 }

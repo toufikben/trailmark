@@ -17,6 +17,7 @@ import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.QueryProductDetailsParams
 import com.android.billingclient.api.QueryPurchasesParams
 import java.util.Collections
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -167,8 +168,16 @@ class BillingManager(
         val c = client ?: return
         val found = Collections.synchronizedSet(mutableSetOf<String>())
         val pending = AtomicInteger(2)
+        val failed = AtomicBoolean(false)
         fun finish() {
-            if (pending.decrementAndGet() == 0) entitlements.syncFromStore(found.toSet())
+            if (pending.decrementAndGet() != 0) return
+            // Revoking needs the full picture: a failed query would make a
+            // paying user look unsubscribed, so keep the stored entitlement.
+            if (failed.get()) {
+                Log.w(TAG, "Purchase query incomplete; keeping the stored entitlement")
+                return
+            }
+            entitlements.syncFromStore(found.toSet())
         }
         c.queryPurchasesAsync(
             QueryPurchasesParams.newBuilder().setProductType(BillingClient.ProductType.SUBS).build(),
@@ -176,6 +185,8 @@ class BillingManager(
             if (result.responseCode == BillingClient.BillingResponseCode.OK) {
                 collectActive(purchases, found)
                 handle(purchases)
+            } else {
+                failed.set(true)
             }
             finish()
         }
@@ -185,6 +196,8 @@ class BillingManager(
             if (result.responseCode == BillingClient.BillingResponseCode.OK) {
                 collectActive(purchases, found)
                 handle(purchases)
+            } else {
+                failed.set(true)
             }
             finish()
         }

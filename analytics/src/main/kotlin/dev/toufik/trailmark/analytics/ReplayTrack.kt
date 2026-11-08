@@ -4,6 +4,7 @@ import dev.toufik.trailmark.core.geo.bearingDeg
 import dev.toufik.trailmark.core.geo.haversineMeters
 import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.core.model.WaypointType
+import kotlin.math.abs
 
 /** A cursor position sampled from a replay timeline. */
 class ReplaySample(
@@ -73,5 +74,54 @@ class ReplayTrack(points: List<StoredPoint>) {
             distanceM = distances[lo] + (distances[hi] - distances[lo]) * f,
             nanos = t,
         )
+    }
+
+    /**
+     * Replay time of something captured along the route. Media carry the moving
+     * time (pauses excluded) while replay runs on the recorded clock, so they are
+     * pinned by place instead: the nearest kept point, and when the route passes
+     * the same spot more than once, the pass whose distance is closest to
+     * [distanceHintM]. Without a usable position, [distanceHintM] alone decides.
+     */
+    fun nanosNear(lat: Double?, lon: Double?, distanceHintM: Double): Long {
+        if (times.isEmpty()) return 0L
+        if (lat == null || lon == null || !lat.isFinite() || !lon.isFinite()) {
+            return nanosAtDistance(distanceHintM)
+        }
+        val gaps = DoubleArray(times.size) { haversineMeters(lats[it], lons[it], lat, lon) }
+        val nearest = gaps.min()
+        var best = 0
+        var bestHintGap = Double.MAX_VALUE
+        for (i in gaps.indices) {
+            if (gaps[i] > nearest + SAME_SPOT_M) continue
+            val hintGap = abs(distances[i] - distanceHintM)
+            if (hintGap < bestHintGap) {
+                bestHintGap = hintGap
+                best = i
+            }
+        }
+        return times[best]
+    }
+
+    /** Replay time at which the cursor has covered [distanceM], clamped to the track. */
+    fun nanosAtDistance(distanceM: Double): Long {
+        if (times.isEmpty()) return 0L
+        if (distanceM <= 0.0) return 0L
+        if (distanceM >= distances.last()) return totalNanos
+        var lo = 0
+        var hi = distances.size - 1
+        while (lo < hi - 1) {
+            val mid = (lo + hi) / 2
+            if (distances[mid] <= distanceM) lo = mid else hi = mid
+        }
+        val d0 = distances[lo]
+        val d1 = distances[hi]
+        val f = if (d1 > d0) (distanceM - d0) / (d1 - d0) else 0.0
+        return times[lo] + ((times[hi] - times[lo]) * f).toLong()
+    }
+
+    private companion object {
+        /** Points this close to the nearest one count as the same spot (GPS scatter). */
+        const val SAME_SPOT_M = 30.0
     }
 }

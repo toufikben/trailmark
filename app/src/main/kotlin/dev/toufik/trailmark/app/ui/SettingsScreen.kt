@@ -37,6 +37,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -64,8 +65,11 @@ import dev.toufik.trailmark.app.LocalPremium
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.Units
+import dev.toufik.trailmark.app.backup.BackupStore
 import dev.toufik.trailmark.app.health.HealthSync
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Language, subscription, map theme and app info. */
 @Composable
@@ -77,6 +81,37 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
     var imperial by remember { mutableStateOf(Units.imperial) }
     var voice by remember { mutableStateOf(prefs.getBoolean("voice_coach", true)) }
     var autoPauseOn by remember { mutableStateOf(prefs.getBoolean("auto_pause", true)) }
+    var backupMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    val saveBackup = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip"),
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val n = withContext(Dispatchers.IO) {
+                    runCatching { BackupStore.write(context, uri) }.getOrDefault(0)
+                }
+                backupMessage = t.backupDone.replace("%d", n.toString())
+            }
+        }
+    }
+    val openBackup = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val n = withContext(Dispatchers.IO) {
+                    runCatching { BackupStore.restore(context, uri) }.getOrDefault(-1)
+                }
+                backupMessage = if (n >= 0) {
+                    t.restoreDone.replace("%d", n.toString())
+                } else {
+                    t.restoreFailed
+                }
+            }
+        }
+    }
 
     Surface(color = Palette.bg, modifier = Modifier.fillMaxSize()) {
         Column(
@@ -316,6 +351,28 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                         },
                     )
                 }
+            }
+            Spacer(Modifier.height(20.dp))
+
+            SectionLabel(t.dataSection)
+            SettingsCard {
+                TextButton(
+                    onClick = { runCatching { saveBackup.launch("trailmark-backup.zip") } },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(t.backupSave, color = Palette.accent, fontSize = 14.sp)
+                }
+                CardDivider()
+                TextButton(
+                    onClick = { runCatching { openBackup.launch(arrayOf("application/zip")) } },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(t.backupRestore, color = Palette.accent, fontSize = 14.sp)
+                }
+            }
+            backupMessage?.let { msg ->
+                Spacer(Modifier.height(8.dp))
+                Text(msg, color = Palette.textSecondary, fontSize = 12.sp)
             }
             Spacer(Modifier.height(20.dp))
 
