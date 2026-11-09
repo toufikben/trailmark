@@ -148,6 +148,11 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
     val recording by RecordingHolder.state.collectAsState()
     var replaySpeed by remember(activityId) { mutableStateOf(1) }
     var replayFlyover by remember(activityId) { mutableStateOf(false) }
+    // Display-only road-matched copy of the trace; null means "draw the raw GPS".
+    var roadPoints by remember(activityId) { mutableStateOf<List<dev.toufik.trailmark.core.model.StoredPoint>?>(null) }
+    val snapRoad = remember {
+        context.getSharedPreferences("trailmark", Context.MODE_PRIVATE).getBoolean("snap_road", true)
+    }
     val packPath = remember(detail) {
         val first = detail?.points?.firstOrNull()
         dev.toufik.trailmark.app.maps.MapPacks.packFor(context, first?.lat, first?.lon)?.absolutePath
@@ -195,6 +200,20 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
             effortBests = seg.bests
             segmentCount = seg.count
             segmentsById = seg.byId
+        }
+    }
+
+    // The road-matched trace is a drawing aid: raw GPS stays in the database and
+    // in every export, so a failed match simply leaves the old line on screen.
+    LaunchedEffect(detail) {
+        val d = detail ?: return@LaunchedEffect
+        roadPoints = null
+        if (snapRoad && dev.toufik.trailmark.app.plan.GhRouter.hasGraphs(context)) {
+            roadPoints = withContext(Dispatchers.IO) {
+                runCatching {
+                    dev.toufik.trailmark.app.maps.SnapToRoad.points(context, d.points)
+                }.getOrNull()
+            }
         }
     }
 
@@ -486,7 +505,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                         }
                     }
                     TrailmarkMap(
-                        points = d.points,
+                        points = roadPoints ?: d.points,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(320.dp)
@@ -721,6 +740,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
         if (chooseExport) {
             FlyoverOptionsDialog(
                 t = t,
+                lang = langNow,
                 initial = exportOptions,
                 onStart = { o ->
                     exportOptions = o
@@ -735,6 +755,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                                 media = o.media,
                                 galleryCopy = o.galleryCopy,
                                 pois = o.pois,
+                                fullTrail = o.fullTrail,
                                 dark = darkMap,
                                 lang = langNow.code,
                                 sport = dd.row.sport,

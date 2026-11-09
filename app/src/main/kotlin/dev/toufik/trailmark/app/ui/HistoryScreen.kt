@@ -1,11 +1,16 @@
 package dev.toufik.trailmark.app.ui
 
 import android.content.Context
+import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
@@ -26,11 +31,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,10 +54,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import dev.toufik.trailmark.app.AppGraph
 import dev.toufik.trailmark.app.LocalLang
 import dev.toufik.trailmark.app.LocalTexts
@@ -72,6 +83,7 @@ import dev.toufik.trailmark.portable.Gpx
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.util.Calendar
 import java.util.Locale
 
@@ -92,11 +104,21 @@ fun HistoryScreen(onOpen: (Long) -> Unit) {
     var query by remember { mutableStateOf("") }
     var sportFilter by remember { mutableStateOf<String?>(null) }
     var menuOpen by remember { mutableStateOf(false) }
+    var pendingDelete by remember { mutableStateOf<ActivityRow?>(null) }
     val routes = remember { mutableStateMapOf<Long, List<Offset>>() }
 
     fun reload() {
         scope.launch {
             rows = withContext(Dispatchers.IO) { AppGraph.repository(context).listActivities() }
+        }
+    }
+
+    fun shareRow(row: ActivityRow) {
+        scope.launch {
+            val points = withContext(Dispatchers.IO) { AppGraph.repository(context).loadPoints(row.id) }
+            if (points.size >= 2) {
+                runCatching { shareGpxFile(context, points, row.startWallMillis, row.id, t.share) }
+            }
         }
     }
 
@@ -292,10 +314,12 @@ fun HistoryScreen(onOpen: (Long) -> Unit) {
                                 }
                             }
                             items(entries, key = { it.id }) { row ->
-                                HistoryCard(
+                                SwipeHistoryCard(
                                     row = row,
                                     outline = routes[row.id],
-                                    onClick = { onOpen(row.id) },
+                                    onOpen = { onOpen(row.id) },
+                                    onShare = { shareRow(row) },
+                                    onDelete = { pendingDelete = row },
                                 )
                             }
                         }
@@ -304,6 +328,135 @@ fun HistoryScreen(onOpen: (Long) -> Unit) {
             }
         }
     }
+
+    pendingDelete?.let { row ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            containerColor = Palette.surface,
+            title = { Text(t.deleteActivity, color = Palette.text, fontSize = 17.sp) },
+            text = {
+                Text(t.deleteActivityConfirm, color = Palette.textSecondary, fontSize = 13.sp)
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingDelete = null
+                        scope.launch {
+                            withContext(Dispatchers.IO) {
+                                AppGraph.repository(context).deleteActivity(row.id)
+                            }
+                            reload()
+                        }
+                    },
+                ) { Text(t.delete, color = Palette.dangerText) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) {
+                    Text(t.cancel, color = Palette.textSecondary)
+                }
+            },
+        )
+    }
+}
+
+/** Swipe right to share the GPX, left to delete; a tap still opens the activity. */
+@Composable
+private fun SwipeHistoryCard(
+    row: ActivityRow,
+    outline: List<Offset>?,
+    onOpen: () -> Unit,
+    onShare: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val t = LocalTexts.current
+    val scope = rememberCoroutineScope()
+    val threshold = with(LocalDensity.current) { 88.dp.toPx() }
+    val shift = remember(row.id) { Animatable(0f) }
+    val max = threshold * 1.5f
+    Box(modifier = Modifier.fillMaxWidth()) {
+        val at = shift.value
+        if (at > 4f) {
+            Surface(
+                color = Palette.accent.copy(alpha = 0.12f),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(t.share, color = Palette.accent, fontSize = 12.sp)
+                }
+            }
+        } else if (at < -4f) {
+            Surface(
+                color = Palette.dangerText.copy(alpha = 0.12f),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    Text(t.delete, color = Palette.dangerText, fontSize = 12.sp)
+                }
+            }
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .graphicsLayer { translationX = shift.value }
+                .pointerInput(row.id) {
+                    detectHorizontalDragGestures(
+                        onHorizontalDrag = { change, amount ->
+                            change.consume()
+                            scope.launch {
+                                shift.snapTo((shift.value + amount).coerceIn(-max, max))
+                            }
+                        },
+                        onDragEnd = {
+                            val v = shift.value
+                            scope.launch {
+                                when {
+                                    v > threshold -> {
+                                        shift.animateTo(0f, tween(120))
+                                        onShare()
+                                    }
+                                    v < -threshold -> {
+                                        shift.animateTo(0f, tween(120))
+                                        onDelete()
+                                    }
+                                    else -> shift.animateTo(0f, spring())
+                                }
+                            }
+                        },
+                        onDragCancel = { scope.launch { shift.animateTo(0f, spring()) } },
+                    )
+                },
+        ) {
+            HistoryCard(row = row, outline = outline, onClick = onOpen)
+        }
+    }
+}
+
+private fun shareGpxFile(
+    context: Context,
+    points: List<StoredPoint>,
+    startWallMillis: Long,
+    id: Long,
+    chooserTitle: String,
+) {
+    val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+    val file = File(dir, "trailmark-$id.gpx")
+    file.writeText(Gpx.write(points, startWallMillis))
+    val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
+    val send = Intent(Intent.ACTION_SEND).apply {
+        type = "application/gpx+xml"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(send, chooserTitle))
 }
 
 @Composable

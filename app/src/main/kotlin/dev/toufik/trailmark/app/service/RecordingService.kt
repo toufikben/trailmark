@@ -243,6 +243,10 @@ class RecordingService : Service() {
             }
             voiceJob = scope.launch {
                 var lastKm = 0
+                // Ghost call-outs: text is always on screen; this is only the voice.
+                var ghostSpokenAt = 0L
+                var ghostSpokenSign = 0
+                var ghostSpokenM = 0
                 while (isActive) {
                     val st = c.state.value
                     if (st.phase == Phase.RECORDING) {
@@ -262,6 +266,36 @@ class RecordingService : Service() {
                                 )
                             }
                             buzz(longArrayOf(0, 120))
+                        }
+                        val gap = RecordingHolder.ghostDelta.value
+                        if (gap != null && ttsReady &&
+                            getSharedPreferences("trailmark", MODE_PRIVATE)
+                                .getBoolean("ghost_voice", true)
+                        ) {
+                            val metres = kotlin.math.abs(gap)
+                            val sign = if (gap >= 0) 1 else -1
+                            val now = System.nanoTime()
+                            val waited = now - ghostSpokenAt
+                            val due = ghostSpokenAt == 0L ||
+                                sign != ghostSpokenSign ||
+                                waited > 60_000_000_000L ||
+                                metres - ghostSpokenM >= 100
+                            if (metres >= 30 && due) {
+                                ghostSpokenAt = now
+                                ghostSpokenSign = sign
+                                ghostSpokenM = metres
+                                val event = if (gap >= 0) {
+                                    CoachEvent.GhostAhead(metres)
+                                } else {
+                                    CoachEvent.GhostBehind(metres)
+                                }
+                                tts?.speak(
+                                    Coach.message(event, coachLocale(currentLang()), metres),
+                                    TextToSpeech.QUEUE_ADD,
+                                    null,
+                                    "ghost-$sign-$metres",
+                                )
+                            }
                         }
                         val la = st.currentLat
                         val lo = st.currentLon
