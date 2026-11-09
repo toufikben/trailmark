@@ -180,6 +180,8 @@ fun RecordingScreen(
     var ghostCandidates by remember { mutableStateOf<List<GhostCandidate>?>(null) }
     var ghostMatch by remember { mutableStateOf<GhostMatch?>(null) }
     var ghostValidated by remember { mutableStateOf(false) }
+    // Ghost time starts at the moment the race joins the old track, not at recorder start.
+    var ghostT0Nanos by remember { mutableStateOf(0L) }
     var mapFix by remember { mutableStateOf<StoredPoint?>(null) }
     var barHeightPx by remember { mutableStateOf(0) }
     var showSpeedometer by remember { mutableStateOf(false) }
@@ -244,6 +246,7 @@ fun RecordingScreen(
             ghostRoute = emptyList()
             ghostMatch = null
             ghostValidated = false
+            ghostT0Nanos = 0L
             return@LaunchedEffect
         }
         if (!pro) {
@@ -252,6 +255,7 @@ fun RecordingScreen(
             ghostRoute = emptyList()
             ghostMatch = null
             ghostValidated = false
+            ghostT0Nanos = 0L
             return@LaunchedEffect
         }
         if (ghostMatch != null) return@LaunchedEffect
@@ -291,6 +295,7 @@ fun RecordingScreen(
         val slice = points.subList(m.fromIndex.coerceIn(0, points.size - 1), points.size)
         ghost = Ghost(points, m.fromIndex)
         ghostRoute = slice
+        ghostT0Nanos = stateRef.value.elapsedNanos
         coachLine = Coach.message(
             CoachEvent.PreviousBest(
                 distanceM = m.remainingM,
@@ -312,6 +317,7 @@ fun RecordingScreen(
             ghost = null
             ghostRoute = emptyList()
             ghostMatch = null
+            ghostT0Nanos = 0L
         }
     }
 
@@ -329,11 +335,12 @@ fun RecordingScreen(
         }
     }
 
-    val ghostNow: StoredPoint? = ghost?.positionAt(state.elapsedNanos)
+    val ghostElapsed = (state.elapsedNanos - ghostT0Nanos).coerceAtLeast(0L)
+    val ghostNow: StoredPoint? = ghost?.positionAt(ghostElapsed)
 
     val gLive = ghost
     val liveDelta: Int? = if (gLive != null && state.phase == Phase.RECORDING) {
-        ghostDeltaM(gLive, state.distanceM, state.elapsedNanos).toInt()
+        ghostDeltaM(gLive, state.distanceM, ghostElapsed).toInt()
     } else {
         null
     }
