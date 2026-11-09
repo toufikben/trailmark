@@ -378,18 +378,21 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             AnimatedVisibility(
-                                visible = !cameraOpen && !navHidden,
+                                visible = !cameraOpen,
                                 enter = slideInVertically(tween(Motion.MED, easing = Motion.EaseOut)) { it },
                                 exit = slideOutVertically(tween(Motion.MED, easing = Motion.EaseOut)) { it },
                             ) {
-                                if (compactNav) {
-                                    CompactTabBar(
+                                when {
+                                    navHidden && compactNav -> NavHandleBar(
+                                        description = extraText(lang, "showNav"),
+                                        onShow = { navHidden = false },
+                                    )
+                                    compactNav -> CompactTabBar(
                                         current = screen,
                                         recording = true,
                                         onSelect = { screen = it },
                                     )
-                                } else {
-                                    TabBar(
+                                    else -> TabBar(
                                         current = screen,
                                         recording = recState.phase == Phase.RECORDING,
                                         onSelect = { screen = it },
@@ -404,28 +407,6 @@ class MainActivity : ComponentActivity() {
                                     showSplash = false
                                 },
                             )
-                        }
-                        if (compactNav && navHidden) {
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .navigationBarsPadding()
-                                    .padding(bottom = 6.dp)
-                                    .width(68.dp)
-                                    .height(22.dp)
-                                    .clip(RoundedCornerShape(11.dp))
-                                    .background(Palette.surface.copy(alpha = 0.92f))
-                                    .clickable(role = Role.Button) { navHidden = false }
-                                    .semantics { contentDescription = extraText(lang, "showNav") },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    Icons.Filled.KeyboardArrowUp,
-                                    contentDescription = null,
-                                    tint = Palette.textSecondary,
-                                    modifier = Modifier.size(18.dp),
-                                )
-                            }
                         }
                         }
                     }
@@ -500,6 +481,36 @@ private fun TabLabel(text: String) {
     )
 }
 
+/** A slim grab strip that brings the tab bar back when it has stepped out of the way. */
+@Composable
+private fun NavHandleBar(description: String, onShow: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .height(30.dp)
+            .clickable(role = Role.Button, onClick = onShow)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .width(64.dp)
+                .height(22.dp)
+                .clip(RoundedCornerShape(11.dp))
+                .background(Palette.surface.copy(alpha = 0.92f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Filled.KeyboardArrowUp,
+                contentDescription = null,
+                tint = Palette.textSecondary,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+}
+
 /** Icon-only tab bar shown while a run is being recorded: same destinations, less height. */
 @Composable
 private fun CompactTabBar(current: Screen, recording: Boolean, onSelect: (Screen) -> Unit) {
@@ -508,8 +519,8 @@ private fun CompactTabBar(current: Screen, recording: Boolean, onSelect: (Screen
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(46.dp)
-                .navigationBarsPadding(),
+                .navigationBarsPadding()
+                .height(46.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             CompactTabItem(
