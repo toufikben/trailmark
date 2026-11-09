@@ -84,6 +84,8 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
     var dark by remember { mutableStateOf(prefs.getBoolean("map_dark", true)) }
     var imperial by remember { mutableStateOf(Units.imperial) }
     var voice by remember { mutableStateOf(prefs.getBoolean("voice_coach", true)) }
+    var ghostVoice by remember { mutableStateOf(prefs.getBoolean("ghost_voice", true)) }
+    var snapRoad by remember { mutableStateOf(prefs.getBoolean("snap_road", true)) }
     var autoPauseOn by remember { mutableStateOf(prefs.getBoolean("auto_pause", true)) }
     var pitchIndex by remember {
         mutableStateOf(
@@ -192,6 +194,14 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                     )
                 }
                 CardDivider()
+                SettingsRow(extraText(lang, "snapRoad")) {
+                    SettingsSwitch(checked = snapRoad) {
+                        snapRoad = it
+                        prefs.edit().putBoolean("snap_road", it).apply()
+                    }
+                }
+                SettingsHint(extraText(lang, "snapRoadHint"))
+                CardDivider()
                 SettingsRow(t.units) {
                     Segmented(
                         aLabel = t.unitsMetric,
@@ -216,6 +226,13 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                     }
                 }
                 if (voice) {
+                    CardDivider()
+                    SettingsRow(extraText(lang, "ghostVoice")) {
+                        SettingsSwitch(checked = ghostVoice) {
+                            ghostVoice = it
+                            prefs.edit().putBoolean("ghost_voice", it).apply()
+                        }
+                    }
                     CardDivider()
                     SettingsRow(extraText(lang, "voiceTone")) {
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -561,8 +578,18 @@ private fun CardDivider() {
 }
 
 @Composable
-private fun SettingsRow(label: String, control: @Composable () -> Unit) {
-    Row(
+/** A quiet second line under a row, for settings that need one sentence of context. */
+@Composable
+private fun SettingsHint(text: String) {
+    Text(
+        text,
+        color = Palette.textSecondary,
+        fontSize = 11.sp,
+        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+    )
+}
+
+private fun SettingsRow(label: String, control: @Composable () -> Unit) {    Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 12.dp),

@@ -211,10 +211,15 @@ internal class HeadlessFlyover(
                         val shot = if (follow) shoot(active, camera) else null
                         val projection = shot ?: fixed ?: error("map image missing")
                         val base = projection.bitmap
-                        val trail = if (frame.phase == FlyoverPhase.INTRO) {
-                            emptyList()
-                        } else {
-                            routeScreen(projection, path, frame.distanceM, if (follow) TRAIL_BEHIND_M else 0.0)
+                        val trail = when {
+                            frame.phase == FlyoverPhase.INTRO -> emptyList()
+                            // The closing shot always shows everything covered, so the
+                            // clip ends on the full track rather than a short stub.
+                            frame.phase == FlyoverPhase.OUTRO ||
+                                !follow || job.fullTrail ->
+                                routeScreen(projection, path, frame.distanceM, full = true)
+                            else ->
+                                routeScreen(projection, path, frame.distanceM, full = false)
                         }
                         val here = if (frame.phase == FlyoverPhase.INTRO) {
                             null
@@ -351,17 +356,18 @@ internal class HeadlessFlyover(
     }
 
     /**
-     * Screen points along the travelled route. In the follow cameras only the
-     * stretch just behind the athlete is kept: it is the part that is on screen,
-     * and it avoids projecting points that sit behind a tilted camera.
+     * Screen points along the travelled route. [full] keeps everything from the
+     * start; otherwise only the stretch just behind the athlete is kept: it is
+     * the part that is on screen, and it avoids projecting points that sit
+     * behind a tilted camera.
      */
     private fun routeScreen(
         snapshot: MapSnapshot,
         path: FlyoverPath,
         distanceM: Double,
-        behindM: Double,
+        full: Boolean,
     ): List<PointF> {
-        val from = (distanceM - behindM).coerceAtLeast(0.0)
+        val from = if (full) 0.0 else (distanceM - TRAIL_BEHIND_M).coerceAtLeast(0.0)
         val span = (distanceM - from).coerceAtLeast(1.0)
         val step = (span / MAX_LINE_VERTICES).coerceAtLeast(2.0)
         val out = ArrayList<PointF>(MAX_LINE_VERTICES + 2)

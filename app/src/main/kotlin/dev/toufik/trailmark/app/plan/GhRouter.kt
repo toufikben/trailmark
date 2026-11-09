@@ -7,7 +7,9 @@ import com.graphhopper.config.CHProfile
 import com.graphhopper.config.Profile
 import com.graphhopper.util.GHUtility
 import com.graphhopper.util.shapes.GHPoint
+import com.graphhopper.routing.util.EdgeFilter
 import dev.toufik.trailmark.core.geo.ElevPoint
+import dev.toufik.trailmark.core.geo.haversineMeters
 import dev.toufik.trailmark.engine.Sport
 import java.io.File
 import java.util.Locale
@@ -117,6 +119,63 @@ object GhRouter {
             out.add(ElevPoint(lat = points.getLat(i), lon = points.getLon(i), eleM = 0.0))
         }
         return if (out.size >= 2) out else null
+    }
+
+    /**
+     * Pulls a recorded trace onto the road graph: every fix is projected onto the
+     * nearest edge when that edge is within [maxOffsetM], so the line follows the
+     * street instead of cutting through buildings.
+     *
+     * A projection that would teleport sideways while the raw fix barely moved is
+     * rejected — that is the wrong edge, not a correction. Returns null when no
+     * graph is installed or almost nothing could be matched (the caller then
+     * keeps drawing the raw trace).
+     */
+    @Synchronized
+    fun snapToRoad(
+        context: Context,
+        latLons: List<Pair<Double, Double>>,
+        maxOffsetM: Double = 35.0,
+    ): Pair<List<Pair<Double, Double>>, Double>? {
+        if (latLons.size < 4) return null
+        if (!hasGraphs(context)) unpackInstalled(context)
+        val dir = graphsDir(context).listFiles()
+            ?.firstOrNull { it.isDirectory && isGraph(it) }
+            ?: return null
+        val h = open(dir) ?: return null
+        val index = runCatching { h.locationIndex }.getOrNull() ?: return null
+
+        val out = ArrayList<Pair<Double, Double>>(latLons.size)
+        var hits = 0
+        var lastRaw: Pair<Double, Double>? = null
+        var lastOut: Pair<Double, Double>? = null
+        for ((lat, lon) in latLons) {
+            val snap = runCatching { index.findClosest(lat, lon, EdgeFilter.ALL_EDGES) }.getOrNull()
+            var take: Pair<Double, Double>? = null
+            if (snap != null && snap.isValid && snap.queryDistance <= maxOffsetM) {
+                val p = snap.snappedPoint
+                take = p.lat to p.lon
+            }
+            val prevOut = lastOut
+            val prevRaw = lastRaw
+            if (take != null && prevOut != null && prevRaw != null) {
+                val jump = haversineMeters(prevOut.first, prevOut.second, take.first, take.second)
+                val rawJump = haversineMeters(prevRaw.first, prevRaw.second, lat, lon)
+                if (jump > rawJump + 25.0 && jump > 35.0) take = null
+            }
+            if (take != null) {
+                hits++
+                out += take
+                lastOut = take
+            } else {
+                val raw = lat to lon
+                out += raw
+                lastOut = raw
+            }
+            lastRaw = lat to lon
+        }
+        if (hits < 3) return null
+        return out to (hits.toDouble() / latLons.size)
     }
 
     @Synchronized

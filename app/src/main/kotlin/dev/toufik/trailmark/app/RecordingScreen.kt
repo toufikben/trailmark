@@ -346,6 +346,11 @@ fun RecordingScreen(
     }
     var lastAhead by remember { mutableStateOf<Boolean?>(null) }
     var overtakeFlash by remember { mutableStateOf<String?>(null) }
+    // The service speaks the gap; the screen keeps owning what is drawn.
+    LaunchedEffect(liveDelta) { RecordingHolder.setGhostDelta(liveDelta) }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose { RecordingHolder.setGhostDelta(null) }
+    }
     val liveDeltaRef = rememberUpdatedState(liveDelta)
     LaunchedEffect(liveDelta?.let { it >= 0 }, state.phase) {
         val d = liveDeltaRef.value

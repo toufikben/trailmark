@@ -24,6 +24,7 @@ data class ExportJob(
     val galleryCopy: Boolean,
     val dark: Boolean,
     val pois: Boolean = false,
+    val fullTrail: Boolean = true,
     val lang: String,
     val sport: String,
     val title: String,
@@ -37,6 +38,7 @@ data class ExportJob(
         .put("galleryCopy", galleryCopy)
         .put("dark", dark)
         .put("pois", pois)
+        .put("fullTrail", fullTrail)
         .put("lang", lang)
         .put("sport", sport)
         .put("title", title)
@@ -56,6 +58,7 @@ data class ExportJob(
                 galleryCopy = o.optBoolean("galleryCopy", true),
                 dark = o.optBoolean("dark", true),
                 pois = o.optBoolean("pois", false),
+                fullTrail = o.optBoolean("fullTrail", true),
                 lang = o.optString("lang", "en"),
                 sport = o.optString("sport", "RUN"),
                 title = o.optString("title"),

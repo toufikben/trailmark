@@ -25,6 +25,8 @@ data class FlyoverOptions(
     val galleryCopy: Boolean = true,
     /** Draw shops, cafés, stations and other points of interest on the map. */
     val pois: Boolean = false,
+    /** Draw the line the athlete has already covered, not just the last stretch. */
+    val fullTrail: Boolean = true,
 )
 
 /** Length of the route part of the clip when the user leaves it on auto. */
