@@ -52,15 +52,15 @@ object TtsVoice {
         }
     }
 
-    /** Human label for a voice row: locale, quality and a gender-ish hint when present. */
+    /** Human label for a voice row: locale, quality and the engine voice id. */
     fun label(voice: Voice): String {
         val q = when {
             voice.quality >= Voice.QUALITY_VERY_HIGH -> "\u2605\u2605\u2605"
             voice.quality >= Voice.QUALITY_HIGH -> "\u2605\u2605"
             else -> "\u2605"
         }
-        val short = voice.name.substringAfterLast('-').substringBefore('_')
-        return "${voice.locale.toLanguageTag()} \u00b7 $q \u00b7 $short"
+        val variant = voice.name.split('-', '_').lastOrNull { it.isNotBlank() } ?: voice.name
+        return "${voice.locale.toLanguageTag()} \u00b7 $q \u00b7 $variant"
     }
 
     /**

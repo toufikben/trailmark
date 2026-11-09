@@ -1,6 +1,23 @@
 package dev.toufik.trailmark.coach
 
-enum class Locale { AR, EN, FR, ES, PT, DE, IT, NL, PL, RU, TR, ID, HI, JA, KO, ZH }
+enum class Locale(val tag: String) {
+    AR("ar"),
+    EN("en"),
+    FR("fr"),
+    ES("es"),
+    PT("pt"),
+    DE("de"),
+    IT("it"),
+    NL("nl"),
+    PL("pl"),
+    RU("ru"),
+    TR("tr"),
+    ID("id"),
+    HI("hi"),
+    JA("ja"),
+    KO("ko"),
+    ZH("zh"),
+}
 
 enum class TurnDirection {
     LEFT,
@@ -120,12 +137,12 @@ object Coach {
             is CoachEvent.OffRoute -> "offRoute"
             is CoachEvent.Finish -> "finish"
         }
-        return BANKS[locale]?.get(key)
-            ?: BANKS.getValue(Locale.EN).getValue(key)
+        return COACH_BANKS[locale]?.get(key)
+            ?: COACH_BANKS.getValue(Locale.EN).getValue(key)
     }
 }
 
-private val BANKS: Map<Locale, Map<String, List<String>>> = mapOf(
+internal val COACH_BANKS: Map<Locale, Map<String, List<String>>> = mapOf(
     Locale.AR to mapOf(
         "previousBest" to listOf(
             "آخر جولة: {km} كم في {time}. اليوم ابدأ بثبات وابنِ الإيقاع.",
