@@ -18,6 +18,7 @@ import androidx.camera.video.Recording
 import androidx.camera.video.VideoCapture
 import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -66,6 +67,7 @@ internal fun CameraCaptureScreen(
     permissionLabel: String,
     errorLabel: String,
     startInVideo: Boolean = false,
+    onModeChange: (Boolean) -> Unit = {},
     onCaptured: (File, String) -> Unit,
     onClose: () -> Unit,
 ) {
@@ -201,10 +203,10 @@ internal fun CameraCaptureScreen(
                 Text(errorLabel, color = Color(0xFFFF6B6B), fontSize = 12.sp)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                TextButton(onClick = { videoMode = false }) {
+                TextButton(onClick = { videoMode = false; onModeChange(false) }) {
                     Text(photoLabel, color = if (!videoMode) Color(0xFFC6FF3D) else Color.White)
                 }
-                TextButton(onClick = { videoMode = true }) {
+                TextButton(onClick = { videoMode = true; onModeChange(true) }) {
                     Text(videoLabel, color = if (videoMode) Color(0xFFC6FF3D) else Color.White)
                 }
             }
@@ -220,11 +222,17 @@ internal fun CameraCaptureScreen(
                 },
                 color = if (recording != null) Color(0xFFFF6B6B) else Color(0xFFC6FF3D),
                 shape = CircleShape,
+                border = BorderStroke(3.dp, Color.White.copy(alpha = if (recording != null) 0.9f else 0.35f)),
                 modifier = Modifier.size(72.dp),
             ) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
-                        if (videoMode && recording != null) recordingLabel else title,
+                        // Reads the live mode, so switching to video never leaves "Photo" on the shutter.
+                        when {
+                            videoMode && recording != null -> recordingLabel
+                            videoMode -> videoLabel
+                            else -> photoLabel
+                        },
                         color = Color(0xFF0E1113),
                         fontSize = 12.sp,
                     )

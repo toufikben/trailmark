@@ -4,10 +4,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -17,13 +19,29 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Settings
@@ -32,6 +50,7 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -44,10 +63,18 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.sp
@@ -225,6 +252,23 @@ class MainActivity : ComponentActivity() {
                         }
                         var showSplash by remember { mutableStateOf(!splashDone) }
                         val recState by RecordingHolder.state.collectAsState()
+                        var cameraOpen by remember { mutableStateOf(false) }
+                        var navHidden by remember { mutableStateOf(false) }
+                        var lastTouch by remember { mutableStateOf(0L) }
+                        // While a run is being recorded the bar slims down, then steps out of the way.
+                        val compactNav = screen is Screen.Record &&
+                            recState.phase == Phase.RECORDING && !cameraOpen
+                        LaunchedEffect(compactNav, lastTouch) {
+                            if (compactNav) {
+                                delay(5000)
+                                navHidden = true
+                            } else {
+                                navHidden = false
+                            }
+                        }
+                        LaunchedEffect(screen) {
+                            if (screen !is Screen.Record) cameraOpen = false
+                        }
                         val pending = pendingScreen.value
                         LaunchedEffect(pending) {
                             if (pending != null) {
@@ -248,7 +292,16 @@ class MainActivity : ComponentActivity() {
                                 else -> Screen.Record
                             }
                         }
-                        Box(modifier = Modifier.fillMaxSize()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pointerInput(Unit) {
+                                    awaitEachGesture {
+                                        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                                        lastTouch = SystemClock.uptimeMillis()
+                                    }
+                                },
+                        ) {
                         Column(modifier = Modifier.fillMaxSize()) {
                             Box(modifier = Modifier.weight(1f)) {
                                 AnimatedContent(
@@ -271,6 +324,7 @@ class MainActivity : ComponentActivity() {
                                             paywallFrom = Screen.Record
                                             screen = Screen.Paywall
                                         },
+                                        onCameraVisible = { cameraOpen = it },
                                     )
                                     Screen.Plan -> PlanScreen(
                                         onRegions = { screen = Screen.Regions },
@@ -323,11 +377,25 @@ class MainActivity : ComponentActivity() {
                                 }
                                 }
                             }
-                            TabBar(
-                                current = screen,
-                                recording = recState.phase == Phase.RECORDING,
-                                onSelect = { screen = it },
-                            )
+                            AnimatedVisibility(
+                                visible = !cameraOpen && !navHidden,
+                                enter = slideInVertically(tween(Motion.MED, easing = Motion.EaseOut)) { it },
+                                exit = slideOutVertically(tween(Motion.MED, easing = Motion.EaseOut)) { it },
+                            ) {
+                                if (compactNav) {
+                                    CompactTabBar(
+                                        current = screen,
+                                        recording = true,
+                                        onSelect = { screen = it },
+                                    )
+                                } else {
+                                    TabBar(
+                                        current = screen,
+                                        recording = recState.phase == Phase.RECORDING,
+                                        onSelect = { screen = it },
+                                    )
+                                }
+                            }
                         }
                         if (showSplash) {
                             SplashScreen(
@@ -336,6 +404,28 @@ class MainActivity : ComponentActivity() {
                                     showSplash = false
                                 },
                             )
+                        }
+                        if (compactNav && navHidden) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .navigationBarsPadding()
+                                    .padding(bottom = 6.dp)
+                                    .width(68.dp)
+                                    .height(22.dp)
+                                    .clip(RoundedCornerShape(11.dp))
+                                    .background(Palette.surface.copy(alpha = 0.92f))
+                                    .clickable(role = Role.Button) { navHidden = false }
+                                    .semantics { contentDescription = extraText(lang, "showNav") },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    Icons.Filled.KeyboardArrowUp,
+                                    contentDescription = null,
+                                    tint = Palette.textSecondary,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
                         }
                         }
                     }
@@ -408,6 +498,81 @@ private fun TabLabel(text: String) {
         softWrap = false,
         overflow = TextOverflow.Ellipsis,
     )
+}
+
+/** Icon-only tab bar shown while a run is being recorded: same destinations, less height. */
+@Composable
+private fun CompactTabBar(current: Screen, recording: Boolean, onSelect: (Screen) -> Unit) {
+    val t = LocalTexts.current
+    Surface(color = Palette.surface, shadowElevation = 10.dp) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(46.dp)
+                .navigationBarsPadding(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CompactTabItem(
+                selected = current is Screen.Record,
+                label = t.tabRecord,
+                onClick = { onSelect(Screen.Record) },
+            ) { RecordTabIcon(active = recording) }
+            CompactTabItem(
+                selected = current is Screen.Plan || current is Screen.Regions,
+                label = t.tabExplore,
+                onClick = { onSelect(Screen.Plan) },
+            ) { Icon(Icons.Filled.Place, contentDescription = null, modifier = Modifier.size(22.dp)) }
+            CompactTabItem(
+                selected = current is Screen.History || current is Screen.Detail,
+                label = t.tabHistory,
+                onClick = { onSelect(Screen.History) },
+            ) { Icon(Icons.Filled.List, contentDescription = null, modifier = Modifier.size(22.dp)) }
+            CompactTabItem(
+                selected = current is Screen.Progress,
+                label = t.tabProgress,
+                onClick = { onSelect(Screen.Progress) },
+            ) { ProgressTabIcon() }
+            CompactTabItem(
+                selected = current is Screen.Settings || current is Screen.Paywall,
+                label = t.tabSettings,
+                onClick = { onSelect(Screen.Settings) },
+            ) { Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(22.dp)) }
+        }
+    }
+}
+
+@Composable
+private fun RowScope.CompactTabItem(
+    selected: Boolean,
+    label: String,
+    onClick: () -> Unit,
+    icon: @Composable () -> Unit,
+) {
+    val color = if (selected) Palette.accent else Palette.textSecondary
+    Box(
+        modifier = Modifier
+            .weight(1f)
+            .fillMaxHeight()
+            .clickable(role = Role.Tab, onClick = onClick)
+            .semantics {
+                this.selected = selected
+                contentDescription = label
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        CompositionLocalProvider(LocalContentColor provides color) { icon() }
+        if (selected) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 3.dp)
+                    .width(18.dp)
+                    .height(2.dp)
+                    .clip(CircleShape)
+                    .background(color),
+            )
+        }
+    }
 }
 
 @Composable

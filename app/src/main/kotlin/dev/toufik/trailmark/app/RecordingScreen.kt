@@ -149,6 +149,7 @@ private fun coachLocale(lang: Lang): Locale =
 fun RecordingScreen(
     onOpenDetail: (Long) -> Unit,
     onPaywall: () -> Unit,
+    onCameraVisible: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("trailmark", Context.MODE_PRIVATE) }
@@ -167,6 +168,9 @@ fun RecordingScreen(
     // and the result must still find the file it was told to write.
     var cameraMode by rememberSaveable { mutableStateOf<String?>(null) }
     var mediaFlash by remember { mutableStateOf(false) }
+
+    // The tab bar goes away while the viewfinder is open, so the preview gets the space.
+    LaunchedEffect(cameraMode != null) { onCameraVisible(cameraMode != null) }
 
     var route by remember { mutableStateOf<List<StoredPoint>>(emptyList()) }
     var media by remember { mutableStateOf<List<MediaRow>>(emptyList()) }
@@ -426,12 +430,9 @@ fun RecordingScreen(
         }
     }
 
-    fun capturePhoto() {
-        cameraMode = "PHOTO"
-    }
-
-    fun captureVideo() {
-        cameraMode = "VIDEO"
+    /** One entry point: the last camera mode used decides whether it opens on photo or video. */
+    fun openCamera() {
+        cameraMode = if (prefs.getBoolean("camera_last_video", false)) "VIDEO" else "PHOTO"
     }
 
     val importLauncher = rememberLauncherForActivityResult(
@@ -747,8 +748,7 @@ fun RecordingScreen(
                 ) {
                     MediaCaptureRow(
                         t = t,
-                        onPhoto = { capturePhoto() },
-                        onVideo = { captureVideo() },
+                        onCamera = { openCamera() },
                         onGallery = { importFromGallery() },
                     )
                 } else {
@@ -805,6 +805,9 @@ fun RecordingScreen(
                     permissionLabel = t.cameraPermission,
                     errorLabel = t.captureFailed,
                     startInVideo = mode == "VIDEO",
+                    onModeChange = { video ->
+                        prefs.edit().putBoolean("camera_last_video", video).apply()
+                    },
                     onCaptured = { file, kind ->
                         cameraMode = null
                         attachCaptured(file, kind)
@@ -1011,16 +1014,18 @@ private fun bearingDeg(lat1: Double, lon1: Double, lat2: Double, lon2: Double): 
     return (Math.toDegrees(Math.atan2(y, x)) + 360.0) % 360.0
 }
 
-/** Photo, video and gallery-pick buttons shown while the recording is paused. */
+/** Camera and gallery-pick buttons shown while a recording is running. */
 @Composable
 private fun MediaCaptureRow(
     t: Texts,
-    onPhoto: () -> Unit,
-    onVideo: () -> Unit,
+    onCamera: () -> Unit,
     onGallery: () -> Unit,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        CaptureRoundButton(description = t.photo, onClick = onPhoto) { color ->
+        CaptureRoundButton(
+            description = t.photo + " / " + t.video,
+            onClick = onCamera,
+        ) { color ->
             val w = size.width
             val h = size.height
             drawRoundRect(
@@ -1043,25 +1048,6 @@ private fun MediaCaptureRow(
                 center = Offset(w * 0.50f, h * 0.55f),
                 style = Stroke(width = w * 0.09f),
             )
-        }
-        CaptureRoundButton(description = t.video, onClick = onVideo) { color ->
-            val w = size.width
-            val h = size.height
-            drawRoundRect(
-                color = color,
-                topLeft = Offset(w * 0.10f, h * 0.30f),
-                size = Size(w * 0.62f, h * 0.48f),
-                cornerRadius = CornerRadius(w * 0.10f),
-                style = Stroke(width = w * 0.09f),
-            )
-            val path = Path().apply {
-                moveTo(w * 0.76f, h * 0.44f)
-                lineTo(w * 0.92f, h * 0.34f)
-                lineTo(w * 0.92f, h * 0.74f)
-                lineTo(w * 0.76f, h * 0.64f)
-                close()
-            }
-            drawPath(path, color)
         }
         CaptureRoundButton(description = t.fromGallery, onClick = onGallery) { color ->
             val w = size.width
