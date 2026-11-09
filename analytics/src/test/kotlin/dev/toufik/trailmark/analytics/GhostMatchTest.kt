@@ -25,7 +25,9 @@ class GhostMatchTest {
     }
 
     private fun routeEast(meters: Double, steps: Int = 6): List<StoredPoint> =
-        (0..steps).map { east(meters * it / steps) }
+        (0..steps).map {
+            east(meters * it / steps).copy(timeNanos = it * 1_000_000_000L)
+        }
 
     private fun candidate(
         id: Long,
