@@ -30,8 +30,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -66,7 +68,9 @@ import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.Units
 import dev.toufik.trailmark.app.backup.BackupStore
+import dev.toufik.trailmark.app.extraText
 import dev.toufik.trailmark.app.health.HealthSync
+import dev.toufik.trailmark.app.service.TtsVoice
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -81,6 +85,19 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
     var imperial by remember { mutableStateOf(Units.imperial) }
     var voice by remember { mutableStateOf(prefs.getBoolean("voice_coach", true)) }
     var autoPauseOn by remember { mutableStateOf(prefs.getBoolean("auto_pause", true)) }
+    var pitchIndex by remember {
+        mutableStateOf(
+            TtsVoice.PITCH_LEVELS.indexOfFirst {
+                kotlin.math.abs(it - prefs.getFloat(TtsVoice.KEY_PITCH, 1f)) < 0.02f
+            }.coerceAtLeast(0),
+        )
+    }
+    var showVoices by remember { mutableStateOf(false) }
+    var voiceName by remember { mutableStateOf(prefs.getString(TtsVoice.KEY_NAME, null)) }
+    var voiceList by remember { mutableStateOf(emptyList<Pair<String, String>>()) }
+    LaunchedEffect(showVoices, lang) {
+        if (showVoices) voiceList = TtsVoice.names(context, lang)
+    }
     var backupMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
@@ -198,6 +215,39 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                         prefs.edit().putBoolean("voice_coach", it).apply()
                     }
                 }
+                if (voice) {
+                    CardDivider()
+                    SettingsRow(extraText(lang, "voiceTone")) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            val toneLabels = listOf(
+                                extraText(lang, "toneLow"),
+                                extraText(lang, "toneDefault"),
+                                extraText(lang, "toneHigh"),
+                            )
+                            toneLabels.forEachIndexed { i, label ->
+                                FilterChip(
+                                    selected = pitchIndex == i,
+                                    onClick = {
+                                        pitchIndex = i
+                                        prefs.edit()
+                                            .putFloat(TtsVoice.KEY_PITCH, TtsVoice.PITCH_LEVELS[i])
+                                            .apply()
+                                    },
+                                    label = { Text(label, fontSize = 11.sp) },
+                                )
+                            }
+                        }
+                    }
+                    CardDivider()
+                    SettingsRow(extraText(lang, "chooseVoice")) {
+                        Text(
+                            voiceName?.substringAfterLast('-') ?: extraText(lang, "voiceDefault"),
+                            color = Palette.accent,
+                            fontSize = 12.sp,
+                            modifier = Modifier.clickable { showVoices = true },
+                        )
+                    }
+                }
                 CardDivider()
                 SettingsRow(t.autoPause) {
                     SettingsSwitch(checked = autoPauseOn) {
@@ -207,6 +257,48 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                 }
             }
             Spacer(Modifier.height(20.dp))
+
+            if (showVoices) {
+                AlertDialog(
+                    onDismissRequest = { showVoices = false },
+                    containerColor = Palette.surface,
+                    title = {
+                        Text(extraText(lang, "chooseVoice"), color = Palette.text, fontSize = 17.sp)
+                    },
+                    text = {
+                        Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+                            if (voiceList.isEmpty()) {
+                                Text(
+                                    extraText(lang, "noVoices"),
+                                    color = Palette.textSecondary,
+                                    fontSize = 13.sp,
+                                )
+                            } else {
+                                VoiceRow(
+                                    label = extraText(lang, "voiceDefault"),
+                                    selected = voiceName == null,
+                                ) {
+                                    voiceName = null
+                                    prefs.edit().remove(TtsVoice.KEY_NAME).apply()
+                                    showVoices = false
+                                }
+                                voiceList.forEach { (id, label) ->
+                                    VoiceRow(label = label, selected = voiceName == id) {
+                                        voiceName = id
+                                        prefs.edit().putString(TtsVoice.KEY_NAME, id).apply()
+                                        showVoices = false
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showVoices = false }) {
+                            Text(t.cancel, color = Palette.accent)
+                        }
+                    },
+                )
+            }
 
             SectionLabel(t.permissions)
             val healthAvailable = remember { HealthSync.available(context) }
@@ -666,5 +758,25 @@ private fun NumberField(
             Spacer(Modifier.width(6.dp))
             Text(unit, color = Palette.textSecondary, fontSize = 13.sp)
         }
+    }
+}
+
+/** One selectable engine voice inside the picker dialog. */
+@Composable
+private fun VoiceRow(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            color = if (selected) Palette.accent else Palette.text,
+            fontSize = 13.sp,
+        )
+        Spacer(Modifier.weight(1f))
+        if (selected) Text("\u2713", color = Palette.accent, fontSize = 14.sp)
     }
 }

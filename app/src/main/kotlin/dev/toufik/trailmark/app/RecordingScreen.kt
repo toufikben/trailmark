@@ -141,11 +141,9 @@ private fun qualityLabel(t: Texts, q: GpsQuality): String = when (q) {
     GpsQuality.LOST -> t.lost
 }
 
-private fun coachLocale(lang: Lang): Locale = when (lang) {
-    Lang.AR -> Locale.AR
-    Lang.FR -> Locale.FR
-    else -> Locale.EN
-}
+/** Every UI language has its own coach bank now; the enum names line up. */
+private fun coachLocale(lang: Lang): Locale =
+    Locale.entries.firstOrNull { it.name == lang.name } ?: Locale.EN
 
 @Composable
 fun RecordingScreen(
@@ -182,6 +180,8 @@ fun RecordingScreen(
     var ghostCandidates by remember { mutableStateOf<List<GhostCandidate>?>(null) }
     var ghostMatch by remember { mutableStateOf<GhostMatch?>(null) }
     var ghostValidated by remember { mutableStateOf(false) }
+    // Ghost time starts at the moment the race joins the old track, not at recorder start.
+    var ghostT0Nanos by remember { mutableStateOf(0L) }
     var mapFix by remember { mutableStateOf<StoredPoint?>(null) }
     var barHeightPx by remember { mutableStateOf(0) }
     var showSpeedometer by remember { mutableStateOf(false) }
@@ -246,6 +246,7 @@ fun RecordingScreen(
             ghostRoute = emptyList()
             ghostMatch = null
             ghostValidated = false
+            ghostT0Nanos = 0L
             return@LaunchedEffect
         }
         if (!pro) {
@@ -254,6 +255,7 @@ fun RecordingScreen(
             ghostRoute = emptyList()
             ghostMatch = null
             ghostValidated = false
+            ghostT0Nanos = 0L
             return@LaunchedEffect
         }
         if (ghostMatch != null) return@LaunchedEffect
@@ -289,13 +291,16 @@ fun RecordingScreen(
         val points = m.candidate.points.filter { it.type != WaypointType.REJECTED }
         if (points.size < 2) return@LaunchedEffect
         ghostMatch = m
-        ghost = Ghost(points, points.first().timeNanos)
-        ghostRoute = points
+        // Race the rest of the old effort, starting where this run joined it.
+        val slice = points.subList(m.fromIndex.coerceIn(0, points.size - 1), points.size)
+        ghost = Ghost(points, m.fromIndex)
+        ghostRoute = slice
+        ghostT0Nanos = stateRef.value.elapsedNanos
         coachLine = Coach.message(
             CoachEvent.PreviousBest(
-                distanceM = m.candidate.distanceM,
-                seconds = m.candidate.elapsedNanos / 1_000_000_000L,
-                targetM = m.candidate.distanceM,
+                distanceM = m.remainingM,
+                seconds = m.remainingNanos / 1_000_000_000L,
+                targetM = m.remainingM,
             ),
             coachLocale(langRef.value),
         )
@@ -312,6 +317,7 @@ fun RecordingScreen(
             ghost = null
             ghostRoute = emptyList()
             ghostMatch = null
+            ghostT0Nanos = 0L
         }
     }
 
@@ -329,11 +335,12 @@ fun RecordingScreen(
         }
     }
 
-    val ghostNow: StoredPoint? = ghost?.positionAt(state.elapsedNanos)
+    val ghostElapsed = (state.elapsedNanos - ghostT0Nanos).coerceAtLeast(0L)
+    val ghostNow: StoredPoint? = ghost?.positionAt(ghostElapsed)
 
     val gLive = ghost
     val liveDelta: Int? = if (gLive != null && state.phase == Phase.RECORDING) {
-        ghostDeltaM(gLive, state.distanceM, state.elapsedNanos).toInt()
+        ghostDeltaM(gLive, state.distanceM, ghostElapsed).toInt()
     } else {
         null
     }
@@ -728,7 +735,7 @@ fun RecordingScreen(
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = with(LocalDensity.current) { barHeightPx.toDp() } + 12.dp),
+                    .padding(bottom = with(LocalDensity.current) { barHeightPx.toDp() } + 4.dp),
             ) {
                 if (state.activityId != null &&
                     (state.phase == Phase.RECORDING || state.phase == Phase.PAUSED)
@@ -833,12 +840,12 @@ private fun StatCell(
         Text(
             text = value,
             color = if (accent) Palette.accent else Palette.text,
-            fontSize = 16.sp,
+            fontSize = 15.sp,
         )
         Text(
             text = if (onClick != null) "$label \u2197" else label,
             color = Palette.textSecondary,
-            fontSize = 11.sp,
+            fontSize = 10.sp,
         )
     }
 }
@@ -1007,7 +1014,7 @@ private fun MediaCaptureRow(
     onVideo: () -> Unit,
     onGallery: () -> Unit,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         CaptureRoundButton(description = t.photo, onClick = onPhoto) { color ->
             val w = size.width
             val h = size.height
@@ -1087,13 +1094,13 @@ private fun CaptureRoundButton(
         shape = CircleShape,
         color = Palette.surface.copy(alpha = 0.94f),
         modifier = Modifier
-            .size(52.dp)
+            .size(44.dp)
             .semantics { contentDescription = description },
     ) {
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(13.dp),
+                .padding(11.dp),
         ) {
             icon(Palette.text)
         }

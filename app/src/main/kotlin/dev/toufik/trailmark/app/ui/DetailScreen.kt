@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -75,6 +76,7 @@ import dev.toufik.trailmark.app.Units
 import dev.toufik.trailmark.app.backfillSegment
 import dev.toufik.trailmark.app.distanceUnit
 import dev.toufik.trailmark.app.elevationUnit
+import dev.toufik.trailmark.app.extraText
 import dev.toufik.trailmark.app.formatDistance
 import dev.toufik.trailmark.app.formatDuration
 import dev.toufik.trailmark.app.formatElevation
@@ -229,53 +231,79 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                 else -> {
                     val pace = if (d.row.distanceM < 50) null
                     else (d.row.elapsedNanos / 1e9) / (d.row.distanceM / 1000)
+                    val a = d.analysis
                     val distAnim by animateFloatAsState(
                         targetValue = d.row.distanceM.toFloat(),
                         animationSpec = tween(Motion.SLOW, easing = Motion.EaseOut),
                         label = "hero-distance",
                     )
-                    Text(
-                        formatDistance(distAnim.toDouble()),
-                        color = Palette.accent,
-                        fontSize = 48.sp,
-                        modifier = Modifier.appearIn(0),
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp).appearIn(1),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                    Surface(
+                        color = Palette.surface,
+                        shape = RoundedCornerShape(22.dp),
+                        modifier = Modifier.fillMaxWidth().appearIn(0),
                     ) {
-                        Text("${t.time} ${formatDuration(d.row.elapsedNanos)}", color = Palette.text, fontSize = 15.sp)
-                        Text(
-                            "${t.pace} ${pace?.let { formatPace(it) } ?: "--:--"}",
-                            color = Palette.text,
-                            fontSize = 15.sp,
-                        )
-                        Text("${t.points} ${d.row.fixCount}", color = Palette.text, fontSize = 15.sp)
-                    }
-                    val a = d.analysis
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp).appearIn(2),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(
-                            "${t.elevation} ${formatElevation(a.elevationGainM)} ${elevationUnit(t)}",
-                            color = Palette.textSecondary,
-                            fontSize = 14.sp,
-                        )
-                        Text(
-                            "${t.maxSpeed} ${formatSpeed(a.maxSpeedMps)} ${speedUnit(t)}",
-                            color = Palette.textSecondary,
-                            fontSize = 14.sp,
-                        )
-                    }
-                    val gapPace = d.gapPaceSecPerKm
-                    if (gapPace != null) {
-                        Text(
-                            "${t.gapPace} ${formatPace(gapPace)}",
-                            color = Palette.textSecondary,
-                            fontSize = 14.sp,
-                            modifier = Modifier.padding(top = 6.dp).appearIn(2),
-                        )
+                        Column(Modifier.padding(18.dp)) {
+                            Row(verticalAlignment = Alignment.Bottom) {
+                                Text(
+                                    formatDistance(distAnim.toDouble()),
+                                    color = Palette.accent,
+                                    fontSize = 52.sp,
+                                )
+                                Text(
+                                    " ${distanceUnit(t)}",
+                                    color = Palette.textSecondary,
+                                    fontSize = 14.sp,
+                                    modifier = Modifier.padding(start = 4.dp, bottom = 10.dp),
+                                )
+                                Spacer(Modifier.weight(1f))
+                                Surface(color = Palette.bg, shape = RoundedCornerShape(50)) {
+                                    Text(
+                                        dev.toufik.trailmark.app.sportLabelOf(t, sportOf(d.row.sport)),
+                                        color = Palette.accent,
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    )
+                                }
+                            }
+                            Text(
+                                dev.toufik.trailmark.app.formatDate(d.row.startWallMillis, langNow),
+                                color = Palette.textSecondary,
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(top = 2.dp),
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                StatTile(t.time, formatDuration(d.row.elapsedNanos), Modifier.weight(1f))
+                                StatTile(
+                                    t.pace,
+                                    pace?.let { formatPace(it) } ?: "--:--",
+                                    Modifier.weight(1f),
+                                )
+                                StatTile(
+                                    t.elevation,
+                                    "${formatElevation(a.elevationGainM)} ${elevationUnit(t)}",
+                                    Modifier.weight(1f),
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                StatTile(
+                                    t.maxSpeed,
+                                    "${formatSpeed(a.maxSpeedMps)} ${speedUnit(t)}",
+                                    Modifier.weight(1f),
+                                )
+                                StatTile(
+                                    t.gapPace,
+                                    d.gapPaceSecPerKm?.let { formatPace(it) } ?: "--:--",
+                                    Modifier.weight(1f),
+                                )
+                                StatTile(t.points, "${d.row.fixCount}", Modifier.weight(1f))
+                            }
+                        }
                     }
                     val wTemp = d.row.weatherTempC
                     val wWind = d.row.weatherWindKmh
@@ -459,7 +487,12 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                     }
                     TrailmarkMap(
                         points = d.points,
-                        modifier = Modifier.fillMaxWidth().height(320.dp).padding(top = 12.dp).appearIn(3),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(320.dp)
+                            .padding(top = 12.dp)
+                            .clip(RoundedCornerShape(18.dp))
+                            .appearIn(3),
                         packPath = packPath,
                         current = cursor,
                         sport = sportOf(d.row.sport),
@@ -582,28 +615,65 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                             }
                         }
                     }
-                    Column(modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
-                        a.splits.forEach { s ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text("${s.kmIndex} ${t.km}", color = Palette.text, fontSize = 13.sp)
-                                Text(formatPace(s.paceSecPerKm), color = Palette.accent, fontSize = 13.sp)
-                                val gap = s.gapPaceSecPerKm
-                                if (gap != null) {
-                                    Text(
-                                        formatPace(gap),
-                                        color = Palette.accent.copy(alpha = 0.55f),
-                                        fontSize = 13.sp,
-                                    )
-                                }
+                    if (a.splits.isNotEmpty()) {
+                        Surface(
+                            color = Palette.surface,
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier.fillMaxWidth().padding(top = 10.dp).appearIn(5),
+                        ) {
+                            Column(Modifier.padding(14.dp)) {
                                 Text(
-                                    formatDuration(s.elapsedNanos),
-                                    color = Palette.textSecondary,
-                                    fontSize = 13.sp,
+                                    extraText(langNow, "splits"),
+                                    color = Palette.text,
+                                    fontSize = 14.sp,
                                 )
+                                val bestPace = a.splits.minOfOrNull { it.paceSecPerKm } ?: 0.0
+                                a.splits.forEach { s ->
+                                    Column(modifier = Modifier.fillMaxWidth().padding(top = 9.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            Text("${s.kmIndex} ${t.km}", color = Palette.text, fontSize = 13.sp)
+                                            Text(formatPace(s.paceSecPerKm), color = Palette.accent, fontSize = 13.sp)
+                                            val gap = s.gapPaceSecPerKm
+                                            if (gap != null) {
+                                                Text(
+                                                    formatPace(gap),
+                                                    color = Palette.accent.copy(alpha = 0.55f),
+                                                    fontSize = 13.sp,
+                                                )
+                                            }
+                                            Text(
+                                                formatDuration(s.elapsedNanos),
+                                                color = Palette.textSecondary,
+                                                fontSize = 13.sp,
+                                            )
+                                        }
+                                        // Bar length is speed, not pace: the fastest kilometre is full width.
+                                        val frac = if (s.paceSecPerKm > 0.0) {
+                                            (bestPace / s.paceSecPerKm).toFloat().coerceIn(0.12f, 1f)
+                                        } else {
+                                            0.12f
+                                        }
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = 5.dp)
+                                                .height(3.dp)
+                                                .clip(RoundedCornerShape(2.dp))
+                                                .background(Palette.bg),
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth(frac)
+                                                    .fillMaxHeight()
+                                                    .background(Palette.accent.copy(alpha = 0.75f)),
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -1163,4 +1233,15 @@ private fun ExportHistoryDialog(t: Texts, onDismiss: () -> Unit) {
             TextButton(onClick = onDismiss) { Text(t.done, color = Palette.accent) }
         },
     )
+}
+
+/** One small labelled value inside the summary card. */
+@Composable
+private fun StatTile(label: String, value: String, modifier: Modifier = Modifier) {
+    Surface(color = Palette.bg, shape = RoundedCornerShape(12.dp), modifier = modifier) {
+        Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+            Text(label, color = Palette.textSecondary, fontSize = 11.sp, maxLines = 1)
+            Text(value, color = Palette.text, fontSize = 15.sp, maxLines = 1)
+        }
+    }
 }

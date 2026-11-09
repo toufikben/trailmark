@@ -18,24 +18,39 @@ data class GhostCandidate(
     val points: List<StoredPoint>,
 )
 
-/** The best previous route for the current start, with the measurements used to choose it. */
+/**
+ * The best previous route for the current position, with the measurements used
+ * to choose it. [fromIndex] is where the race joins the old effort and
+ * [remainingM] is how much of the ghost still lies ahead.
+ */
 data class GhostMatch(
     val candidate: GhostCandidate,
     val startDistanceM: Double,
+    val startOffsetM: Double,
+    val fromIndex: Int,
+    val remainingM: Double,
+    val remainingNanos: Long,
     val headingDeltaDeg: Double?,
     val routeOverlapM: Double?,
 )
 
 private const val MIN_ROUTE_POINTS = 4
 private const val MIN_ROUTE_M = 40.0
+private const val MIN_GHOST_REMAINING_M = 100.0
+private const val BEARING_STEP_M = 20.0
 
 /**
- * Picks a previous activity that starts where the current one starts.
+ * Picks a previous activity whose route passes through the current position.
  *
- * A ghost is only useful when both efforts share the same ground. At the very
- * beginning there is no live route to compare, so the first point + heading is
- * used; once a few fixes exist, [routeOverlapM] rejects candidates that merely
- * started nearby but took another path.
+ * The old rule only accepted a candidate that *started* within 120 m of the new
+ * start, so beginning the recorder a few streets before or after the old start
+ * point silently produced no ghost at all. Matching is now done against the
+ * nearest point of the candidate polyline: the race begins there, the ghost
+ * clock and distance both start from that point, and the heading is compared
+ * with the direction the ghost travels at that spot.
+ *
+ * Once a few fixes exist, [routeOverlapM] rejects candidates that merely passed
+ * nearby but took another road.
  */
 fun matchGhost(
     sport: String,
@@ -44,9 +59,10 @@ fun matchGhost(
     currentBearing: Double?,
     currentRoute: List<StoredPoint>,
     candidates: List<GhostCandidate>,
-    maxStartM: Double = 120.0,
+    maxStartM: Double = 250.0,
     maxHeadingDeg: Double = 55.0,
     maxRouteOverlapM: Double = 45.0,
+    minRemainingM: Double = MIN_GHOST_REMAINING_M,
 ): GhostMatch? {
     val live = currentRoute.filter { it.type != WaypointType.REJECTED }
     val liveBearing = currentBearing ?: startBearing(live)
@@ -59,11 +75,21 @@ fun matchGhost(
         .mapNotNull { candidate ->
             val points = candidate.points.filter { it.type != WaypointType.REJECTED }
             if (points.size < 2) return@mapNotNull null
-            val first = points.first()
-            val startDistance = haversineMeters(startLat, startLon, first.lat, first.lon)
+
+            val fromIndex = nearestIndex(points, startLat, startLon)
+            val startDistance = haversineMeters(
+                startLat,
+                startLon,
+                points[fromIndex].lat,
+                points[fromIndex].lon,
+            )
             if (startDistance > maxStartM) return@mapNotNull null
 
-            val candidateBearing = startBearing(points)
+            val offset = distanceUpTo(points, fromIndex)
+            val ghost = Ghost(points, fromIndex)
+            if (ghost.lengthM < minRemainingM) return@mapNotNull null
+
+            val candidateBearing = bearingAt(points, fromIndex)
             val headingDelta = if (liveBearing != null && candidateBearing != null) {
                 angleDelta(liveBearing, candidateBearing)
             } else {
@@ -78,7 +104,16 @@ fun matchGhost(
                 (headingDelta ?: 0.0) * 0.8 +
                 (overlap ?: 0.0) * 2.0
             Scored(
-                GhostMatch(candidate, startDistance, headingDelta, overlap),
+                GhostMatch(
+                    candidate = candidate,
+                    startDistanceM = startDistance,
+                    startOffsetM = offset,
+                    fromIndex = fromIndex,
+                    remainingM = ghost.lengthM,
+                    remainingNanos = ghost.durationNanos,
+                    headingDeltaDeg = headingDelta,
+                    routeOverlapM = overlap,
+                ),
                 score,
             )
         }
@@ -110,6 +145,51 @@ private fun startBearing(points: List<StoredPoint>): Double? {
         }
     }
     return null
+}
+
+/** Direction the candidate travels through [index], measured ~20 m ahead. */
+private fun bearingAt(points: List<StoredPoint>, index: Int): Double? {
+    val here = points.getOrNull(index) ?: return null
+    for (i in index + 1 until points.size) {
+        val p = points[i]
+        if (haversineMeters(here.lat, here.lon, p.lat, p.lon) >= BEARING_STEP_M) {
+            return bearingDeg(here.lat, here.lon, p.lat, p.lon)
+        }
+    }
+    // Near the end of the old track, look backwards for the incoming heading.
+    for (i in index - 1 downTo 0) {
+        val p = points[i]
+        if (haversineMeters(p.lat, p.lon, here.lat, here.lon) >= BEARING_STEP_M) {
+            return bearingDeg(p.lat, p.lon, here.lat, here.lon)
+        }
+    }
+    return null
+}
+
+private fun nearestIndex(points: List<StoredPoint>, lat: Double, lon: Double): Int {
+    var best = 0
+    var bestM = Double.MAX_VALUE
+    points.forEachIndexed { i, p ->
+        val d = haversineMeters(lat, lon, p.lat, p.lon)
+        if (d < bestM) {
+            bestM = d
+            best = i
+        }
+    }
+    return best
+}
+
+private fun distanceUpTo(points: List<StoredPoint>, index: Int): Double {
+    var out = 0.0
+    for (i in 1..index.coerceAtMost(points.lastIndex)) {
+        out += haversineMeters(
+            points[i - 1].lat,
+            points[i - 1].lon,
+            points[i].lat,
+            points[i].lon,
+        )
+    }
+    return out
 }
 
 private fun routeLengthM(points: List<StoredPoint>): Double {

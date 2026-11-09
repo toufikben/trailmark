@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.toufik.trailmark.analytics.ActivityStat
 import dev.toufik.trailmark.analytics.AchievementState
+import dev.toufik.trailmark.analytics.AchFamily
 import dev.toufik.trailmark.analytics.PersonalRecords
 import dev.toufik.trailmark.analytics.evaluateAchievements
 import dev.toufik.trailmark.analytics.personalRecords
@@ -60,8 +61,11 @@ import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.Texts
 import dev.toufik.trailmark.app.achievementTitle
 import dev.toufik.trailmark.app.distanceUnit
+import dev.toufik.trailmark.app.elevationUnit
+import dev.toufik.trailmark.app.extraText
 import dev.toufik.trailmark.app.formatDistance
 import dev.toufik.trailmark.app.formatDuration
+import dev.toufik.trailmark.app.formatElevation
 import dev.toufik.trailmark.data.ActivityRow
 import dev.toufik.trailmark.data.SegmentStat
 import dev.toufik.trailmark.data.SegmentEffort
@@ -291,14 +295,23 @@ private fun SportFilterRow(t: Texts, selected: String?, onSelect: (String?) -> U
 private fun NextGoalCard(t: Texts, rows: List<ActivityRow>) {
     val lang = LocalLang.current
     val states = remember(rows) {
-        evaluateAchievements(rows.map { ActivityStat(it.startWallMillis, it.distanceM) })
+        evaluateAchievements(
+            rows.map {
+                ActivityStat(
+                    startWallMillis = it.startWallMillis,
+                    distanceM = it.distanceM,
+                    elapsedNanos = it.elapsedNanos,
+                    climbM = it.climbM,
+                    sport = it.sport,
+                )
+            },
+        )
     }
     val next = remember(states) {
-        states.filter { !it.unlocked }
-            .maxByOrNull { if (it.target > 0.0) it.current / it.target else 0.0 }
+        states.filter { !it.unlocked }.maxByOrNull { it.fraction() }
     } ?: return
     val unlocked = states.count { it.unlocked }
-    val frac = (next.current / next.target).toFloat().coerceIn(0f, 1f)
+    val frac = next.fraction().toFloat().coerceIn(0f, 1f)
     var shown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { shown = true }
     val grow by animateFloatAsState(
@@ -775,7 +788,18 @@ private fun SportSplitCard(t: Texts, rows: List<ActivityRow>) {
 @Composable
 private fun AchievementsCard(t: Texts, rows: List<ActivityRow>) {
     val lang = LocalLang.current
-    val states = evaluateAchievements(rows.map { ActivityStat(it.startWallMillis, it.distanceM) })
+    val states = evaluateAchievements(
+        rows.map {
+            ActivityStat(
+                startWallMillis = it.startWallMillis,
+                distanceM = it.distanceM,
+                elapsedNanos = it.elapsedNanos,
+                climbM = it.climbM,
+                sport = it.sport,
+            )
+        },
+    )
+    val unlockedCount = states.count { it.unlocked }
     Surface(
         color = Palette.surface,
         shape = RoundedCornerShape(16.dp),
@@ -785,18 +809,82 @@ private fun AchievementsCard(t: Texts, rows: List<ActivityRow>) {
             .appearIn(4),
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
-            Text(t.achievements, color = Palette.text, fontSize = 14.sp)
-            states.chunked(3).forEach { rowStates ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(t.achievements, color = Palette.text, fontSize = 14.sp)
+                Text(
+                    "$unlockedCount / ${states.size}",
+                    color = if (states.isNotEmpty() && unlockedCount == states.size) {
+                        Palette.accent
+                    } else {
+                        Palette.textSecondary
+                    },
+                    fontSize = 12.sp,
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(Palette.textSecondary.copy(alpha = 0.18f)),
+            ) {
+                if (states.isNotEmpty() && unlockedCount > 0) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(unlockedCount.toFloat() / states.size)
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(Palette.accent),
+                    )
+                }
+            }
+            val order = listOf(
+                AchFamily.VOLUME,
+                AchFamily.COUNT,
+                AchFamily.SPEED,
+                AchFamily.CLIMB,
+                AchFamily.VARIETY,
+                AchFamily.STREAK,
+                AchFamily.TIME,
+            )
+            order.forEach { family ->
+                val familyStates = states.filter { it.family == family }
+                if (familyStates.isEmpty()) return@forEach
+                val familyUnlocked = familyStates.count { it.unlocked }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        .padding(top = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    rowStates.forEach { st ->
-                        AchievementCell(lang, t, st, modifier = Modifier.weight(1f))
+                    Text(
+                        extraText(lang, family),
+                        color = Palette.textSecondary,
+                        fontSize = 11.sp,
+                    )
+                    Text(
+                        "$familyUnlocked/${familyStates.size}",
+                        color = Palette.textSecondary.copy(alpha = 0.8f),
+                        fontSize = 10.sp,
+                    )
+                }
+                familyStates.chunked(4).forEach { rowStates ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        rowStates.forEach { st ->
+                            AchievementCell(lang, t, st, modifier = Modifier.weight(1f))
+                        }
+                        repeat(4 - rowStates.size) { Spacer(Modifier.weight(1f)) }
                     }
-                    repeat(3 - rowStates.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
         }
@@ -848,7 +936,7 @@ private fun AchievementCell(
                     radius = rr,
                     style = Stroke(width = r * 0.13f),
                 )
-                val frac = (st.current / st.target).toFloat().coerceIn(0f, 1f)
+                val frac = st.fraction().toFloat().coerceIn(0f, 1f)
                 if (frac > 0f) {
                     drawArc(
                         color = Palette.accent.copy(alpha = 0.85f),
@@ -879,12 +967,21 @@ private fun AchievementCell(
     }
 }
 
-private fun achievementProgress(t: Texts, st: AchievementState): String =
-    if (st.id.startsWith("dist_") || st.id.startsWith("single_")) {
-        "${formatDistance(st.current)}/${formatDistance(st.target)} ${distanceUnit(t)}"
-    } else {
-        "${st.current.toInt()}/${st.target.toInt()}"
+private fun achievementProgress(t: Texts, st: AchievementState): String = when {
+    st.id.startsWith("pace_") -> {
+        val best = if (st.raw > 0.0) formatDuration((st.raw * 1_000_000_000.0).toLong()) else "--:--"
+        val goal = formatDuration((st.target * 1_000_000_000.0).toLong())
+        "$best / $goal"
     }
+
+    st.id.startsWith("climb") ->
+        "${formatElevation(st.current)}/${formatElevation(st.target)} ${elevationUnit(t)}"
+
+    st.id.startsWith("dist_") || st.id.startsWith("single_") ->
+        "${formatDistance(st.current)}/${formatDistance(st.target)} ${distanceUnit(t)}"
+
+    else -> "${st.current.toInt()}/${st.target.toInt()}"
+}
 
 private fun totalsSince(rows: List<ActivityRow>, fromMillis: Long): Totals {
     val out = Totals()

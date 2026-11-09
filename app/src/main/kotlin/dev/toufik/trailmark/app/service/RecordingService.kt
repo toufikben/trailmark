@@ -129,17 +129,9 @@ class RecordingService : Service() {
         return Lang.entries.firstOrNull { it.code == code } ?: Lang.AR
     }
 
-    private fun coachLocale(lang: Lang): CoachLocale = when (lang) {
-        Lang.FR -> CoachLocale.FR
-        Lang.AR -> CoachLocale.AR
-        else -> CoachLocale.EN
-    }
-
-    private fun speechLocale(lang: Lang): java.util.Locale = when (coachLocale(lang)) {
-        CoachLocale.AR -> java.util.Locale("ar")
-        CoachLocale.FR -> java.util.Locale.FRENCH
-        CoachLocale.EN -> java.util.Locale.ENGLISH
-    }
+    /** Coach banks cover every UI language; names line up with the Lang enum. */
+    private fun coachLocale(lang: Lang): CoachLocale =
+        CoachLocale.entries.firstOrNull { it.name == lang.name } ?: CoachLocale.EN
 
     private fun coachDirection(kind: TurnKind): TurnDirection = when (kind) {
         TurnKind.LEFT -> TurnDirection.LEFT
@@ -245,7 +237,7 @@ class RecordingService : Service() {
         if (getSharedPreferences("trailmark", MODE_PRIVATE).getBoolean("voice_coach", true)) {
             tts = TextToSpeech(this) { status ->
                 if (status == TextToSpeech.SUCCESS) {
-                    runCatching { tts?.language = speechLocale(currentLang()) }
+                    tts?.let { TtsVoice.apply(it, this@RecordingService, currentLang()) }
                     ttsReady = true
                 }
             }

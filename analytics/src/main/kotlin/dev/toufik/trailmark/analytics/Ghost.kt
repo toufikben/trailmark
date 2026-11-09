@@ -19,21 +19,27 @@ private const val MAX_GAP_NANOS = 15_000_000_000L
  * A previous effort as a distance-vs-time curve. Interpolates linearly between
  * stored points so the live delta and the ghost marker can be read at any
  * elapsed time.
+ *
+ * [fromIndex] lets the race begin in the middle of the previous effort: the
+ * ghost clock and its distance both start at that point, which is what makes a
+ * match useful when the new run starts a little before or after the old one.
  */
-class Ghost(points: List<StoredPoint>, startNanos: Long) {
-    private val pts = points
-    private val times = LongArray(points.size)
-    private val distances = DoubleArray(points.size)
+class Ghost(points: List<StoredPoint>, fromIndex: Int = 0) {
+    private val pts = if (points.isEmpty()) {
+        emptyList()
+    } else {
+        points.subList(fromIndex.coerceIn(0, points.size - 1), points.size)
+    }
+    private val times = LongArray(pts.size)
+    private val distances = DoubleArray(pts.size)
 
     init {
-        var acc = 0.0
-        points.forEachIndexed { i, p ->
-            if (i > 0) {
-                acc += haversineMeters(points[i - 1].lat, points[i - 1].lon, p.lat, p.lon)
-                val rawGap = (p.timeNanos - points[i - 1].timeNanos).coerceAtLeast(0L)
-                times[i] = times[i - 1] + rawGap.coerceAtMost(MAX_GAP_NANOS)
-            }
-            distances[i] = acc
+        for (i in 1 until pts.size) {
+            val prev = pts[i - 1]
+            val p = pts[i]
+            distances[i] = distances[i - 1] + haversineMeters(prev.lat, prev.lon, p.lat, p.lon)
+            val rawGap = (p.timeNanos - prev.timeNanos).coerceAtLeast(0L)
+            times[i] = times[i - 1] + rawGap.coerceAtMost(MAX_GAP_NANOS)
         }
     }
 

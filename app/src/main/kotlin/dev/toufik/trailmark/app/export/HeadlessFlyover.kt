@@ -133,6 +133,8 @@ internal class HeadlessFlyover(
         var snapshotter: MapSnapshotter? = null
         var fixed: MapSnapshot? = null
         var previousBase: Bitmap? = null
+        var mediaBase: MapSnapshot? = null
+        var mediaBaseId: Long = -1
         try {
             val follow = job.camera != FlyoverCamera.OVERVIEW
             val tilt = if (job.camera == FlyoverCamera.FLY_3D) FLY_TILT else 0.0
@@ -160,8 +162,35 @@ internal class HeadlessFlyover(
                 when (frame) {
                     is ExportFrame.Media -> {
                         val image = withContext(Dispatchers.IO) { card.bitmapFor(frame.clip, frame.t) }
+                        // The card floats over a map: the overview when the
+                        // camera is held still, or the spot where the shot was
+                        // taken while following the route.
+                        val clipId = frame.clip.media.id
+                        val backdrop: MapSnapshot? = if (!follow) {
+                            fixed
+                        } else {
+                            if (mediaBaseId != clipId) {
+                                val old = mediaBase
+                                val hereBearing = path.bearingAt(frame.clip.atDistanceM, lookAhead(path))
+                                mediaBase = shoot(
+                                    active,
+                                    followCamera(path.at(frame.clip.atDistanceM), hereBearing, zoom, tilt),
+                                )
+                                mediaBaseId = clipId
+                                old?.let { runCatching { it.bitmap.recycle() } }
+                            }
+                            mediaBase
+                        }
+                        val base = backdrop?.bitmap
                         withContext(Dispatchers.Default) {
-                            encoder.frame { canvas -> card.draw(canvas, image, frame.clip, frame.t) }
+                            encoder.frame { canvas ->
+                                if (base != null && !base.isRecycled) {
+                                    canvas.drawBitmap(base, null, FULL_RECT, BITMAP_PAINT)
+                                } else {
+                                    canvas.drawColor(0xFF0B0F0E.toInt())
+                                }
+                                card.draw(canvas, image, frame.clip, frame.t)
+                            }
                         }
                     }
                     is ExportFrame.Map -> {
@@ -226,6 +255,7 @@ internal class HeadlessFlyover(
         } finally {
             runCatching { previousBase?.recycle() }
             runCatching { fixed?.bitmap?.recycle() }
+            if (mediaBase?.bitmap !== fixed?.bitmap) runCatching { mediaBase?.bitmap?.recycle() }
             card.close()
             // The snapshotter belongs to the main thread, cancelling it from a
             // worker is not safe.

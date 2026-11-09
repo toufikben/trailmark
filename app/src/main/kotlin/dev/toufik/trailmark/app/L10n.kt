@@ -884,8 +884,207 @@ private val ACHIEVEMENT_TITLES = mapOf(
 
 fun textsFor(lang: Lang): Texts = ALL_TEXTS.getValue(lang)
 
+/**
+ * Titles that carry no words, only numbers and symbols, so they read the same in
+ * every language. The wordier tiers keep their per-locale entry in the tables above.
+ */
+private val NEUTRAL_ACH_TITLES = mapOf(
+    "count_5" to "5 \u00d7",
+    "pace_5k_25" to "5K \u00b7 25:00",
+    "pace_5k_20" to "5K \u00b7 20:00",
+    "climb_500" to "\u26f0 500",
+    "climb_1000" to "\u26f0 1000",
+    "climb_2000" to "\u26f0 2000",
+    "climb_5000" to "\u26f0 5000",
+    "climb_single_100" to "\u26f0 100 \u00b7 1\u00d7",
+    "climb_single_500" to "\u26f0 500 \u00b7 1\u00d7",
+    "sports_2" to "\ud83c\udfbd 2",
+    "sports_3" to "\ud83c\udfbd 3",
+    "sports_4" to "\ud83c\udfbd 4",
+    "first_bike" to "\ud83d\udeb4 1\u00d7",
+    "first_hike" to "\ud83e\udd7e 1\u00d7",
+    "streak_14" to "\ud83d\udd25 14",
+    "streak_30" to "\ud83d\udd25 30",
+    "dawn_1" to "\ud83c\udf05 1\u00d7",
+    "dawn_10" to "\ud83c\udf05 10",
+    "night_1" to "\ud83c\udf19 1\u00d7",
+    "night_10" to "\ud83c\udf19 10",
+    "weekend_10" to "\ud83d\uddd3 10",
+)
+
 /** Localized short title for an achievement id from the analytics rules. */
-fun achievementTitle(lang: Lang, id: String): String = ACHIEVEMENT_TITLES[lang]?.get(id) ?: id
+fun achievementTitle(lang: Lang, id: String): String =
+    ACHIEVEMENT_TITLES[lang]?.get(id) ?: NEUTRAL_ACH_TITLES[id] ?: id
+
+/**
+ * Strings added after the big table was frozen. Kept in one compact place so a
+ * new label costs one line per language instead of a 200-field constructor edit.
+ */
+private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
+    Lang.AR to mapOf(
+        "search" to "بحث", "noResults" to "لا نتائج", "media" to "وسائط",
+        "volume" to "المسافة", "count" to "العدد", "speed" to "السرعة", "climb" to "الصعود",
+        "variety" to "التنوّع", "streak" to "السلاسل", "time" to "التوقيت",
+        "voiceTone" to "نبرة الصوت", "toneLow" to "أخفض", "toneDefault" to "افتراضي",
+        "toneHigh" to "أعلى", "chooseVoice" to "صوت الجهاز",
+        "voiceDefault" to "صوت النظام الافتراضي",
+        "noVoices" to "لا توجد أصوات إضافية — ثبّت حزمة صوت من إعدادات النظام",
+        "splits" to "التقسيمات",
+    ),
+    Lang.EN to mapOf(
+        "search" to "Search", "noResults" to "No results", "media" to "Media",
+        "volume" to "Distance", "count" to "Count", "speed" to "Speed", "climb" to "Climb",
+        "variety" to "Variety", "streak" to "Streaks", "time" to "Time of day",
+        "voiceTone" to "Voice tone", "toneLow" to "Lower", "toneDefault" to "Default",
+        "toneHigh" to "Higher", "chooseVoice" to "Device voice",
+        "voiceDefault" to "System default",
+        "noVoices" to "No extra voices — install a speech pack in system settings",
+        "splits" to "Splits",
+    ),
+    Lang.FR to mapOf(
+        "search" to "Rechercher", "noResults" to "Aucun résultat", "media" to "Médias",
+        "volume" to "Distance", "count" to "Nombre", "speed" to "Vitesse", "climb" to "Dénivelé",
+        "variety" to "Variété", "streak" to "Séries", "time" to "Moment",
+        "voiceTone" to "Tonalité", "toneLow" to "Plus grave", "toneDefault" to "Par défaut",
+        "toneHigh" to "Plus aigu", "chooseVoice" to "Voix de l'appareil",
+        "voiceDefault" to "Voix système par défaut",
+        "noVoices" to "Aucune voix supplémentaire — installez un pack vocal dans les réglages",
+        "splits" to "Kilomètres",
+    ),
+    Lang.ES to mapOf(
+        "search" to "Buscar", "noResults" to "Sin resultados", "media" to "Medios",
+        "volume" to "Distancia", "count" to "Cantidad", "speed" to "Velocidad", "climb" to "Desnivel",
+        "variety" to "Variedad", "streak" to "Rachas", "time" to "Momento",
+        "voiceTone" to "Tono de voz", "toneLow" to "Más grave", "toneDefault" to "Predeterminado",
+        "toneHigh" to "Más agudo", "chooseVoice" to "Voz del dispositivo",
+        "voiceDefault" to "Voz del sistema",
+        "noVoices" to "No hay voces extra: instala un paquete de voz en los ajustes",
+        "splits" to "Parciales",
+    ),
+    Lang.PT to mapOf(
+        "search" to "Pesquisar", "noResults" to "Sem resultados", "media" to "Mídia",
+        "volume" to "Distância", "count" to "Quantidade", "speed" to "Velocidade", "climb" to "Subida",
+        "variety" to "Variedade", "streak" to "Sequências", "time" to "Momento",
+        "voiceTone" to "Tom de voz", "toneLow" to "Mais grave", "toneDefault" to "Padrão",
+        "toneHigh" to "Mais agudo", "chooseVoice" to "Voz do dispositivo",
+        "voiceDefault" to "Voz do sistema",
+        "noVoices" to "Sem vozes extra — instala um pacote de voz nas definições",
+        "splits" to "Parciais",
+    ),
+    Lang.DE to mapOf(
+        "search" to "Suchen", "noResults" to "Keine Ergebnisse", "media" to "Medien",
+        "volume" to "Distanz", "count" to "Anzahl", "speed" to "Tempo", "climb" to "Anstieg",
+        "variety" to "Vielfalt", "streak" to "Serien", "time" to "Tageszeit",
+        "voiceTone" to "Stimmlage", "toneLow" to "Tiefer", "toneDefault" to "Standard",
+        "toneHigh" to "Höher", "chooseVoice" to "Gerätestimme",
+        "voiceDefault" to "Systemstandard",
+        "noVoices" to "Keine weiteren Stimmen — Sprachpaket in den Einstellungen installieren",
+        "splits" to "Kilometer",
+    ),
+    Lang.IT to mapOf(
+        "search" to "Cerca", "noResults" to "Nessun risultato", "media" to "Media",
+        "volume" to "Distanza", "count" to "Quantità", "speed" to "Velocità", "climb" to "Dislivello",
+        "variety" to "Varietà", "streak" to "Serie", "time" to "Momento",
+        "voiceTone" to "Tono di voce", "toneLow" to "Più grave", "toneDefault" to "Predefinito",
+        "toneHigh" to "Più acuto", "chooseVoice" to "Voce del dispositivo",
+        "voiceDefault" to "Voce di sistema",
+        "noVoices" to "Nessuna voce extra — installa un pacchetto vocale nelle impostazioni",
+        "splits" to "Parziali",
+    ),
+    Lang.NL to mapOf(
+        "search" to "Zoeken", "noResults" to "Geen resultaten", "media" to "Media",
+        "volume" to "Afstand", "count" to "Aantal", "speed" to "Snelheid", "climb" to "Klim",
+        "variety" to "Variëteit", "streak" to "Reeksen", "time" to "Moment",
+        "voiceTone" to "Stemtoon", "toneLow" to "Lager", "toneDefault" to "Standaard",
+        "toneHigh" to "Hoger", "chooseVoice" to "Toestelstem",
+        "voiceDefault" to "Systeemstandaard",
+        "noVoices" to "Geen extra stemmen — installeer een spraakpakket in de instellingen",
+        "splits" to "Kilometers",
+    ),
+    Lang.PL to mapOf(
+        "search" to "Szukaj", "noResults" to "Brak wyników", "media" to "Multimedia",
+        "volume" to "Dystans", "count" to "Liczba", "speed" to "Tempo", "climb" to "Wzniesienia",
+        "variety" to "Różnorodność", "streak" to "Serie", "time" to "Pora",
+        "voiceTone" to "Wysokość głosu", "toneLow" to "Niżej", "toneDefault" to "Domyślnie",
+        "toneHigh" to "Wyżej", "chooseVoice" to "Głos urządzenia",
+        "voiceDefault" to "Głos systemowy",
+        "noVoices" to "Brak dodatkowych głosów — zainstaluj pakiet mowy w ustawieniach",
+        "splits" to "Kilometry",
+    ),
+    Lang.RU to mapOf(
+        "search" to "Поиск", "noResults" to "Нет результатов", "media" to "Медиа",
+        "volume" to "Дистанция", "count" to "Количество", "speed" to "Скорость", "climb" to "Набор",
+        "variety" to "Разнообразие", "streak" to "Серии", "time" to "Время суток",
+        "voiceTone" to "Тон голоса", "toneLow" to "Ниже", "toneDefault" to "По умолчанию",
+        "toneHigh" to "Выше", "chooseVoice" to "Голос устройства",
+        "voiceDefault" to "Системный голос",
+        "noVoices" to "Нет дополнительных голосов — установите речевой пакет в настройках",
+        "splits" to "Километры",
+    ),
+    Lang.TR to mapOf(
+        "search" to "Ara", "noResults" to "Sonuç yok", "media" to "Medya",
+        "volume" to "Mesafe", "count" to "Adet", "speed" to "Hız", "climb" to "Tırmanış",
+        "variety" to "Çeşitlilik", "streak" to "Seriler", "time" to "Zaman",
+        "voiceTone" to "Ses tonu", "toneLow" to "Daha kalın", "toneDefault" to "Varsayılan",
+        "toneHigh" to "Daha ince", "chooseVoice" to "Cihaz sesi",
+        "voiceDefault" to "Sistem sesi",
+        "noVoices" to "Ek ses yok — ayarlardan bir konuşma paketi yükleyin",
+        "splits" to "Kilometreler",
+    ),
+    Lang.ID to mapOf(
+        "search" to "Cari", "noResults" to "Tidak ada hasil", "media" to "Media",
+        "volume" to "Jarak", "count" to "Jumlah", "speed" to "Kecepatan", "climb" to "Pendakian",
+        "variety" to "Variasi", "streak" to "Rentetan", "time" to "Waktu",
+        "voiceTone" to "Nada suara", "toneLow" to "Lebih rendah", "toneDefault" to "Bawaan",
+        "toneHigh" to "Lebih tinggi", "chooseVoice" to "Suara perangkat",
+        "voiceDefault" to "Suara sistem",
+        "noVoices" to "Tidak ada suara tambahan — pasang paket suara di pengaturan",
+        "splits" to "Per kilometer",
+    ),
+    Lang.HI to mapOf(
+        "search" to "खोजें", "noResults" to "कोई परिणाम नहीं", "media" to "मीडिया",
+        "volume" to "दूरी", "count" to "संख्या", "speed" to "गति", "climb" to "चढ़ाई",
+        "variety" to "विविधता", "streak" to "लगातार", "time" to "समय",
+        "voiceTone" to "आवाज़ का सुर", "toneLow" to "गहरी", "toneDefault" to "डिफ़ॉल्ट",
+        "toneHigh" to "ऊँची", "chooseVoice" to "डिवाइस आवाज़",
+        "voiceDefault" to "सिस्टम आवाज़",
+        "noVoices" to "कोई अतिरिक्त आवाज़ नहीं — सेटिंग्स में स्पीच पैक इंस्टॉल करें",
+        "splits" to "किलोमीटर",
+    ),
+    Lang.JA to mapOf(
+        "search" to "検索", "noResults" to "結果なし", "media" to "メディア",
+        "volume" to "距離", "count" to "回数", "speed" to "スピード", "climb" to "登り",
+        "variety" to "バラエティ", "streak" to "連続", "time" to "時間帯",
+        "voiceTone" to "声のトーン", "toneLow" to "低め", "toneDefault" to "標準",
+        "toneHigh" to "高め", "chooseVoice" to "端末の音声",
+        "voiceDefault" to "システム標準",
+        "noVoices" to "追加の音声なし — 設定で音声パックをインストール",
+        "splits" to "ラップ",
+    ),
+    Lang.KO to mapOf(
+        "search" to "검색", "noResults" to "결과 없음", "media" to "미디어",
+        "volume" to "거리", "count" to "횟수", "speed" to "속도", "climb" to "상승",
+        "variety" to "다양성", "streak" to "연속", "time" to "시간대",
+        "voiceTone" to "음성 톤", "toneLow" to "낮게", "toneDefault" to "기본",
+        "toneHigh" to "높게", "chooseVoice" to "기기 음성",
+        "voiceDefault" to "시스템 기본",
+        "noVoices" to "추가 음성 없음 — 설정에서 음성 팩을 설치하세요",
+        "splits" to "구간",
+    ),
+    Lang.ZH to mapOf(
+        "search" to "搜索", "noResults" to "无结果", "media" to "媒体",
+        "volume" to "距离", "count" to "次数", "speed" to "速度", "climb" to "爬升",
+        "variety" to "多样", "streak" to "连胜", "time" to "时段",
+        "voiceTone" to "音调", "toneLow" to "更低", "toneDefault" to "默认",
+        "toneHigh" to "更高", "chooseVoice" to "设备语音",
+        "voiceDefault" to "系统默认",
+        "noVoices" to "没有额外语音——请在系统设置中安装语音包",
+        "splits" to "分段",
+    ),
+)
+
+/** One of the late-added labels above; falls back to the key so nothing is silent. */
+fun extraText(lang: Lang, key: String): String = EXTRA_TEXT[lang]?.get(key) ?: key
 
 val LocalTexts = compositionLocalOf { AR_TEXTS }
 val LocalLang = compositionLocalOf { Lang.AR }

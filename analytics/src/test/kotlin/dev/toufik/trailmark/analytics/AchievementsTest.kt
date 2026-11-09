@@ -6,7 +6,13 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.util.Calendar
 
-private fun stat(millis: Long, distanceM: Double) = ActivityStat(millis, distanceM)
+private fun stat(
+    millis: Long,
+    distanceM: Double,
+    elapsedNanos: Long = 0L,
+    climbM: Double = 0.0,
+    sport: String = "",
+) = ActivityStat(millis, distanceM, elapsedNanos, climbM, sport)
 
 private fun state(list: List<AchievementState>, id: String) = list.first { it.id == id }
 
@@ -22,7 +28,7 @@ class AchievementsTest {
     @Test
     fun emptyHistoryUnlocksNothing() {
         val all = evaluateAchievements(emptyList())
-        assertEquals(17, all.size)
+        assertEquals(38, all.size)
         assertTrue(all.none { it.unlocked })
         assertEquals(0.0, state(all, "first").current, 1e-9)
     }
@@ -95,5 +101,80 @@ class AchievementsTest {
         val all = evaluateAchievements(listOf(stat(day(2026, 6, 1), 60_000.0)))
         assertEquals(10_000.0, state(all, "dist_10").current, 1e-9)
         assertTrue(state(all, "dist_10").unlocked)
+    }
+
+    @Test
+    fun climbAccumulatesAndUnlocksPerSingleEffort() {
+        val rows = listOf(
+            stat(day(2026, 7, 1), 8_000.0, climbM = 300.0),
+            stat(day(2026, 7, 2), 8_000.0, climbM = 300.0),
+        )
+        val all = evaluateAchievements(rows)
+        assertTrue(state(all, "climb_500").unlocked)
+        assertFalse(state(all, "climb_1000").unlocked)
+        assertTrue(state(all, "climb_single_100").unlocked)
+        assertFalse(state(all, "climb_single_500").unlocked)
+        assertEquals(600.0, state(all, "climb_1000").current, 1e-9)
+    }
+
+    @Test
+    fun fasterFiveKUnlocksThePaceTier() {
+        // 20 minutes for 5 km = 1200 s; the tier target is 1200 s.
+        val all = evaluateAchievements(
+            listOf(stat(day(2026, 8, 1), 5_000.0, elapsedNanos = 1_200_000_000_000L)),
+        )
+        assertTrue(state(all, "pace_5k_20").unlocked)
+        assertTrue(state(all, "pace_5k_25").unlocked)
+        assertEquals(1_200.0, state(all, "pace_5k_20").raw, 1e-6)
+    }
+
+    @Test
+    fun slowerFiveKLeavesThePaceTierLockedButShowsTheRealTime() {
+        // 30 minutes for 5 km = 1800 s.
+        val all = evaluateAchievements(
+            listOf(stat(day(2026, 8, 2), 5_000.0, elapsedNanos = 1_800_000_000_000L)),
+        )
+        assertFalse(state(all, "pace_5k_25").unlocked)
+        assertEquals(1_800.0, state(all, "pace_5k_25").raw, 1e-6)
+        assertTrue(state(all, "pace_5k_25").fraction() < 1.0)
+    }
+
+    @Test
+    fun sportsVarietyCountsDistinctDisciplines() {
+        val rows = listOf(
+            stat(day(2026, 9, 1), 3_000.0, sport = "RUN"),
+            stat(day(2026, 9, 2), 3_000.0, sport = "BIKE"),
+            stat(day(2026, 9, 3), 3_000.0, sport = "HIKE"),
+        )
+        val all = evaluateAchievements(rows)
+        assertTrue(state(all, "sports_2").unlocked)
+        assertTrue(state(all, "sports_3").unlocked)
+        assertFalse(state(all, "sports_4").unlocked)
+        assertTrue(state(all, "first_bike").unlocked)
+        assertTrue(state(all, "first_hike").unlocked)
+    }
+
+    @Test
+    fun dawnAndNightTiersSplitByStartHour() {
+        val rows = listOf(
+            stat(day(2026, 10, 1, hour = 5), 2_000.0),
+            stat(day(2026, 10, 2, hour = 21), 2_000.0),
+        )
+        val all = evaluateAchievements(rows)
+        assertTrue(state(all, "dawn_1").unlocked)
+        assertFalse(state(all, "dawn_10").unlocked)
+        assertTrue(state(all, "night_1").unlocked)
+        assertFalse(state(all, "night_10").unlocked)
+    }
+
+    @Test
+    fun familiesGroupEveryTier() {
+        val all = evaluateAchievements(emptyList())
+        val known = setOf(
+            AchFamily.VOLUME, AchFamily.COUNT, AchFamily.SPEED, AchFamily.CLIMB,
+            AchFamily.VARIETY, AchFamily.STREAK, AchFamily.TIME,
+        )
+        assertTrue(all.all { it.family in known })
+        assertEquals(all.size, all.map { it.id }.toSet().size)
     }
 }
