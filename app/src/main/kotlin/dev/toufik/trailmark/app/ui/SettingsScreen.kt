@@ -577,7 +577,6 @@ private fun CardDivider() {
     HorizontalDivider(color = Palette.textSecondary.copy(alpha = 0.10f), thickness = 1.dp)
 }
 
-@Composable
 /** A quiet second line under a row, for settings that need one sentence of context. */
 @Composable
 private fun SettingsHint(text: String) {
@@ -589,7 +588,9 @@ private fun SettingsHint(text: String) {
     )
 }
 
-private fun SettingsRow(label: String, control: @Composable () -> Unit) {    Row(
+@Composable
+private fun SettingsRow(label: String, control: @Composable () -> Unit) {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 12.dp),
