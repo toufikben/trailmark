@@ -140,4 +140,64 @@ class GhostMatchTest {
         assertNotNull(overlap)
         assertTrue(overlap!! < 5.0)
     }
+
+    @Test
+    fun joinsTheRouteWhenTheNewRunStartsAfterTheOldOne() {
+        val match = matchGhost(
+            sport = "RUN",
+            startLat = baseLat,
+            startLon = baseLon + 300.0 / 89_200.0,
+            currentBearing = 90.0,
+            currentRoute = emptyList(),
+            candidates = listOf(candidate(1, points = routeEast(1000.0, steps = 20))),
+        )
+
+        assertNotNull(match)
+        assertTrue(match!!.startDistanceM < 5.0)
+        assertTrue(match.startOffsetM > 250.0)
+        assertTrue(match.remainingM < 760.0)
+        assertTrue(match.fromIndex > 0)
+    }
+
+    @Test
+    fun joinsTheRouteWhenTheNewRunStartsBeforeTheOldOne() {
+        val match = matchGhost(
+            sport = "RUN",
+            startLat = baseLat,
+            startLon = baseLon - 150.0 / 89_200.0,
+            currentBearing = 90.0,
+            currentRoute = emptyList(),
+            candidates = listOf(candidate(1, points = routeEast(800.0, steps = 16))),
+        )
+
+        assertNotNull(match)
+        assertEquals(0, match!!.fromIndex)
+        assertTrue(match.startDistanceM > 100.0)
+        assertTrue(match.remainingM > 700.0)
+    }
+
+    @Test
+    fun ignoresACandidateWithTooLittleRouteLeft() {
+        val match = matchGhost(
+            sport = "RUN",
+            startLat = baseLat,
+            startLon = baseLon + 980.0 / 89_200.0,
+            currentBearing = 90.0,
+            currentRoute = emptyList(),
+            candidates = listOf(candidate(1, points = routeEast(1000.0, steps = 20))),
+        )
+
+        assertNull(match)
+    }
+
+    @Test
+    fun ghostStartedMidRouteCountsFromThatPoint() {
+        val points = routeEast(1000.0, steps = 20)
+        val full = Ghost(points)
+        val joined = Ghost(points, 10)
+
+        assertTrue(joined.lengthM < full.lengthM)
+        assertEquals(0.0, joined.distanceAt(0L), 1e-9)
+        assertEquals(joined.lengthM, joined.distanceAt(joined.durationNanos), 1e-6)
+    }
 }

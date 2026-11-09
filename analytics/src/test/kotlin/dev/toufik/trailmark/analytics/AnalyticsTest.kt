@@ -47,7 +47,6 @@ class AnalysisTest {
 class GhostTest {
     private val ghost = Ghost(
         listOf(p(0L, 36.7538), p(10_000_000_000L, 36.7548)),
-        0L,
     )
 
     @Test
@@ -73,7 +72,6 @@ class GhostTest {
                 p(10_000_000_000L, 36.7548),
                 p(610_000_000_000L, 36.7558),
             ),
-            0L,
         )
         // 15 s of clamped race time: the pause adds only the cap, not 10 min.
         assertEquals(25_000_000_000L, paused.durationNanos)

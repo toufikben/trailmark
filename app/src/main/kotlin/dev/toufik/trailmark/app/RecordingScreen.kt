@@ -141,11 +141,9 @@ private fun qualityLabel(t: Texts, q: GpsQuality): String = when (q) {
     GpsQuality.LOST -> t.lost
 }
 
-private fun coachLocale(lang: Lang): Locale = when (lang) {
-    Lang.AR -> Locale.AR
-    Lang.FR -> Locale.FR
-    else -> Locale.EN
-}
+/** Every UI language has its own coach bank now; the enum names line up. */
+private fun coachLocale(lang: Lang): Locale =
+    Locale.entries.firstOrNull { it.name == lang.name } ?: Locale.EN
 
 @Composable
 fun RecordingScreen(
@@ -289,13 +287,15 @@ fun RecordingScreen(
         val points = m.candidate.points.filter { it.type != WaypointType.REJECTED }
         if (points.size < 2) return@LaunchedEffect
         ghostMatch = m
-        ghost = Ghost(points, points.first().timeNanos)
-        ghostRoute = points
+        // Race the rest of the old effort, starting where this run joined it.
+        val slice = points.subList(m.fromIndex.coerceIn(0, points.size - 1), points.size)
+        ghost = Ghost(points, m.fromIndex)
+        ghostRoute = slice
         coachLine = Coach.message(
             CoachEvent.PreviousBest(
-                distanceM = m.candidate.distanceM,
-                seconds = m.candidate.elapsedNanos / 1_000_000_000L,
-                targetM = m.candidate.distanceM,
+                distanceM = m.remainingM,
+                seconds = m.remainingNanos / 1_000_000_000L,
+                targetM = m.remainingM,
             ),
             coachLocale(langRef.value),
         )
