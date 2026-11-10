@@ -543,54 +543,62 @@ private fun CompactTabBar(current: Screen, recording: Boolean, onSelect: (Screen
         unselectedIconColor = Palette.textSecondary,
         indicatorColor = Palette.accent.copy(alpha = 0.16f),
     )
-    NavigationBar(
-        containerColor = Palette.surface,
-        tonalElevation = 0.dp,
-        windowInsets = WindowInsets(0, 0, 0, 0),
+    // The inset lives on the wrapper: a padded bar keeps its icons above the system bar,
+    // while a zero-inset NavigationBar would be drawn behind it where touches never land.
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(48.dp),
+            .navigationBarsPadding(),
     ) {
-        NavigationBarItem(
-            selected = current is Screen.Record,
-            onClick = { onSelect(Screen.Record) },
-            icon = { RecordTabIcon(active = recording) },
-            label = null,
-            alwaysShowLabel = false,
-            colors = colors,
-        )
-        NavigationBarItem(
-            selected = current is Screen.Plan || current is Screen.Regions,
-            onClick = { onSelect(Screen.Plan) },
-            icon = { Icon(Icons.Filled.Place, contentDescription = t.tabExplore, modifier = Modifier.size(22.dp)) },
-            label = null,
-            alwaysShowLabel = false,
-            colors = colors,
-        )
-        NavigationBarItem(
-            selected = current is Screen.History || current is Screen.Detail,
-            onClick = { onSelect(Screen.History) },
-            icon = { Icon(Icons.Filled.List, contentDescription = t.tabHistory, modifier = Modifier.size(22.dp)) },
-            label = null,
-            alwaysShowLabel = false,
-            colors = colors,
-        )
-        NavigationBarItem(
-            selected = current is Screen.Progress,
-            onClick = { onSelect(Screen.Progress) },
-            icon = { ProgressTabIcon() },
-            label = null,
-            alwaysShowLabel = false,
-            colors = colors,
-        )
-        NavigationBarItem(
-            selected = current is Screen.Settings || current is Screen.Paywall,
-            onClick = { onSelect(Screen.Settings) },
-            icon = { Icon(Icons.Filled.Settings, contentDescription = t.tabSettings, modifier = Modifier.size(22.dp)) },
-            label = null,
-            alwaysShowLabel = false,
-            colors = colors,
-        )
+        NavigationBar(
+            containerColor = Palette.surface,
+            tonalElevation = 0.dp,
+            windowInsets = WindowInsets(0, 0, 0, 0),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp),
+        ) {
+            NavigationBarItem(
+                selected = current is Screen.Record,
+                onClick = { onSelect(Screen.Record) },
+                icon = { RecordTabIcon(active = recording) },
+                label = null,
+                alwaysShowLabel = false,
+                colors = colors,
+            )
+            NavigationBarItem(
+                selected = current is Screen.Plan || current is Screen.Regions,
+                onClick = { onSelect(Screen.Plan) },
+                icon = { Icon(Icons.Filled.Place, contentDescription = t.tabExplore, modifier = Modifier.size(22.dp)) },
+                label = null,
+                alwaysShowLabel = false,
+                colors = colors,
+            )
+            NavigationBarItem(
+                selected = current is Screen.History || current is Screen.Detail,
+                onClick = { onSelect(Screen.History) },
+                icon = { Icon(Icons.Filled.List, contentDescription = t.tabHistory, modifier = Modifier.size(22.dp)) },
+                label = null,
+                alwaysShowLabel = false,
+                colors = colors,
+            )
+            NavigationBarItem(
+                selected = current is Screen.Progress,
+                onClick = { onSelect(Screen.Progress) },
+                icon = { ProgressTabIcon() },
+                label = null,
+                alwaysShowLabel = false,
+                colors = colors,
+            )
+            NavigationBarItem(
+                selected = current is Screen.Settings || current is Screen.Paywall,
+                onClick = { onSelect(Screen.Settings) },
+                icon = { Icon(Icons.Filled.Settings, contentDescription = t.tabSettings, modifier = Modifier.size(22.dp)) },
+                label = null,
+                alwaysShowLabel = false,
+                colors = colors,
+            )
+        }
     }
 }
 
