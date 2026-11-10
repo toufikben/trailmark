@@ -125,7 +125,7 @@ class ExportTimelineTest {
     fun twoShotsOfTheSameSpotAreShownOnce() {
         val timeline = ExportTimeline(
             path(),
-            routeSeconds = 15,
+            routeSeconds = 60,
             clips = listOf(clip(500.0), clip(520.0), clip(1_500.0)),
         )
         val shown = (0 until timeline.frames)

@@ -224,6 +224,13 @@ internal class HeadlessFlyover(
                             MediaStage.HOLD -> 1.0
                             MediaStage.TAIL -> 1.0 - easeInOut(frame.stageT)
                         }.toFloat().coerceIn(0f, 1f)
+                        // A clip cut without the descent still needs its short fade,
+                        // otherwise the hard cut flashes for one frame.
+                        val edge = if (frame.clip.leadFrames == 0 && frame.clip.tailFrames == 0) {
+                            (minOf(frame.t, 1.0 - frame.t) / 0.05).coerceIn(0.0, 1.0).toFloat()
+                        } else {
+                            1f
+                        }
                         val wideAnchor = mediaBase?.let { project(it, path.at(frame.clip.atDistanceM)) }
                         val tightAnchor = mediaTight?.let { project(it, path.at(frame.clip.atDistanceM)) }
                         val anchor = if (dive >= 0.5f) tightAnchor ?: wideAnchor else wideAnchor ?: tightAnchor
@@ -255,7 +262,7 @@ internal class HeadlessFlyover(
                                     pinRing.alpha = (255 * glow).toInt()
                                     canvas.drawCircle(anchor.x, anchor.y, 22f + 16f * (1f - dive), pinRing)
                                 }
-                                card.draw(canvas, image, frame.clip, frame.t, cover)
+                                card.draw(canvas, image, frame.clip, frame.t, cover * edge)
                             }
                         }
                     }
