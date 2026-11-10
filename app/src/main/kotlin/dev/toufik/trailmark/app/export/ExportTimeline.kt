@@ -16,19 +16,41 @@ internal const val VIDEO_MAX_SECONDS = 6
 internal const val MAX_PHOTOS = 8
 internal const val MAX_VIDEOS = 3
 
+/** The camera drops onto the spot before a card opens, and climbs back out after it. */
+internal const val MEDIA_LEAD_SECONDS = 0.7
+internal const val MEDIA_TAIL_SECONDS = 0.8
+
+/** Two shots taken within this distance of each other would show the same place twice. */
+internal const val MEDIA_MIN_SPACING_M = 40.0
+
+/** Media may never take more than this share of the clip, so the route stays the subject. */
+internal const val MEDIA_MAX_SHARE = 0.35
+
+/** How a media card is presented: on its own, or with a descent and a climb-out around it. */
+enum class MediaStage { LEAD, HOLD, TAIL }
+
 /** A media item placed at a point along the route. */
 internal class MediaClip(
     val media: MediaRow,
     val atDistanceM: Double,
-    val frames: Int,
+    val holdFrames: Int,
+    val leadFrames: Int,
+    val tailFrames: Int,
 ) {
     val isVideo: Boolean get() = media.kind == "VIDEO"
+    val frames: Int get() = holdFrames + leadFrames + tailFrames
 }
 
 /** One output frame: either the map at a distance, or a media card. */
 internal sealed class ExportFrame {
     class Map(val phase: FlyoverPhase, val t: Double, val distanceM: Double) : ExportFrame()
-    class Media(val clip: MediaClip, val t: Double) : ExportFrame()
+    class Media(
+        val clip: MediaClip,
+        val t: Double,
+        val stage: MediaStage,
+        /** Progress inside the current stage: 0 at its first frame, 1 at its last. */
+        val stageT: Double,
+    ) : ExportFrame()
 }
 
 /**
@@ -67,10 +89,7 @@ internal class ExportTimeline(
 
     init {
         val total = path.totalM
-        val placed = clips
-            .filter { it.frames > 0 }
-            .sortedBy { it.atDistanceM }
-            .take(MAX_PHOTOS + MAX_VIDEOS)
+        val placed = placeClips(clips)
 
         // Where the route is cut. The route always starts at zero, otherwise a
         // route without clips has no chunk to render and the flight is empty.
@@ -155,20 +174,70 @@ internal class ExportTimeline(
                 ExportFrame.Map(seg.phase, t, d)
             }
             is Seg.MediaSeg -> {
-                val n = seg.clip.frames.coerceAtLeast(1)
-                ExportFrame.Media(seg.clip, (local.toDouble() / (n - 1).coerceAtLeast(1)).coerceIn(0.0, 1.0))
+                val clip = seg.clip
+                val n = clip.frames.coerceAtLeast(1)
+                val t = (local.toDouble() / (n - 1).coerceAtLeast(1)).coerceIn(0.0, 1.0)
+                val lead = clip.leadFrames.coerceAtLeast(0)
+                val tail = clip.tailFrames.coerceAtLeast(0)
+                val stage = when {
+                    lead > 0 && local < lead -> MediaStage.LEAD
+                    tail > 0 && local >= n - tail -> MediaStage.TAIL
+                    else -> MediaStage.HOLD
+                }
+                val stageT = when (stage) {
+                    MediaStage.LEAD -> local.toDouble() / lead.coerceAtLeast(1)
+                    MediaStage.TAIL -> (local - (n - tail)).toDouble() / tail.coerceAtLeast(1)
+                    MediaStage.HOLD -> 0.0
+                }
+                ExportFrame.Media(clip, t, stage, stageT.coerceIn(0.0, 1.0))
             }
         }
     }
 
+    /**
+     * The clips that make the cut, in route order: near-duplicates dropped, and
+     * a hard cap on how much of the clip media may take, so a long ride is not
+     * swallowed by photos.
+     */
+    private fun placeClips(clips: List<MediaClip>): List<MediaClip> {
+        val sorted = clips.filter { it.frames > 0 }.sortedBy { it.atDistanceM }
+        val budget = (routeFrames * MEDIA_MAX_SHARE).toInt()
+        val kept = ArrayList<MediaClip>(sorted.size)
+        var spent = 0
+        for (c in sorted) {
+            if (kept.size >= MAX_PHOTOS + MAX_VIDEOS) break
+            val last = kept.lastOrNull()
+            if (last != null && c.atDistanceM - last.atDistanceM < MEDIA_MIN_SPACING_M) continue
+            if (kept.isNotEmpty() && spent + c.frames > budget) break
+            kept.add(c)
+            spent += c.frames
+        }
+        return kept
+    }
+
     /** Builds the clips the export can use, honouring the user's media choice. */
     companion object {
-        fun clipsFor(media: List<MediaRow>, mode: ExportMedia, path: FlyoverPath): List<MediaClip> {
+        fun clipsFor(
+            media: List<MediaRow>,
+            mode: ExportMedia,
+            path: FlyoverPath,
+            cinematic: Boolean,
+        ): List<MediaClip> {
             if (mode == ExportMedia.OFF) return emptyList()
+            val lead = if (cinematic) (MEDIA_LEAD_SECONDS * FLYOVER_FPS).toInt() else 0
+            val tail = if (cinematic) (MEDIA_TAIL_SECONDS * FLYOVER_FPS).toInt() else 0
             val photos = media.filter { it.kind == "PHOTO" && File(it.filePath).isFile }
                 .sortedBy { it.elapsedNanos }
                 .take(MAX_PHOTOS)
-                .map { MediaClip(it, distanceOf(it, path), PHOTO_SECONDS * FLYOVER_FPS) }
+                .map {
+                    MediaClip(
+                        it,
+                        distanceOf(it, path),
+                        PHOTO_SECONDS * FLYOVER_FPS,
+                        lead,
+                        tail,
+                    )
+                }
             val videos = if (mode == ExportMedia.ALL) {
                 media.filter { it.kind == "VIDEO" && File(it.filePath).isFile }
                     .sortedBy { it.elapsedNanos }
@@ -176,7 +245,7 @@ internal class ExportTimeline(
                     .map {
                         val seconds = ((it.durationMs ?: 0L) / 1000L).toInt()
                             .coerceIn(1, VIDEO_MAX_SECONDS)
-                        MediaClip(it, distanceOf(it, path), seconds * FLYOVER_FPS)
+                        MediaClip(it, distanceOf(it, path), seconds * FLYOVER_FPS, lead, tail)
                     }
             } else {
                 emptyList()

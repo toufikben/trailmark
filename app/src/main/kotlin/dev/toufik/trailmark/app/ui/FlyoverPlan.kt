@@ -27,6 +27,8 @@ data class FlyoverOptions(
     val pois: Boolean = false,
     /** Draw the line the athlete has already covered, not just the last stretch. */
     val fullTrail: Boolean = true,
+    /** Drop onto each photo's spot and climb back out, instead of cutting straight to it. */
+    val cinematic: Boolean = true,
 )
 
 /** Length of the route part of the clip when the user leaves it on auto. */

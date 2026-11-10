@@ -63,6 +63,9 @@ internal const val VIDEO_HEIGHT = 1280
 
 private const val FLY_TILT = 55.0
 
+/** How much closer the camera steps onto a photo's spot before the card opens. */
+private const val DIVE_ZOOM = 0.75
+
 /** How many vertices the drawn line may have: more is invisible at 720 px. */
 private const val MAX_LINE_VERTICES = 260
 
@@ -80,6 +83,17 @@ private const val POI_FILTER =
 
 private val FULL_RECT = Rect(0, 0, VIDEO_WIDTH, VIDEO_HEIGHT)
 private val BITMAP_PAINT = Paint(Paint.FILTER_BITMAP_FLAG)
+
+/** One paint reused for the two map images of a media card; only alpha changes. */
+private val basePaint = Paint(Paint.FILTER_BITMAP_FLAG)
+
+/** The pin that marks the photo's place on the map while the card opens. */
+private val pinFill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFC6FF3D.toInt() }
+private val pinRing = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    color = 0xFF0E1113.toInt()
+    style = Paint.Style.STROKE
+    strokeWidth = 5f
+}
 
 private val LINE_PAINT = Paint(Paint.ANTI_ALIAS_FLAG).apply {
     color = 0xFFC6FF3D.toInt()
@@ -118,7 +132,7 @@ internal class HeadlessFlyover(
     ) {
         val path = FlyoverPath(points)
         require(!path.isEmpty && path.totalM >= 1.0) { "nothing to fly over" }
-        val clips = ExportTimeline.clipsFor(media, job.media, path)
+        val clips = ExportTimeline.clipsFor(media, job.media, path, job.cinematic)
         val seconds = if (job.seconds > 0) job.seconds else autoFlyoverSeconds(path.totalM)
         val timeline = ExportTimeline(path, seconds, clips)
         val lang = Lang.entries.firstOrNull { it.code == job.lang } ?: Lang.EN
@@ -134,6 +148,7 @@ internal class HeadlessFlyover(
         var fixed: MapSnapshot? = null
         var previousBase: Bitmap? = null
         var mediaBase: MapSnapshot? = null
+        var mediaTight: MapSnapshot? = null
         var mediaBaseId: Long = -1
         try {
             val follow = job.camera != FlyoverCamera.OVERVIEW
@@ -164,32 +179,83 @@ internal class HeadlessFlyover(
                         val image = withContext(Dispatchers.IO) { card.bitmapFor(frame.clip, frame.t) }
                         // The card floats over a map: the overview when the
                         // camera is held still, or the spot where the shot was
-                        // taken while following the route.
+                        // taken while following the route. A second, tighter
+                        // image of the same spot is what the camera drops onto:
+                        // cross-fading the two reads as a descent and costs one
+                        // extra image per clip, not a flight through every frame.
                         val clipId = frame.clip.media.id
-                        val backdrop: MapSnapshot? = if (!follow) {
-                            fixed
-                        } else {
-                            if (mediaBaseId != clipId) {
-                                val old = mediaBase
+                        if (mediaBaseId != clipId) {
+                            val oldWide = mediaBase
+                            val oldTight = mediaTight
+                            val at = path.at(frame.clip.atDistanceM)
+                            if (follow) {
                                 val hereBearing = path.bearingAt(frame.clip.atDistanceM, lookAhead(path))
-                                mediaBase = shoot(
-                                    active,
-                                    followCamera(path.at(frame.clip.atDistanceM), hereBearing, zoom, tilt),
-                                )
-                                mediaBaseId = clipId
-                                old?.let { runCatching { it.bitmap.recycle() } }
+                                val cam = followCamera(at, hereBearing, zoom, tilt)
+                                mediaBase = shoot(active, cam)
+                                mediaTight = if (job.cinematic) {
+                                    shoot(active, CameraPosition.Builder(cam).zoom(zoom + DIVE_ZOOM).build())
+                                } else {
+                                    null
+                                }
+                            } else {
+                                mediaBase = fixed
+                                mediaTight = if (job.cinematic) {
+                                    shoot(
+                                        active,
+                                        CameraPosition.Builder(overview).zoom(overview.zoom + DIVE_ZOOM).build(),
+                                    )
+                                } else {
+                                    null
+                                }
                             }
-                            mediaBase
+                            mediaBaseId = clipId
+                            oldWide?.takeIf { it !== fixed }?.let { runCatching { it.bitmap.recycle() } }
+                            oldTight?.let { runCatching { it.bitmap.recycle() } }
                         }
-                        val base = backdrop?.bitmap
+                        val wide = mediaBase?.bitmap
+                        val tight = mediaTight?.bitmap
+                        val dive = when (frame.stage) {
+                            MediaStage.LEAD -> easeInOut(frame.stageT)
+                            MediaStage.HOLD -> 1.0
+                            MediaStage.TAIL -> 1.0 - easeInOut(frame.stageT)
+                        }.toFloat().coerceIn(0f, 1f)
+                        val cover = when (frame.stage) {
+                            MediaStage.LEAD -> easeInOut(frame.stageT)
+                            MediaStage.HOLD -> 1.0
+                            MediaStage.TAIL -> 1.0 - easeInOut(frame.stageT)
+                        }.toFloat().coerceIn(0f, 1f)
+                        val wideAnchor = mediaBase?.let { project(it, path.at(frame.clip.atDistanceM)) }
+                        val tightAnchor = mediaTight?.let { project(it, path.at(frame.clip.atDistanceM)) }
+                        val anchor = if (dive >= 0.5f) tightAnchor ?: wideAnchor else wideAnchor ?: tightAnchor
                         withContext(Dispatchers.Default) {
                             encoder.frame { canvas ->
-                                if (base != null && !base.isRecycled) {
-                                    canvas.drawBitmap(base, null, FULL_RECT, BITMAP_PAINT)
-                                } else {
+                                if (wide != null && !wide.isRecycled) {
+                                    basePaint.alpha = ((1f - dive) * 255).toInt().coerceIn(0, 255)
+                                    if (basePaint.alpha > 0) canvas.drawBitmap(wide, null, FULL_RECT, basePaint)
+                                } else if (wide == null) {
                                     canvas.drawColor(0xFF0B0F0E.toInt())
                                 }
-                                card.draw(canvas, image, frame.clip, frame.t)
+                                if (tight != null && !tight.isRecycled && dive > 0.002f) {
+                                    // The tight shot settles as it arrives, so the cross-fade
+                                    // does not read as two stills dissolving.
+                                    val s = 0.88f + 0.12f * dive
+                                    val ax = anchor?.x ?: (VIDEO_WIDTH / 2f)
+                                    val ay = anchor?.y ?: (VIDEO_HEIGHT / 2f)
+                                    basePaint.alpha = (dive * 255).toInt().coerceIn(0, 255)
+                                    canvas.save()
+                                    canvas.scale(s, s, ax, ay)
+                                    canvas.drawBitmap(tight, null, FULL_RECT, basePaint)
+                                    canvas.restore()
+                                }
+                                if (anchor != null && cover < 0.98f) {
+                                    // A pulsing pin keeps the place visible under the card.
+                                    val glow = (1f - cover).coerceIn(0f, 1f)
+                                    pinFill.alpha = (200 * glow).toInt()
+                                    canvas.drawCircle(anchor.x, anchor.y, 22f + 16f * (1f - dive), pinFill)
+                                    pinRing.alpha = (255 * glow).toInt()
+                                    canvas.drawCircle(anchor.x, anchor.y, 22f + 16f * (1f - dive), pinRing)
+                                }
+                                card.draw(canvas, image, frame.clip, frame.t, cover)
                             }
                         }
                     }
@@ -261,6 +327,7 @@ internal class HeadlessFlyover(
             runCatching { previousBase?.recycle() }
             runCatching { fixed?.bitmap?.recycle() }
             if (mediaBase?.bitmap !== fixed?.bitmap) runCatching { mediaBase?.bitmap?.recycle() }
+            runCatching { mediaTight?.bitmap?.recycle() }
             card.close()
             // The snapshotter belongs to the main thread, cancelling it from a
             // worker is not safe.

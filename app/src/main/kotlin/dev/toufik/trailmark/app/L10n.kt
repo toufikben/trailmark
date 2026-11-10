@@ -934,6 +934,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "snapRoadHint" to "يستخدم خريطة التوجيه دون اتصال؛ نزّل منطقة توجيه أولًا.",
         "fullTrail" to "ارسم المسار أثناء المشي",
         "fullTrailHint" to "يبقى المسار المقطوع ظاهرًا خلف المتسابق، ثم يُعرض كاملًا في النهاية.",
+        "cinematic" to "سينمائي",
+        "cinematicHint" to "الكاميرا تنزل إلى مكان الصورة ثم تعود إلى الخريطة بدل القطع المباشر.",
         "splits" to "التقسيمات",
     ),
     Lang.EN to mapOf(
@@ -949,6 +951,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "snapRoadHint" to "Uses the offline routing map; download a routing region first.",
         "fullTrail" to "Draw the whole path",
         "fullTrailHint" to "Keeps the travelled line behind the rider, then shows the full route at the end.",
+        "cinematic" to "Cinematic shots",
+        "cinematicHint" to "The camera drops onto the photo spot, then climbs back to the map instead of cutting straight to it.",
         "splits" to "Splits",
     ),
     Lang.FR to mapOf(
@@ -964,6 +968,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "snapRoadHint" to "Utilise la carte de routage hors ligne ; téléchargez d’abord une région.",
         "fullTrail" to "Tracer tout le parcours",
         "fullTrailHint" to "Garde le tracé parcouru derrière le coureur, puis affiche tout le parcours à la fin.",
+        "cinematic" to "Plans cinematographiques",
+        "cinematicHint" to "La camera descend sur le lieu de la photo puis remonte vers la carte au lieu de couper net.",
         "splits" to "Kilomètres",
     ),
     Lang.ES to mapOf(
@@ -979,6 +985,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "snapRoadHint" to "Usa el mapa de rutas sin conexión; descarga antes una región.",
         "fullTrail" to "Dibujar todo el recorrido",
         "fullTrailHint" to "Mantiene el trazado recorrido detrás y muestra la ruta completa al final.",
+        "cinematic" to "Planos cinematograficos",
+        "cinematicHint" to "La camara baja al lugar de la foto y vuelve al mapa en vez de cortar en seco.",
         "splits" to "Parciales",
     ),
     Lang.PT to mapOf(
@@ -994,6 +1002,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "snapRoadHint" to "Usa o mapa de rotas offline; baixe uma região primeiro.",
         "fullTrail" to "Desenhar todo o percurso",
         "fullTrailHint" to "Mantém o traçado percorrido atrás e mostra o percurso completo no fim.",
+        "cinematic" to "Planos cinematograficos",
+        "cinematicHint" to "A camara desce ao local da foto e regressa ao mapa em vez de cortar a direito.",
         "splits" to "Parciais",
     ),
     Lang.DE to mapOf(
@@ -1009,6 +1019,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "snapRoadHint" to "Nutzt die Offline-Routenkarte; lade zuerst eine Region herunter.",
         "fullTrail" to "Ganzen Weg zeichnen",
         "fullTrailHint" to "Lässt die gelaufene Linie sichtbar und zeigt am Ende die ganze Strecke.",
+        "cinematic" to "Kamerafahrten",
+        "cinematicHint" to "Die Kamera senkt sich auf den Ort des Fotos und steigt wieder zur Karte auf, statt hart zu schneiden.",
         "splits" to "Kilometer",
     ),
     Lang.IT to mapOf(
@@ -1024,6 +1036,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "snapRoadHint" to "Usa la mappa di routing offline; scarica prima una regione.",
         "fullTrail" to "Disegna tutto il percorso",
         "fullTrailHint" to "Mantiene il tracciato percorso dietro e mostra tutto il percorso alla fine.",
+        "cinematic" to "Inquadrature cinematografiche",
+        "cinematicHint" to "La camera scende sul punto della foto e risale alla mappa invece di staccare di netto.",
         "splits" to "Parziali",
     ),
     Lang.NL to mapOf(
@@ -1039,6 +1053,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "snapRoadHint" to "Gebruikt de offline routemap; download eerst een regio.",
         "fullTrail" to "Het hele pad tekenen",
         "fullTrailHint" to "Houdt de afgelegde lijn zichtbaar en toont aan het eind de hele route.",
+        "cinematic" to "Cinematische shots",
+        "cinematicHint" to "De camera daalt naar de plek van de foto en klimt terug naar de kaart in plaats van hard te knippen.",
         "splits" to "Kilometers",
     ),
     Lang.PL to mapOf(
@@ -1054,6 +1070,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "snapRoadHint" to "Korzysta z offline’owej mapy tras; najpierw pobierz region.",
         "fullTrail" to "Rysuj całą trasę",
         "fullTrailHint" to "Zostawia przebyty ślad za zawodnikiem i pokazuje całą trasę na końcu.",
+        "cinematic" to "Ujecia filmowe",
+        "cinematicHint" to "Kamera zniza sie nad miejsce zdjecia i wraca do mapy zamiast twardego ciecia.",
         "splits" to "Kilometry",
     ),
     Lang.RU to mapOf(
@@ -1069,6 +1087,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "snapRoadHint" to "Использует офлайн-карту маршрутов; сначала скачайте регион.",
         "fullTrail" to "Рисовать весь маршрут",
         "fullTrailHint" to "Оставляет пройденную линию позади, а в конце показывает весь маршрут.",
+        "cinematic" to "Кинематографичные кадры",
+        "cinematicHint" to "Камера опускается к месту снимка и возвращается к карте вместо резкой склейки.",
         "splits" to "Километры",
     ),
     Lang.TR to mapOf(
@@ -1084,6 +1104,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "snapRoadHint" to "Çevrimdışı rota haritasını kullanır; önce bir bölge indirin.",
         "fullTrail" to "Tüm rotayı çiz",
         "fullTrailHint" to "Kat edilen çizgiyi arkada tutar, sonunda tüm rotayı gösterir.",
+        "cinematic" to "Sinematik cekimler",
+        "cinematicHint" to "Kamera kesme yerine fotografin oldugu yere iner ve haritaya geri cikar.",
         "splits" to "Kilometreler",
     ),
     Lang.ID to mapOf(
@@ -1099,6 +1121,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "snapRoadHint" to "Memakai peta rute offline; unduh wilayah dulu.",
         "fullTrail" to "Gambar seluruh jalur",
         "fullTrailHint" to "Menjaga jejak yang dilalui di belakang, lalu menampilkan seluruh rute di akhir.",
+        "cinematic" to "Bidikan sinematik",
+        "cinematicHint" to "Kamera turun ke lokasi foto lalu naik lagi ke peta, bukan potongan langsung.",
         "splits" to "Per kilometer",
     ),
     Lang.HI to mapOf(
@@ -1114,6 +1138,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "snapRoadHint" to "ऑफ़लाइन रूटिंग मैप का उपयोग करता है; पहले क्षेत्र डाउनलोड करें।",
         "fullTrail" to "पूरा रास्ता बनाएं",
         "fullTrailHint" to "तय की गई रेखा पीछे रहती है, अंत में पूरा रास्ता दिखता है।",
+        "cinematic" to "सिनेमाई शॉट",
+        "cinematicHint" to "कैमरा सीधे कट लगाने के बजाय फ़ोटो की जगह पर उतरता है और फिर नक्शे पर लौटता है।",
         "splits" to "किलोमीटर",
     ),
     Lang.JA to mapOf(
@@ -1129,6 +1155,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "snapRoadHint" to "オフラインルーティングマップを使用します。先に地域をダウンロードしてください。",
         "fullTrail" to "全ルートを描画",
         "fullTrailHint" to "走った線を後ろに残し、最後に全ルートを表示します。",
+        "cinematic" to "シネマティック演出",
+        "cinematicHint" to "カットせずに、カメラが写真の地点まで降りてから地図へ戻ります。",
         "splits" to "ラップ",
     ),
     Lang.KO to mapOf(
@@ -1144,6 +1172,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "snapRoadHint" to "오프라인 라우팅 지도를 사용합니다. 먼저 지역을 다운로드하세요.",
         "fullTrail" to "전체 경로 그리기",
         "fullTrailHint" to "지나온 선을 뒤에 남기고 마지막에 전체 경로를 보여줍니다.",
+        "cinematic" to "시네마틱 연출",
+        "cinematicHint" to "바로 자르지 않고 카메라가 사진 지점으로 내려갔다가 지도로 돌아옵니다.",
         "splits" to "구간",
     ),
     Lang.ZH to mapOf(
@@ -1159,6 +1189,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "snapRoadHint" to "使用离线路线地图；请先下载区域。",
         "fullTrail" to "绘制完整路径",
         "fullTrailHint" to "将已走过的线留在身后，结束时显示完整路线。",
+        "cinematic" to "电影感运镜",
+        "cinematicHint" to "镜头先俯冲到照片所在的位置，再拉回地图，而不是直接硬切。",
         "splits" to "分段",
     ),
 )

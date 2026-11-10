@@ -70,15 +70,29 @@ internal class MediaCard(private val texts: Texts) {
     fun bitmapFor(clip: MediaClip, progress: Double): Bitmap? =
         if (clip.isVideo) videoFrameFor(clip, progress) else photoFor(clip)
 
-    fun draw(canvas: Canvas, bitmap: Bitmap?, clip: MediaClip, progress: Double) {
-        // A short fade in and out, so the cut does not flash.
-        val edge = minOf(progress.coerceIn(0.0, 1.0), 1.0 - progress.coerceIn(0.0, 1.0))
-        val alpha = (edge / 0.05).coerceIn(0.0, 1.0).toFloat()
-        if (alpha <= 0.02f) return
+    fun draw(
+        canvas: Canvas,
+        bitmap: Bitmap?,
+        clip: MediaClip,
+        progress: Double,
+        cover: Float,
+    ) {
+        // The caller drives the entrance and the exit; this only guards the ends.
+        val alpha = cover.coerceIn(0f, 1f)
+        if (alpha <= 0.01f) return
 
         // Dim the map a little behind the card so the card reads as a card.
         vignette.alpha = (120 * alpha).toInt()
         canvas.drawRect(full, vignette)
+
+        // The card rises into place and settles back out.
+        val cx = cardRect.centerX()
+        val cy = cardRect.centerY()
+        val scale = 0.9f + 0.1f * alpha
+        canvas.save()
+        canvas.translate(cx, cy + (1f - alpha) * 70f)
+        canvas.scale(scale, scale)
+        canvas.translate(-cx, -cy)
 
         canvas.save()
         canvas.clipPath(cardPath)
@@ -86,7 +100,19 @@ internal class MediaCard(private val texts: Texts) {
         canvas.drawRect(cardRect, cardBg)
         if (bitmap != null && !bitmap.isRecycled) {
             image.alpha = (255 * alpha).toInt()
-            canvas.drawBitmap(bitmap, null, fitIn(bitmap.width, bitmap.height, imageArea), image)
+            // A slow drift on the photo, so a still picture still moves.
+            val kb = 1.0 + 0.06 * progress.coerceIn(0.0, 1.0)
+            val fitted = fitIn(bitmap.width, bitmap.height, imageArea)
+            val grew = RectF(
+                fitted.centerX() - fitted.width() * kb / 2f,
+                fitted.centerY() - fitted.height() * kb / 2f,
+                fitted.centerX() + fitted.width() * kb / 2f,
+                fitted.centerY() + fitted.height() * kb / 2f,
+            )
+            canvas.save()
+            canvas.clipRect(imageArea)
+            canvas.drawBitmap(bitmap, null, grew, image)
+            canvas.restore()
         }
         captionBg.alpha = (170 * alpha).toInt()
         canvas.drawRect(captionArea, captionBg)
@@ -113,6 +139,7 @@ internal class MediaCard(private val texts: Texts) {
 
         border.alpha = (96 * alpha).toInt()
         canvas.drawRoundRect(cardRect, CARD_RADIUS, CARD_RADIUS, border)
+        canvas.restore()
     }
 
     fun close() {
