@@ -8,6 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -17,12 +18,25 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Place
@@ -32,6 +46,7 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -44,10 +59,14 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.sp
@@ -225,6 +244,14 @@ class MainActivity : ComponentActivity() {
                         }
                         var showSplash by remember { mutableStateOf(!splashDone) }
                         val recState by RecordingHolder.state.collectAsState()
+                        var cameraOpen by remember { mutableStateOf(false) }
+                        // While a run is being recorded the bar slims down to icons so the
+                        // sheet below has room; it stays visible, there is nothing to reveal.
+                        val compactNav = screen is Screen.Record &&
+                            recState.phase == Phase.RECORDING && !cameraOpen
+                        LaunchedEffect(screen) {
+                            if (screen !is Screen.Record) cameraOpen = false
+                        }
                         val pending = pendingScreen.value
                         LaunchedEffect(pending) {
                             if (pending != null) {
@@ -271,6 +298,7 @@ class MainActivity : ComponentActivity() {
                                             paywallFrom = Screen.Record
                                             screen = Screen.Paywall
                                         },
+                                        onCameraVisible = { cameraOpen = it },
                                     )
                                     Screen.Plan -> PlanScreen(
                                         onRegions = { screen = Screen.Regions },
@@ -323,11 +351,24 @@ class MainActivity : ComponentActivity() {
                                 }
                                 }
                             }
-                            TabBar(
-                                current = screen,
-                                recording = recState.phase == Phase.RECORDING,
-                                onSelect = { screen = it },
-                            )
+                            AnimatedVisibility(
+                                visible = !cameraOpen,
+                                enter = slideInVertically(tween(Motion.MED, easing = Motion.EaseOut)) { it },
+                                exit = slideOutVertically(tween(Motion.MED, easing = Motion.EaseOut)) { it },
+                            ) {
+                                when {
+                                    compactNav -> CompactTabBar(
+                                        current = screen,
+                                        recording = true,
+                                        onSelect = { screen = it },
+                                    )
+                                    else -> TabBar(
+                                        current = screen,
+                                        recording = recState.phase == Phase.RECORDING,
+                                        onSelect = { screen = it },
+                                    )
+                                }
+                            }
                         }
                         if (showSplash) {
                             SplashScreen(
@@ -408,6 +449,74 @@ private fun TabLabel(text: String) {
         softWrap = false,
         overflow = TextOverflow.Ellipsis,
     )
+}
+
+/** Icon-only tab bar shown while a run is being recorded: same destinations, less height. */
+@Composable
+private fun CompactTabBar(current: Screen, recording: Boolean, onSelect: (Screen) -> Unit) {
+    val t = LocalTexts.current
+    val colors = NavigationBarItemDefaults.colors(
+        selectedIconColor = Palette.accent,
+        unselectedIconColor = Palette.textSecondary,
+        indicatorColor = Palette.accent.copy(alpha = 0.16f),
+    )
+    // The inset lives on the wrapper: a padded bar keeps its icons above the system bar,
+    // while a zero-inset NavigationBar would be drawn behind it where touches never land.
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding(),
+    ) {
+        NavigationBar(
+            containerColor = Palette.surface,
+            tonalElevation = 0.dp,
+            windowInsets = WindowInsets(0, 0, 0, 0),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp),
+        ) {
+            NavigationBarItem(
+                selected = current is Screen.Record,
+                onClick = { onSelect(Screen.Record) },
+                icon = { RecordTabIcon(active = recording) },
+                label = null,
+                alwaysShowLabel = false,
+                colors = colors,
+            )
+            NavigationBarItem(
+                selected = current is Screen.Plan || current is Screen.Regions,
+                onClick = { onSelect(Screen.Plan) },
+                icon = { Icon(Icons.Filled.Place, contentDescription = t.tabExplore, modifier = Modifier.size(22.dp)) },
+                label = null,
+                alwaysShowLabel = false,
+                colors = colors,
+            )
+            NavigationBarItem(
+                selected = current is Screen.History || current is Screen.Detail,
+                onClick = { onSelect(Screen.History) },
+                icon = { Icon(Icons.Filled.List, contentDescription = t.tabHistory, modifier = Modifier.size(22.dp)) },
+                label = null,
+                alwaysShowLabel = false,
+                colors = colors,
+            )
+            NavigationBarItem(
+                selected = current is Screen.Progress,
+                onClick = { onSelect(Screen.Progress) },
+                icon = { ProgressTabIcon() },
+                label = null,
+                alwaysShowLabel = false,
+                colors = colors,
+            )
+            NavigationBarItem(
+                selected = current is Screen.Settings || current is Screen.Paywall,
+                onClick = { onSelect(Screen.Settings) },
+                icon = { Icon(Icons.Filled.Settings, contentDescription = t.tabSettings, modifier = Modifier.size(22.dp)) },
+                label = null,
+                alwaysShowLabel = false,
+                colors = colors,
+            )
+        }
+    }
 }
 
 @Composable
