@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.os.Bundle
 import android.os.SystemClock
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -27,6 +28,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -384,19 +386,13 @@ class MainActivity : ComponentActivity() {
                                 exit = slideOutVertically(tween(Motion.MED, easing = Motion.EaseOut)) { it },
                             ) {
                                 when {
-                                    navHidden && compactNav -> NavHandleBar(
-                                        description = extraText(lang, "showNav"),
-                                        onShow = {
-                                            navShownAt = SystemClock.uptimeMillis()
-                                            navHidden = false
-                                        },
-                                    )
                                     compactNav -> CompactTabBar(
                                         current = screen,
                                         recording = true,
                                         // The bar appears under the finger that dismissed the handle;
                                         // ignore that same gesture so it cannot pick a tab.
                                         onSelect = {
+                                            Log.d(NAV_TAG, "select requested; shownAgo=${SystemClock.uptimeMillis() - navShownAt}")
                                             if (SystemClock.uptimeMillis() - navShownAt > 400) screen = it
                                         },
                                     )
@@ -406,6 +402,22 @@ class MainActivity : ComponentActivity() {
                                         onSelect = { screen = it },
                                     )
                                 }
+                            }
+                        }
+                        if (compactNav && navHidden) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .navigationBarsPadding(),
+                            ) {
+                                NavHandleBar(
+                                    description = extraText(lang, "showNav"),
+                                    onShow = {
+                                        Log.d(NAV_TAG, "nav handle tapped")
+                                        navShownAt = SystemClock.uptimeMillis()
+                                        navHidden = false
+                                    },
+                                )
                             }
                         }
                         if (showSplash) {
@@ -426,6 +438,7 @@ class MainActivity : ComponentActivity() {
     companion object {
         /** Intent extra: a screen to open by key (a notification tapping into a clip). */
         const val EXTRA_SCREEN = "screen"
+        private const val NAV_TAG = "TrailmarkNav"
     }
 }
 
@@ -492,29 +505,31 @@ private fun TabLabel(text: String) {
 /** A slim grab strip that brings the tab bar back when it has stepped out of the way. */
 @Composable
 private fun NavHandleBar(description: String, onShow: () -> Unit) {
+    // A real button with a full-width hit target: a slim custom strip was too easy to miss.
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .navigationBarsPadding()
-            .height(30.dp)
+            .height(34.dp)
             .clickable(role = Role.Button, onClick = onShow)
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {
-        Box(
+        Surface(
+            color = Palette.surface.copy(alpha = 0.94f),
+            shape = RoundedCornerShape(12.dp),
+            shadowElevation = 6.dp,
             modifier = Modifier
-                .width(64.dp)
-                .height(22.dp)
-                .clip(RoundedCornerShape(11.dp))
-                .background(Palette.surface.copy(alpha = 0.92f)),
-            contentAlignment = Alignment.Center,
+                .width(72.dp)
+                .height(24.dp),
         ) {
-            Icon(
-                Icons.Filled.KeyboardArrowUp,
-                contentDescription = null,
-                tint = Palette.textSecondary,
-                modifier = Modifier.size(18.dp),
-            )
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                Icon(
+                    Icons.Filled.KeyboardArrowUp,
+                    contentDescription = null,
+                    tint = Palette.textSecondary,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         }
     }
 }
@@ -523,74 +538,59 @@ private fun NavHandleBar(description: String, onShow: () -> Unit) {
 @Composable
 private fun CompactTabBar(current: Screen, recording: Boolean, onSelect: (Screen) -> Unit) {
     val t = LocalTexts.current
-    Surface(color = Palette.surface, shadowElevation = 10.dp) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .height(46.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            CompactTabItem(
-                selected = current is Screen.Record,
-                label = t.tabRecord,
-                onClick = { onSelect(Screen.Record) },
-            ) { RecordTabIcon(active = recording) }
-            CompactTabItem(
-                selected = current is Screen.Plan || current is Screen.Regions,
-                label = t.tabExplore,
-                onClick = { onSelect(Screen.Plan) },
-            ) { Icon(Icons.Filled.Place, contentDescription = null, modifier = Modifier.size(22.dp)) }
-            CompactTabItem(
-                selected = current is Screen.History || current is Screen.Detail,
-                label = t.tabHistory,
-                onClick = { onSelect(Screen.History) },
-            ) { Icon(Icons.Filled.List, contentDescription = null, modifier = Modifier.size(22.dp)) }
-            CompactTabItem(
-                selected = current is Screen.Progress,
-                label = t.tabProgress,
-                onClick = { onSelect(Screen.Progress) },
-            ) { ProgressTabIcon() }
-            CompactTabItem(
-                selected = current is Screen.Settings || current is Screen.Paywall,
-                label = t.tabSettings,
-                onClick = { onSelect(Screen.Settings) },
-            ) { Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(22.dp)) }
-        }
-    }
-}
-
-@Composable
-private fun RowScope.CompactTabItem(
-    selected: Boolean,
-    label: String,
-    onClick: () -> Unit,
-    icon: @Composable () -> Unit,
-) {
-    val color = if (selected) Palette.accent else Palette.textSecondary
-    Box(
+    val colors = NavigationBarItemDefaults.colors(
+        selectedIconColor = Palette.accent,
+        unselectedIconColor = Palette.textSecondary,
+        indicatorColor = Palette.accent.copy(alpha = 0.16f),
+    )
+    NavigationBar(
+        containerColor = Palette.surface,
+        tonalElevation = 0.dp,
+        windowInsets = WindowInsets(0, 0, 0, 0),
         modifier = Modifier
-            .weight(1f)
-            .fillMaxHeight()
-            .clickable(role = Role.Tab, onClick = onClick)
-            .semantics {
-                this.selected = selected
-                contentDescription = label
-            },
-        contentAlignment = Alignment.Center,
+            .fillMaxWidth()
+            .height(48.dp),
     ) {
-        CompositionLocalProvider(LocalContentColor provides color) { icon() }
-        if (selected) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 3.dp)
-                    .width(18.dp)
-                    .height(2.dp)
-                    .clip(CircleShape)
-                    .background(color),
-            )
-        }
+        NavigationBarItem(
+            selected = current is Screen.Record,
+            onClick = { onSelect(Screen.Record) },
+            icon = { RecordTabIcon(active = recording) },
+            label = null,
+            alwaysShowLabel = false,
+            colors = colors,
+        )
+        NavigationBarItem(
+            selected = current is Screen.Plan || current is Screen.Regions,
+            onClick = { onSelect(Screen.Plan) },
+            icon = { Icon(Icons.Filled.Place, contentDescription = t.tabExplore, modifier = Modifier.size(22.dp)) },
+            label = null,
+            alwaysShowLabel = false,
+            colors = colors,
+        )
+        NavigationBarItem(
+            selected = current is Screen.History || current is Screen.Detail,
+            onClick = { onSelect(Screen.History) },
+            icon = { Icon(Icons.Filled.List, contentDescription = t.tabHistory, modifier = Modifier.size(22.dp)) },
+            label = null,
+            alwaysShowLabel = false,
+            colors = colors,
+        )
+        NavigationBarItem(
+            selected = current is Screen.Progress,
+            onClick = { onSelect(Screen.Progress) },
+            icon = { ProgressTabIcon() },
+            label = null,
+            alwaysShowLabel = false,
+            colors = colors,
+        )
+        NavigationBarItem(
+            selected = current is Screen.Settings || current is Screen.Paywall,
+            onClick = { onSelect(Screen.Settings) },
+            icon = { Icon(Icons.Filled.Settings, contentDescription = t.tabSettings, modifier = Modifier.size(22.dp)) },
+            label = null,
+            alwaysShowLabel = false,
+            colors = colors,
+        )
     }
 }
 
