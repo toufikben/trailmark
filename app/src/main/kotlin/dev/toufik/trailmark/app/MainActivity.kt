@@ -381,7 +381,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             AnimatedVisibility(
-                                visible = !cameraOpen,
+                                visible = !cameraOpen && !(compactNav && navHidden),
                                 enter = slideInVertically(tween(Motion.MED, easing = Motion.EaseOut)) { it },
                                 exit = slideOutVertically(tween(Motion.MED, easing = Motion.EaseOut)) { it },
                             ) {
