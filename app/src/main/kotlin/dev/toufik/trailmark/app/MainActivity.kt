@@ -4,8 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.os.Bundle
-import android.os.SystemClock
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -24,9 +22,6 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Column
@@ -43,7 +38,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Settings
@@ -71,12 +65,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.sp
@@ -255,20 +245,10 @@ class MainActivity : ComponentActivity() {
                         var showSplash by remember { mutableStateOf(!splashDone) }
                         val recState by RecordingHolder.state.collectAsState()
                         var cameraOpen by remember { mutableStateOf(false) }
-                        var navHidden by remember { mutableStateOf(false) }
-                        var lastTouch by remember { mutableStateOf(0L) }
-                        var navShownAt by remember { mutableStateOf(0L) }
-                        // While a run is being recorded the bar slims down, then steps out of the way.
+                        // While a run is being recorded the bar slims down to icons so the
+                        // sheet below has room; it stays visible, there is nothing to reveal.
                         val compactNav = screen is Screen.Record &&
                             recState.phase == Phase.RECORDING && !cameraOpen
-                        LaunchedEffect(compactNav, lastTouch) {
-                            if (compactNav) {
-                                delay(5000)
-                                navHidden = true
-                            } else {
-                                navHidden = false
-                            }
-                        }
                         LaunchedEffect(screen) {
                             if (screen !is Screen.Record) cameraOpen = false
                         }
@@ -295,16 +275,7 @@ class MainActivity : ComponentActivity() {
                                 else -> Screen.Record
                             }
                         }
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .pointerInput(Unit) {
-                                    awaitEachGesture {
-                                        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                                        lastTouch = SystemClock.uptimeMillis()
-                                    }
-                                },
-                        ) {
+                        Box(modifier = Modifier.fillMaxSize()) {
                         Column(modifier = Modifier.fillMaxSize()) {
                             Box(modifier = Modifier.weight(1f)) {
                                 AnimatedContent(
@@ -381,7 +352,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             AnimatedVisibility(
-                                visible = !cameraOpen && !(compactNav && navHidden),
+                                visible = !cameraOpen,
                                 enter = slideInVertically(tween(Motion.MED, easing = Motion.EaseOut)) { it },
                                 exit = slideOutVertically(tween(Motion.MED, easing = Motion.EaseOut)) { it },
                             ) {
@@ -389,12 +360,7 @@ class MainActivity : ComponentActivity() {
                                     compactNav -> CompactTabBar(
                                         current = screen,
                                         recording = true,
-                                        // The bar appears under the finger that dismissed the handle;
-                                        // ignore that same gesture so it cannot pick a tab.
-                                        onSelect = {
-                                            Log.d(NAV_TAG, "select requested; shownAgo=${SystemClock.uptimeMillis() - navShownAt}")
-                                            if (SystemClock.uptimeMillis() - navShownAt > 400) screen = it
-                                        },
+                                        onSelect = { screen = it },
                                     )
                                     else -> TabBar(
                                         current = screen,
@@ -402,22 +368,6 @@ class MainActivity : ComponentActivity() {
                                         onSelect = { screen = it },
                                     )
                                 }
-                            }
-                        }
-                        if (compactNav && navHidden) {
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .navigationBarsPadding(),
-                            ) {
-                                NavHandleBar(
-                                    description = extraText(lang, "showNav"),
-                                    onShow = {
-                                        Log.d(NAV_TAG, "nav handle tapped")
-                                        navShownAt = SystemClock.uptimeMillis()
-                                        navHidden = false
-                                    },
-                                )
                             }
                         }
                         if (showSplash) {
@@ -438,7 +388,6 @@ class MainActivity : ComponentActivity() {
     companion object {
         /** Intent extra: a screen to open by key (a notification tapping into a clip). */
         const val EXTRA_SCREEN = "screen"
-        private const val NAV_TAG = "TrailmarkNav"
     }
 }
 
@@ -500,38 +449,6 @@ private fun TabLabel(text: String) {
         softWrap = false,
         overflow = TextOverflow.Ellipsis,
     )
-}
-
-/** A slim grab strip that brings the tab bar back when it has stepped out of the way. */
-@Composable
-private fun NavHandleBar(description: String, onShow: () -> Unit) {
-    // A real button with a full-width hit target: a slim custom strip was too easy to miss.
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(34.dp)
-            .clickable(role = Role.Button, onClick = onShow)
-            .semantics { contentDescription = description },
-        contentAlignment = Alignment.Center,
-    ) {
-        Surface(
-            color = Palette.surface.copy(alpha = 0.94f),
-            shape = RoundedCornerShape(12.dp),
-            shadowElevation = 6.dp,
-            modifier = Modifier
-                .width(72.dp)
-                .height(24.dp),
-        ) {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                Icon(
-                    Icons.Filled.KeyboardArrowUp,
-                    contentDescription = null,
-                    tint = Palette.textSecondary,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-        }
-    }
 }
 
 /** Icon-only tab bar shown while a run is being recorded: same destinations, less height. */

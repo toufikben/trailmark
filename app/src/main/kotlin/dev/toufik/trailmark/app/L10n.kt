@@ -935,7 +935,6 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrail" to "ارسم المسار أثناء المشي",
         "fullTrailHint" to "يبقى المسار المقطوع ظاهرًا خلف المتسابق، ثم يُعرض كاملًا في النهاية.",
         "splits" to "التقسيمات",
-        "showNav" to "إظهار شريط التنقل",
     ),
     Lang.EN to mapOf(
         "search" to "Search", "noResults" to "No results", "media" to "Media",
@@ -951,7 +950,6 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrail" to "Draw the whole path",
         "fullTrailHint" to "Keeps the travelled line behind the rider, then shows the full route at the end.",
         "splits" to "Splits",
-        "showNav" to "Show navigation bar",
     ),
     Lang.FR to mapOf(
         "search" to "Rechercher", "noResults" to "Aucun résultat", "media" to "Médias",
@@ -967,7 +965,6 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrail" to "Tracer tout le parcours",
         "fullTrailHint" to "Garde le tracé parcouru derrière le coureur, puis affiche tout le parcours à la fin.",
         "splits" to "Kilomètres",
-        "showNav" to "Afficher la barre de navigation",
     ),
     Lang.ES to mapOf(
         "search" to "Buscar", "noResults" to "Sin resultados", "media" to "Medios",
@@ -983,7 +980,6 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrail" to "Dibujar todo el recorrido",
         "fullTrailHint" to "Mantiene el trazado recorrido detrás y muestra la ruta completa al final.",
         "splits" to "Parciales",
-        "showNav" to "Mostrar barra de navegación",
     ),
     Lang.PT to mapOf(
         "search" to "Pesquisar", "noResults" to "Sem resultados", "media" to "Mídia",
@@ -999,7 +995,6 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrail" to "Desenhar todo o percurso",
         "fullTrailHint" to "Mantém o traçado percorrido atrás e mostra o percurso completo no fim.",
         "splits" to "Parciais",
-        "showNav" to "Mostrar barra de navegação",
     ),
     Lang.DE to mapOf(
         "search" to "Suchen", "noResults" to "Keine Ergebnisse", "media" to "Medien",
@@ -1015,7 +1010,6 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrail" to "Ganzen Weg zeichnen",
         "fullTrailHint" to "Lässt die gelaufene Linie sichtbar und zeigt am Ende die ganze Strecke.",
         "splits" to "Kilometer",
-        "showNav" to "Navigationsleiste anzeigen",
     ),
     Lang.IT to mapOf(
         "search" to "Cerca", "noResults" to "Nessun risultato", "media" to "Media",
@@ -1031,7 +1025,6 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrail" to "Disegna tutto il percorso",
         "fullTrailHint" to "Mantiene il tracciato percorso dietro e mostra tutto il percorso alla fine.",
         "splits" to "Parziali",
-        "showNav" to "Mostra barra di navigazione",
     ),
     Lang.NL to mapOf(
         "search" to "Zoeken", "noResults" to "Geen resultaten", "media" to "Media",
@@ -1047,7 +1040,6 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrail" to "Het hele pad tekenen",
         "fullTrailHint" to "Houdt de afgelegde lijn zichtbaar en toont aan het eind de hele route.",
         "splits" to "Kilometers",
-        "showNav" to "Navigatiebalk tonen",
     ),
     Lang.PL to mapOf(
         "search" to "Szukaj", "noResults" to "Brak wyników", "media" to "Multimedia",
@@ -1063,7 +1055,6 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrail" to "Rysuj całą trasę",
         "fullTrailHint" to "Zostawia przebyty ślad za zawodnikiem i pokazuje całą trasę na końcu.",
         "splits" to "Kilometry",
-        "showNav" to "Pokaż pasek nawigacji",
     ),
     Lang.RU to mapOf(
         "search" to "Поиск", "noResults" to "Нет результатов", "media" to "Медиа",
@@ -1079,7 +1070,6 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrail" to "Рисовать весь маршрут",
         "fullTrailHint" to "Оставляет пройденную линию позади, а в конце показывает весь маршрут.",
         "splits" to "Километры",
-        "showNav" to "Показать панель навигации",
     ),
     Lang.TR to mapOf(
         "search" to "Ara", "noResults" to "Sonuç yok", "media" to "Medya",
@@ -1095,7 +1085,6 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrail" to "Tüm rotayı çiz",
         "fullTrailHint" to "Kat edilen çizgiyi arkada tutar, sonunda tüm rotayı gösterir.",
         "splits" to "Kilometreler",
-        "showNav" to "Gezinme çubuğunu göster",
     ),
     Lang.ID to mapOf(
         "search" to "Cari", "noResults" to "Tidak ada hasil", "media" to "Media",
@@ -1111,7 +1100,6 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrail" to "Gambar seluruh jalur",
         "fullTrailHint" to "Menjaga jejak yang dilalui di belakang, lalu menampilkan seluruh rute di akhir.",
         "splits" to "Per kilometer",
-        "showNav" to "Tampilkan bilah navigasi",
     ),
     Lang.HI to mapOf(
         "search" to "खोजें", "noResults" to "कोई परिणाम नहीं", "media" to "मीडिया",
@@ -1127,7 +1115,6 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrail" to "पूरा रास्ता बनाएं",
         "fullTrailHint" to "तय की गई रेखा पीछे रहती है, अंत में पूरा रास्ता दिखता है।",
         "splits" to "किलोमीटर",
-        "showNav" to "नेविगेशन बार दिखाएँ",
     ),
     Lang.JA to mapOf(
         "search" to "検索", "noResults" to "結果なし", "media" to "メディア",
@@ -1143,7 +1130,6 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrail" to "全ルートを描画",
         "fullTrailHint" to "走った線を後ろに残し、最後に全ルートを表示します。",
         "splits" to "ラップ",
-        "showNav" to "ナビゲーションバーを表示",
     ),
     Lang.KO to mapOf(
         "search" to "검색", "noResults" to "결과 없음", "media" to "미디어",
@@ -1159,7 +1145,6 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrail" to "전체 경로 그리기",
         "fullTrailHint" to "지나온 선을 뒤에 남기고 마지막에 전체 경로를 보여줍니다.",
         "splits" to "구간",
-        "showNav" to "탐색 표시줄 표시",
     ),
     Lang.ZH to mapOf(
         "search" to "搜索", "noResults" to "无结果", "media" to "媒体",
@@ -1175,7 +1160,6 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrail" to "绘制完整路径",
         "fullTrailHint" to "将已走过的线留在身后，结束时显示完整路线。",
         "splits" to "分段",
-        "showNav" to "显示导航栏",
     ),
 )
 
