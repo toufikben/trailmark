@@ -185,8 +185,10 @@ internal class ExportTimeline(
                     else -> MediaStage.HOLD
                 }
                 val stageT = when (stage) {
-                    MediaStage.LEAD -> local.toDouble() / lead.coerceAtLeast(1)
-                    MediaStage.TAIL -> (local - (n - tail)).toDouble() / tail.coerceAtLeast(1)
+                    // The last frame of a stage sits exactly on 1, so the descent
+                    // hands over to the hold without a one-frame jump.
+                    MediaStage.LEAD -> local.toDouble() / (lead - 1).coerceAtLeast(1)
+                    MediaStage.TAIL -> (local - (n - tail)).toDouble() / (tail - 1).coerceAtLeast(1)
                     MediaStage.HOLD -> 0.0
                 }
                 ExportFrame.Media(clip, t, stage, stageT.coerceIn(0.0, 1.0))
