@@ -255,6 +255,7 @@ class MainActivity : ComponentActivity() {
                         var cameraOpen by remember { mutableStateOf(false) }
                         var navHidden by remember { mutableStateOf(false) }
                         var lastTouch by remember { mutableStateOf(0L) }
+                        var navShownAt by remember { mutableStateOf(0L) }
                         // While a run is being recorded the bar slims down, then steps out of the way.
                         val compactNav = screen is Screen.Record &&
                             recState.phase == Phase.RECORDING && !cameraOpen
@@ -385,12 +386,19 @@ class MainActivity : ComponentActivity() {
                                 when {
                                     navHidden && compactNav -> NavHandleBar(
                                         description = extraText(lang, "showNav"),
-                                        onShow = { navHidden = false },
+                                        onShow = {
+                                            navShownAt = SystemClock.uptimeMillis()
+                                            navHidden = false
+                                        },
                                     )
                                     compactNav -> CompactTabBar(
                                         current = screen,
                                         recording = true,
-                                        onSelect = { screen = it },
+                                        // The bar appears under the finger that dismissed the handle;
+                                        // ignore that same gesture so it cannot pick a tab.
+                                        onSelect = {
+                                            if (SystemClock.uptimeMillis() - navShownAt > 400) screen = it
+                                        },
                                     )
                                     else -> TabBar(
                                         current = screen,
