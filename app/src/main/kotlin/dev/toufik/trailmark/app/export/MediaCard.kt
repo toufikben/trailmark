@@ -101,7 +101,7 @@ internal class MediaCard(private val texts: Texts) {
         if (bitmap != null && !bitmap.isRecycled) {
             image.alpha = (255 * alpha).toInt()
             // A slow drift on the photo, so a still picture still moves.
-            val kb = 1.0 + 0.06 * progress.coerceIn(0.0, 1.0)
+            val kb = 1f + 0.06f * progress.coerceIn(0.0, 1.0).toFloat()
             val fitted = fitIn(bitmap.width, bitmap.height, imageArea)
             val grew = RectF(
                 fitted.centerX() - fitted.width() * kb / 2f,
