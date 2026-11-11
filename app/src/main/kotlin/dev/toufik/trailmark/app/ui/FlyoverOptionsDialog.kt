@@ -41,6 +41,7 @@ internal fun FlyoverOptionsDialog(
     var gallery by remember { mutableStateOf(initial.galleryCopy) }
     var pois by remember { mutableStateOf(initial.pois) }
     var fullTrail by remember { mutableStateOf(initial.fullTrail) }
+    var cinematic by remember { mutableStateOf(initial.cinematic) }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Palette.surface,
@@ -129,6 +130,25 @@ internal fun FlyoverOptionsDialog(
                     color = Palette.textSecondary,
                     fontSize = 11.sp,
                 )
+                if (media != ExportMedia.OFF) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            dev.toufik.trailmark.app.extraText(lang, "cinematic"),
+                            color = Palette.textSecondary,
+                            fontSize = 12.sp,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Switch(checked = cinematic, onCheckedChange = { cinematic = it })
+                    }
+                    Text(
+                        dev.toufik.trailmark.app.extraText(lang, "cinematicHint"),
+                        color = Palette.textSecondary,
+                        fontSize = 11.sp,
+                    )
+                }
                 Text(t.exportInBackground, color = Palette.textSecondary, fontSize = 11.sp)
                 TextButton(onClick = onHistory) {
                     Text(t.exportHistory, color = Palette.accent, fontSize = 12.sp)
@@ -146,6 +166,7 @@ internal fun FlyoverOptionsDialog(
                             galleryCopy = gallery,
                             pois = pois,
                             fullTrail = fullTrail,
+                            cinematic = cinematic,
                         ),
                     )
                 },
