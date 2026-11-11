@@ -129,7 +129,9 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                 } else {
                     val done = t.restoreDone.replace("%d", result.activities.toString())
                     if (result.skippedMedia > 0) {
-                        done + " " + extraText(lang, "restoreSkipped")
+                        // A middle dot keeps the two clauses apart without picking a
+                        // sentence mark that would be wrong in half the languages.
+                        done + " · " + extraText(lang, "restoreSkipped")
                             .replace("%d", result.skippedMedia.toString())
                     } else {
                         done
