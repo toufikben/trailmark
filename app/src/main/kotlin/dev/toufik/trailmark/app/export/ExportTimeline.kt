@@ -23,8 +23,19 @@ internal const val MEDIA_TAIL_SECONDS = 0.8
 /** Two shots taken within this distance of each other would show the same place twice. */
 internal const val MEDIA_MIN_SPACING_M = 40.0
 
-/** Media may never take more than this share of the clip, so the route stays the subject. */
-internal const val MEDIA_MAX_SHARE = 0.35
+/** The shortest a card may hold and still read; used when the budget is tight. */
+internal const val MEDIA_MIN_HOLD_SECONDS = 1.2
+
+/**
+ * How much of the route section media may take. A short clip has no room for
+ * three three-second photos, so it gives media a bigger slice; a long ride keeps
+ * the route as the subject and hands photos a smaller one.
+ */
+internal fun mediaShareFor(routeSeconds: Int): Double = when {
+    routeSeconds <= 20 -> 0.55
+    routeSeconds >= 60 -> 0.35
+    else -> 0.55 - (routeSeconds - 20) * (0.20 / 40.0)
+}
 
 /** How a media card is presented: on its own, or with a descent and a climb-out around it. */
 enum class MediaStage { LEAD, HOLD, TAIL }
@@ -78,7 +89,8 @@ internal class ExportTimeline(
         class MediaSeg(val clip: MediaClip) : Seg(clip.frames)
     }
 
-    private val routeFrames = (routeSeconds.coerceAtLeast(1) * FLYOVER_FPS).coerceAtLeast(2)
+    private val lengthSeconds = routeSeconds.coerceAtLeast(1)
+    private val routeFrames = (lengthSeconds * FLYOVER_FPS).coerceAtLeast(2)
     private val segs: List<Seg>
 
     /** First frame index of each segment, plus the end. */
@@ -197,24 +209,46 @@ internal class ExportTimeline(
     }
 
     /**
-     * The clips that make the cut, in route order: near-duplicates dropped, and
-     * a hard cap on how much of the clip media may take, so a long ride is not
-     * swallowed by photos.
+     * The clips that make the cut, in route order: near-duplicates dropped, then
+     * as many clips as the time budget can carry, with the leftover time spread
+     * evenly over their holds. Dropping a whole photo is the last resort, and
+     * only when even the shortest readable hold does not fit.
      */
     private fun placeClips(clips: List<MediaClip>): List<MediaClip> {
         val sorted = clips.filter { it.frames > 0 }.sortedBy { it.atDistanceM }
-        val budget = (routeFrames * MEDIA_MAX_SHARE).toInt()
-        val kept = ArrayList<MediaClip>(sorted.size)
-        var spent = 0
+        // Spacing and the hard caps are about content, not about time.
+        val candidates = ArrayList<MediaClip>(sorted.size)
         for (c in sorted) {
-            if (kept.size >= MAX_PHOTOS + MAX_VIDEOS) break
-            val last = kept.lastOrNull()
+            if (candidates.size >= MAX_PHOTOS + MAX_VIDEOS) break
+            val last = candidates.lastOrNull()
             if (last != null && c.atDistanceM - last.atDistanceM < MEDIA_MIN_SPACING_M) continue
-            if (kept.isNotEmpty() && spent + c.frames > budget) break
-            kept.add(c)
-            spent += c.frames
+            candidates.add(c)
         }
-        return kept
+        if (candidates.isEmpty()) return candidates
+
+        val budget = (routeFrames * mediaShareFor(lengthSeconds)).toInt().coerceAtLeast(1)
+        val floorHold = (MEDIA_MIN_HOLD_SECONDS * FLYOVER_FPS).toInt()
+        fun shortest(c: MediaClip) = c.leadFrames + minOf(floorHold, c.holdFrames) + c.tailFrames
+
+        // Count the clips that fit at the shortest hold that still reads.
+        var count = 0
+        var spent = 0
+        for (c in candidates) {
+            val shortestFrames = shortest(c)
+            if (count > 0 && spent + shortestFrames > budget) break
+            count++
+            spent += shortestFrames
+        }
+        val kept = candidates.take(count)
+        val overhead = kept.sumOf { it.leadFrames + it.tailFrames }
+        val spare = (budget - overhead).coerceAtLeast(0)
+        val perClip = spare / kept.size
+        return kept.map { c ->
+            // Never longer than the item was cut to, never shorter than a flash.
+            val lower = minOf(floorHold, c.holdFrames)
+            val hold = perClip.coerceIn(lower, c.holdFrames)
+            MediaClip(c.media, c.atDistanceM, hold, c.leadFrames, c.tailFrames)
+        }
     }
 
     /** Builds the clips the export can use, honouring the user's media choice. */

@@ -145,9 +145,61 @@ class ExportTimelineTest {
             .count { timeline.frame(it) is ExportFrame.Media }
         val routeFrames = routeSeconds * FLYOVER_FPS
         assertTrue(
-            mediaFrames <= (routeFrames * MEDIA_MAX_SHARE).toInt(),
+            mediaFrames <= (routeFrames * mediaShareFor(routeSeconds)).toInt() + 1,
             "$mediaFrames media frames out of $routeFrames route frames",
         )
         assertTrue(mediaFrames > 0, "at least one shot survives the budget")
+    }
+
+    @Test
+    fun aShortClipStillShowsEveryPhoto() {
+        // Three photos on a fifteen-second flyover used to leave two of them out.
+        val timeline = ExportTimeline(
+            path(),
+            routeSeconds = 15,
+            clips = listOf(clip(300.0), clip(600.0), clip(900.0)),
+        )
+        val shown = (0 until timeline.frames)
+            .map { timeline.frame(it) }
+            .filterIsInstance<ExportFrame.Media>()
+            .map { it.clip }
+            .distinct()
+        assertEquals(3, shown.size, "every photo of a short ride gets shown")
+        val floor = (MEDIA_MIN_HOLD_SECONDS * FLYOVER_FPS).toInt()
+        assertTrue(
+            shown.all { it.holdFrames >= floor },
+            "holds: ${shown.map { it.holdFrames }}",
+        )
+    }
+
+    @Test
+    fun aLongRideKeepsFullHolds() {
+        val timeline = ExportTimeline(path(), routeSeconds = 90, clips = listOf(clip(1_000.0)))
+        val shown = (0 until timeline.frames)
+            .map { timeline.frame(it) }
+            .filterIsInstance<ExportFrame.Media>()
+            .map { it.clip }
+            .distinct()
+        assertEquals(1, shown.size)
+        assertEquals(
+            PHOTO_SECONDS * FLYOVER_FPS,
+            shown.first().holdFrames,
+            "a long ride has room for the full three seconds",
+        )
+    }
+
+    @Test
+    fun aLongRideShowsMorePhotosThanAShortOne() {
+        val clips = (1..6).map { clip(it * 300.0) }
+        fun shown(routeSeconds: Int): Int {
+            val timeline = ExportTimeline(path(), routeSeconds = routeSeconds, clips = clips)
+            return (0 until timeline.frames)
+                .map { timeline.frame(it) }
+                .filterIsInstance<ExportFrame.Media>()
+                .map { it.clip }
+                .distinct()
+                .size
+        }
+        assertTrue(shown(90) > shown(15), "90 s: ${shown(90)}, 15 s: ${shown(15)}")
     }
 }
