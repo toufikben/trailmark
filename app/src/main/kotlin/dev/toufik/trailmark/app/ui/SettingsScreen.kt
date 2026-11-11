@@ -120,13 +120,20 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
     ) { uri ->
         if (uri != null) {
             scope.launch {
-                val n = withContext(Dispatchers.IO) {
-                    runCatching { BackupStore.restore(context, uri) }.getOrDefault(-1)
+                val result = withContext(Dispatchers.IO) {
+                    runCatching { BackupStore.restore(context, uri) }
+                        .getOrDefault(dev.toufik.trailmark.app.backup.RestoreResult(-1, 0))
                 }
-                backupMessage = if (n >= 0) {
-                    t.restoreDone.replace("%d", n.toString())
-                } else {
+                backupMessage = if (result.failed) {
                     t.restoreFailed
+                } else {
+                    val done = t.restoreDone.replace("%d", result.activities.toString())
+                    if (result.skippedMedia > 0) {
+                        done + " " + extraText(lang, "restoreSkipped")
+                            .replace("%d", result.skippedMedia.toString())
+                    } else {
+                        done
+                    }
                 }
             }
         }

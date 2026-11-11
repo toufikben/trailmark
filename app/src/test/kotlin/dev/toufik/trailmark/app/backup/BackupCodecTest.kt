@@ -119,4 +119,62 @@ class BackupCodecTest {
         )
         assertTrue(decoded.activities.isEmpty())
     }
+
+    @Test
+    fun theMediaFingerprintSurvivesTheRoundTrip() {
+        val digest = sha256Hex("the photo".toByteArray())
+        val file = BackupFile(
+            createdWallMillis = 1L,
+            activities = listOf(
+                BackupActivity(
+                    sport = "RUN",
+                    startWallMillis = 1L,
+                    distanceM = 10.0,
+                    elapsedNanos = 1_000_000_000L,
+                    fixCount = 1,
+                    rejectedCount = 0,
+                    mockDetected = false,
+                    weatherTempC = null,
+                    weatherWindKmh = null,
+                    weatherWindDeg = null,
+                    weatherCode = null,
+                    points = emptyList(),
+                    media = listOf(
+                        BackupMedia(
+                            entry = "media/1-1.jpg",
+                            kind = "PHOTO",
+                            lat = null,
+                            lon = null,
+                            bearingDeg = null,
+                            distanceM = 10.0,
+                            elapsedNanos = 1_000_000_000L,
+                            createdWallMillis = 1L,
+                            durationMs = null,
+                            caption = null,
+                            sha256 = digest,
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val decoded = requireNotNull(BackupCodec.decode(BackupCodec.encode(file)))
+        assertEquals(digest, decoded.activities.single().media.single().sha256)
+    }
+
+    @Test
+    fun anArchiveWithoutFingerprintsStillRestores() {
+        // Archives written before the field existed carry no sha256; they must
+        // decode to null rather than fail, so old backups keep working.
+        val legacy = """
+            {"format":"trailmark-backup","version":1,"created":5,"activities":[
+              {"sport":"RUN","startWallMillis":1,"distanceM":2,"elapsedNanos":3,
+               "fixCount":0,"rejectedCount":0,"mockDetected":false,
+               "points":[],
+               "media":[{"entry":"media/1-1.jpg","kind":"PHOTO","distanceM":2,
+                         "elapsedNanos":3,"createdWallMillis":1}]}
+            ]}
+        """.trimIndent()
+        val decoded = requireNotNull(BackupCodec.decode(legacy))
+        assertNull(decoded.activities.single().media.single().sha256)
+    }
 }

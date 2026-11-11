@@ -31,7 +31,9 @@ internal fun FlyoverOptionsDialog(
     t: Texts,
     lang: dev.toufik.trailmark.app.Lang,
     initial: FlyoverOptions,
-    onStart: (FlyoverOptions) -> Unit,
+    /** True when a recipe is already saved, so the switch starts on. */
+    remembering: Boolean = false,
+    onStart: (FlyoverOptions, remember: Boolean) -> Unit,
     onHistory: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -42,6 +44,7 @@ internal fun FlyoverOptionsDialog(
     var pois by remember { mutableStateOf(initial.pois) }
     var fullTrail by remember { mutableStateOf(initial.fullTrail) }
     var cinematic by remember { mutableStateOf(initial.cinematic) }
+    var rememberRecipe by remember { mutableStateOf(remembering) }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Palette.surface,
@@ -150,6 +153,21 @@ internal fun FlyoverOptionsDialog(
                     )
                 }
                 Text(t.exportInBackground, color = Palette.textSecondary, fontSize = 11.sp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        dev.toufik.trailmark.app.extraText(lang, "saveRecipe"),
+                        color = Palette.textSecondary,
+                        fontSize = 12.sp,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Switch(
+                        checked = rememberRecipe,
+                        onCheckedChange = { rememberRecipe = it },
+                    )
+                }
                 TextButton(onClick = onHistory) {
                     Text(t.exportHistory, color = Palette.accent, fontSize = 12.sp)
                 }
@@ -168,6 +186,7 @@ internal fun FlyoverOptionsDialog(
                             fullTrail = fullTrail,
                             cinematic = cinematic,
                         ),
+                        rememberRecipe,
                     )
                 },
             ) {

@@ -936,6 +936,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrailHint" to "يبقى المسار المقطوع ظاهرًا خلف المتسابق، ثم يُعرض كاملًا في النهاية.",
         "cinematic" to "سينمائي",
         "cinematicHint" to "الكاميرا تنزل إلى مكان الصورة ثم تعود إلى الخريطة بدل القطع المباشر.",
+        "saveRecipe" to "حفظ كإعداد افتراضي",
+        "restoreSkipped" to "تخطّي %d ملفًا تالفًا",
         "splits" to "التقسيمات",
     ),
     Lang.EN to mapOf(
@@ -953,6 +955,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrailHint" to "Keeps the travelled line behind the rider, then shows the full route at the end.",
         "cinematic" to "Cinematic shots",
         "cinematicHint" to "The camera drops onto the photo spot, then climbs back to the map instead of cutting straight to it.",
+        "saveRecipe" to "Save as default",
+        "restoreSkipped" to "Skipped %d damaged files",
         "splits" to "Splits",
     ),
     Lang.FR to mapOf(
@@ -970,6 +974,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrailHint" to "Garde le tracé parcouru derrière le coureur, puis affiche tout le parcours à la fin.",
         "cinematic" to "Plans cinematographiques",
         "cinematicHint" to "La camera descend sur le lieu de la photo puis remonte vers la carte au lieu de couper net.",
+        "saveRecipe" to "Enregistrer par défaut",
+        "restoreSkipped" to "%d fichiers endommagés ignorés",
         "splits" to "Kilomètres",
     ),
     Lang.ES to mapOf(
@@ -987,6 +993,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrailHint" to "Mantiene el trazado recorrido detrás y muestra la ruta completa al final.",
         "cinematic" to "Planos cinematograficos",
         "cinematicHint" to "La camara baja al lugar de la foto y vuelve al mapa en vez de cortar en seco.",
+        "saveRecipe" to "Guardar como predeterminado",
+        "restoreSkipped" to "Se omitieron %d archivos dañados",
         "splits" to "Parciales",
     ),
     Lang.PT to mapOf(
@@ -1004,6 +1012,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrailHint" to "Mantém o traçado percorrido atrás e mostra o percurso completo no fim.",
         "cinematic" to "Planos cinematograficos",
         "cinematicHint" to "A camara desce ao local da foto e regressa ao mapa em vez de cortar a direito.",
+        "saveRecipe" to "Guardar como predefinição",
+        "restoreSkipped" to "%d ficheiros corrompidos ignorados",
         "splits" to "Parciais",
     ),
     Lang.DE to mapOf(
@@ -1021,6 +1031,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrailHint" to "Lässt die gelaufene Linie sichtbar und zeigt am Ende die ganze Strecke.",
         "cinematic" to "Kamerafahrten",
         "cinematicHint" to "Die Kamera senkt sich auf den Ort des Fotos und steigt wieder zur Karte auf, statt hart zu schneiden.",
+        "saveRecipe" to "Als Standard speichern",
+        "restoreSkipped" to "%d beschädigte Dateien übersprungen",
         "splits" to "Kilometer",
     ),
     Lang.IT to mapOf(
@@ -1038,6 +1050,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrailHint" to "Mantiene il tracciato percorso dietro e mostra tutto il percorso alla fine.",
         "cinematic" to "Inquadrature cinematografiche",
         "cinematicHint" to "La camera scende sul punto della foto e risale alla mappa invece di staccare di netto.",
+        "saveRecipe" to "Salva come predefinito",
+        "restoreSkipped" to "%d file danneggiati ignorati",
         "splits" to "Parziali",
     ),
     Lang.NL to mapOf(
@@ -1055,6 +1069,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrailHint" to "Houdt de afgelegde lijn zichtbaar en toont aan het eind de hele route.",
         "cinematic" to "Cinematische shots",
         "cinematicHint" to "De camera daalt naar de plek van de foto en klimt terug naar de kaart in plaats van hard te knippen.",
+        "saveRecipe" to "Opslaan als standaard",
+        "restoreSkipped" to "%d beschadigde bestanden overgeslagen",
         "splits" to "Kilometers",
     ),
     Lang.PL to mapOf(
@@ -1072,6 +1088,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrailHint" to "Zostawia przebyty ślad za zawodnikiem i pokazuje całą trasę na końcu.",
         "cinematic" to "Ujecia filmowe",
         "cinematicHint" to "Kamera zniza sie nad miejsce zdjecia i wraca do mapy zamiast twardego ciecia.",
+        "saveRecipe" to "Zapisz jako domyślne",
+        "restoreSkipped" to "Pominięto %d uszkodzonych plików",
         "splits" to "Kilometry",
     ),
     Lang.RU to mapOf(
@@ -1089,6 +1107,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrailHint" to "Оставляет пройденную линию позади, а в конце показывает весь маршрут.",
         "cinematic" to "Кинематографичные кадры",
         "cinematicHint" to "Камера опускается к месту снимка и возвращается к карте вместо резкой склейки.",
+        "saveRecipe" to "Сохранить по умолчанию",
+        "restoreSkipped" to "Пропущено повреждённых файлов: %d",
         "splits" to "Километры",
     ),
     Lang.TR to mapOf(
@@ -1106,6 +1126,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrailHint" to "Kat edilen çizgiyi arkada tutar, sonunda tüm rotayı gösterir.",
         "cinematic" to "Sinematik cekimler",
         "cinematicHint" to "Kamera kesme yerine fotografin oldugu yere iner ve haritaya geri cikar.",
+        "saveRecipe" to "Varsayılan olarak kaydet",
+        "restoreSkipped" to "%d bozuk dosya atlandı",
         "splits" to "Kilometreler",
     ),
     Lang.ID to mapOf(
@@ -1123,6 +1145,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrailHint" to "Menjaga jejak yang dilalui di belakang, lalu menampilkan seluruh rute di akhir.",
         "cinematic" to "Bidikan sinematik",
         "cinematicHint" to "Kamera turun ke lokasi foto lalu naik lagi ke peta, bukan potongan langsung.",
+        "saveRecipe" to "Simpan sebagai bawaan",
+        "restoreSkipped" to "%d file rusak dilewati",
         "splits" to "Per kilometer",
     ),
     Lang.HI to mapOf(
@@ -1140,6 +1164,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrailHint" to "तय की गई रेखा पीछे रहती है, अंत में पूरा रास्ता दिखता है।",
         "cinematic" to "सिनेमाई शॉट",
         "cinematicHint" to "कैमरा सीधे कट लगाने के बजाय फ़ोटो की जगह पर उतरता है और फिर नक्शे पर लौटता है।",
+        "saveRecipe" to "डिफ़ॉल्ट के रूप में सहेजें",
+        "restoreSkipped" to "%d खराब फ़ाइलें छोड़ी गईं",
         "splits" to "किलोमीटर",
     ),
     Lang.JA to mapOf(
@@ -1157,6 +1183,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrailHint" to "走った線を後ろに残し、最後に全ルートを表示します。",
         "cinematic" to "シネマティック演出",
         "cinematicHint" to "カットせずに、カメラが写真の地点まで降りてから地図へ戻ります。",
+        "saveRecipe" to "既定として保存",
+        "restoreSkipped" to "壊れたファイル %d 件をスキップしました",
         "splits" to "ラップ",
     ),
     Lang.KO to mapOf(
@@ -1174,6 +1202,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrailHint" to "지나온 선을 뒤에 남기고 마지막에 전체 경로를 보여줍니다.",
         "cinematic" to "시네마틱 연출",
         "cinematicHint" to "바로 자르지 않고 카메라가 사진 지점으로 내려갔다가 지도로 돌아옵니다.",
+        "saveRecipe" to "기본값으로 저장",
+        "restoreSkipped" to "손상된 파일 %d개를 건너뛰었습니다",
         "splits" to "구간",
     ),
     Lang.ZH to mapOf(
@@ -1191,6 +1221,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "fullTrailHint" to "将已走过的线留在身后，结束时显示完整路线。",
         "cinematic" to "电影感运镜",
         "cinematicHint" to "镜头先俯冲到照片所在的位置，再拉回地图，而不是直接硬切。",
+        "saveRecipe" to "保存为默认",
+        "restoreSkipped" to "已跳过 %d 个损坏的文件",
         "splits" to "分段",
     ),
 )

@@ -48,6 +48,7 @@ object BackupStore {
                     createdWallMillis = m.createdWallMillis,
                     durationMs = m.durationMs,
                     caption = m.caption,
+                    sha256 = runCatching { sha256Hex(file) }.getOrNull(),
                 )
             }
             activities.add(
@@ -93,10 +94,12 @@ object BackupStore {
     /**
      * Restores an archive into the database and the app's media folder. Media
      * rows whose bytes are missing from the archive are skipped rather than
-     * pointing at a file that will never exist.
+     * pointing at a file that will never exist, and so is any entry whose bytes
+     * no longer match the SHA-256 recorded when the archive was written.
      */
-    fun restore(context: Context, uri: Uri): Int {
-        val input = context.contentResolver.openInputStream(uri) ?: return -1
+    fun restore(context: Context, uri: Uri): RestoreResult {
+        val input = context.contentResolver.openInputStream(uri)
+            ?: return RestoreResult(activities = -1, skippedMedia = 0)
         var json: String? = null
         val mediaBytes = HashMap<String, ByteArray>()
         ZipInputStream(BufferedInputStream(input)).use { zip ->
@@ -112,9 +115,11 @@ object BackupStore {
                 zip.closeEntry()
             }
         }
-        val backup = json?.let { BackupCodec.decode(it) } ?: return -1
+        val backup = json?.let { BackupCodec.decode(it) }
+            ?: return RestoreResult(activities = -1, skippedMedia = 0)
         val repo = AppGraph.repository(context)
         var restored = 0
+        var skippedMedia = 0
         for (a in backup.activities) {
             val id = runCatching {
                 val newId = repo.insertActivity(
@@ -139,7 +144,15 @@ object BackupStore {
                     repo.setWeather(newId, temp, wind, deg, code)
                 }
                 for (m in a.media) {
-                    val bytes = mediaBytes[m.entry] ?: continue
+                    val bytes = mediaBytes[m.entry]
+                    if (bytes == null) {
+                        skippedMedia++
+                        continue
+                    }
+                    if (m.sha256 != null && !sha256Hex(bytes).equals(m.sha256, ignoreCase = true)) {
+                        skippedMedia++
+                        continue
+                    }
                     val file = if (m.kind == "VIDEO") {
                         MediaCapture.newVideoFile(context)
                     } else {
@@ -167,6 +180,11 @@ object BackupStore {
             }.getOrNull() ?: continue
             if (id > 0) restored++
         }
-        return restored
+        return RestoreResult(activities = restored, skippedMedia = skippedMedia)
     }
+}
+
+/** What a restore managed: activities written, media entries left out. */
+class RestoreResult(val activities: Int, val skippedMedia: Int) {
+    val failed: Boolean get() = activities < 0
 }

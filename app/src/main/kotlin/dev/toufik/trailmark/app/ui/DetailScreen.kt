@@ -141,7 +141,12 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
     var showCreateSegment by remember { mutableStateOf(false) }
     var chooseExport by remember { mutableStateOf(false) }
     var showExportHistory by remember { mutableStateOf(false) }
-    var exportOptions by remember { mutableStateOf(FlyoverOptions()) }
+    var exportOptions by remember {
+        mutableStateOf(dev.toufik.trailmark.app.export.ExportRecipe.load(context) ?: FlyoverOptions())
+    }
+    var savedRecipe by remember {
+        mutableStateOf(dev.toufik.trailmark.app.export.ExportRecipe.load(context) != null)
+    }
     val exportState by dev.toufik.trailmark.app.export.ExportHolder.state.collectAsState()
     val exportHere = exportState?.takeIf { it.activityId == activityId }
     var confirmDelete by remember { mutableStateOf(false) }
@@ -742,8 +747,13 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                 t = t,
                 lang = langNow,
                 initial = exportOptions,
-                onStart = { o ->
+                remembering = savedRecipe,
+                onStart = { o, keepAsDefault ->
                     exportOptions = o
+                    if (keepAsDefault) {
+                        dev.toufik.trailmark.app.export.ExportRecipe.save(context, o)
+                        savedRecipe = true
+                    }
                     chooseExport = false
                     if (dd != null) {
                         dev.toufik.trailmark.app.service.ExportService.start(

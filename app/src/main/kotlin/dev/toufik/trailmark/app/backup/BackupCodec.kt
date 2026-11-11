@@ -48,6 +48,12 @@ data class BackupMedia(
     val createdWallMillis: Long,
     val durationMs: Long?,
     val caption: String?,
+    /**
+     * SHA-256 of the entry's bytes, so a restore can tell a good file from a
+     * damaged one. Null on archives written before the field existed; those
+     * restore exactly as they always did.
+     */
+    val sha256: String? = null,
 )
 
 /**
@@ -103,6 +109,7 @@ object BackupCodec {
                 putNullable(mo, "bearing", m.bearingDeg)
                 putNullable(mo, "durationMs", m.durationMs)
                 putNullable(mo, "caption", m.caption)
+                putNullable(mo, "sha256", m.sha256)
                 media.put(mo)
             }
             o.put("media", media)
@@ -158,6 +165,7 @@ object BackupCodec {
                         createdWallMillis = m.optLong("createdWallMillis", 0L),
                         durationMs = optLongOrNull(m, "durationMs"),
                         caption = optStringOrNull(m, "caption"),
+                        sha256 = optStringOrNull(m, "sha256"),
                     ),
                 )
             }
