@@ -77,6 +77,9 @@ private const val BEARING_TAU_S = 0.5
 
 private const val SNAPSHOT_TIMEOUT_MS = 25_000L
 
+/** Attempts per snapshot before the export is reported as failed. */
+private const val SNAPSHOT_ATTEMPTS = 2
+
 /** Point-of-interest classes worth a label on a flyover, as the live map uses. */
 private const val POI_FILTER =
     """["in","class","shop","restaurant","cafe","fast_food","bakery","bar","bank","pharmacy","hospital","fuel","supermarket","grocery","convenience","marketplace","hotel","station","bus","railway","transit","attraction","museum","theatre","cinema"]"""
@@ -409,24 +412,36 @@ internal class HeadlessFlyover(
     }
 
     private suspend fun shoot(snapshotter: MapSnapshotter, camera: CameraPosition): MapSnapshot {
+        // A snapshotter that misses its deadline once (tiles still downloading,
+        // a busy GL thread) usually answers on the next try, and losing a
+        // minutes-long export to one slow frame is a poor trade. One retry
+        // covers the transient case without hiding a real hang.
+        repeat(SNAPSHOT_ATTEMPTS) {
+            val shot = snapshotOnce(snapshotter, camera)
+            // The snapshotter resets itself only after the callback returns; let
+            // that reset run before the next camera is set.
+            yield()
+            if (shot != null) return shot
+        }
+        error("map snapshot timed out")
+    }
+
+    private suspend fun snapshotOnce(
+        snapshotter: MapSnapshotter,
+        camera: CameraPosition,
+    ): MapSnapshot? = withTimeoutOrNull(SNAPSHOT_TIMEOUT_MS) {
         // The snapshotter lives on the main thread; only the drawing is done on
         // a worker, so the activity stays responsive during a long render.
-        val shot = withTimeoutOrNull(SNAPSHOT_TIMEOUT_MS) {
-            withContext(Dispatchers.Main) {
-                snapshotter.setCameraPosition(camera)
-                suspendCancellableCoroutine { cont ->
-                    cont.invokeOnCancellation { runCatching { snapshotter.cancel() } }
-                    snapshotter.start(
-                        { snap -> if (cont.isActive) cont.resume(snap) else snap.bitmap.recycle() },
-                        { err -> if (cont.isActive) cont.resumeWithException(IllegalStateException(err)) },
-                    )
-                }
+        withContext(Dispatchers.Main) {
+            snapshotter.setCameraPosition(camera)
+            suspendCancellableCoroutine { cont ->
+                cont.invokeOnCancellation { runCatching { snapshotter.cancel() } }
+                snapshotter.start(
+                    { snap -> if (cont.isActive) cont.resume(snap) else snap.bitmap.recycle() },
+                    { err -> if (cont.isActive) cont.resumeWithException(IllegalStateException(err)) },
+                )
             }
         }
-        // The snapshotter resets itself only after the callback returns; let that
-        // reset run before the next camera is set.
-        yield()
-        return shot ?: error("map snapshot timed out")
     }
 
     /**

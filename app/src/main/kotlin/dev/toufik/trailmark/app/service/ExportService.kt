@@ -219,12 +219,16 @@ class ExportService : Service() {
             } catch (e: Throwable) {
                 withContext(NonCancellable + Dispatchers.IO) { out.delete() }
                 ExportStore.clearPending(this@ExportService)
+                // The message here is a codec or snapshotter detail that says
+                // nothing to the user, so it goes to the log and the screen
+                // shows one localized sentence instead.
+                android.util.Log.w("TrailmarkExport", "export failed for ${job.activityId}", e)
                 ExportHolder.publish(
                     ExportState(
                         ExportPhase.FAILED,
                         job.activityId,
                         job.title,
-                        error = e.message ?: t.exportFailed,
+                        error = t.exportFailed,
                     ),
                 )
                 withContext(Dispatchers.Main) {

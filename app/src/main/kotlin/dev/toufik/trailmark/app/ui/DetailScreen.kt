@@ -385,7 +385,9 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                                 shareStoryCardImage(context, card, d.row.id, t.storyCard)
                             }
                         }) { Text(t.storyCard, color = Palette.accent) }
-                        if (d.points.size > 1) {
+                        // The renderer refuses a path shorter than a metre, so the
+                        // button that would open a doomed export stays hidden.
+                        if (d.points.size > 1 && d.row.distanceM >= 1.0) {
                             TextButton(onClick = {
                                 if (pro) chooseExport = true else onPaywall()
                             }) {
