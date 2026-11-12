@@ -6,6 +6,9 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Switch
@@ -50,7 +53,15 @@ internal fun FlyoverOptionsDialog(
         containerColor = Palette.surface,
         title = { Text(t.exportVideo, color = Palette.text) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            // The panel is taller than the screen on small phones once the media
+            // hints appear, so the options scroll inside the dialog instead of
+            // running behind the buttons.
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
                 Text(t.videoLength, color = Palette.textSecondary, fontSize = 12.sp)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf(0, 15, 30, 60).forEach { s ->
