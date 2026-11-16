@@ -1,6 +1,8 @@
 package dev.toufik.trailmark.app.gps
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
@@ -25,8 +27,24 @@ class AndroidLocationFixSource(private val context: Context) : FixSource {
     override fun fixes(): Flow<RawFix> = callbackFlow {
         val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         val listener = LocationListener { loc -> trySend(loc.toRawFix()) }
-        lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0L, 0f, listener, Looper.getMainLooper())
-        awaitClose { lm.removeUpdates(listener) }
+        // Android 12+ lets the user grant only an approximate location; the GPS
+        // provider needs the fine one, and asking for it anyway throws
+        // SecurityException inside the flow, which killed the whole process
+        // mid-run instead of merely leaving the runner without fixes.
+        val fine = context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        if (fine) {
+            runCatching {
+                lm.requestLocationUpdates(
+                    LocationManager.GPS_PROVIDER,
+                    0L,
+                    0f,
+                    listener,
+                    Looper.getMainLooper(),
+                )
+            }
+        }
+        awaitClose { runCatching { lm.removeUpdates(listener) } }
     }
 
     private fun Location.toRawFix(): RawFix = RawFix(

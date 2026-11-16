@@ -1,6 +1,7 @@
 package dev.toufik.trailmark.app.backup
 
 import dev.toufik.trailmark.core.model.StoredPoint
+import dev.toufik.trailmark.core.model.UNMEASURED_ACCURACY_M
 import dev.toufik.trailmark.core.model.WaypointType
 import org.json.JSONArray
 import org.json.JSONObject
@@ -85,11 +86,11 @@ object BackupCodec {
             val pts = JSONArray()
             for (p in a.points) {
                 val po = JSONObject()
-                    .put("lat", p.lat)
-                    .put("lon", p.lon)
-                    .put("t", p.timeNanos)
-                    .put("acc", p.accuracyM)
-                    .put("type", p.type.name)
+                putFinite(po, "lat", p.lat)
+                putFinite(po, "lon", p.lon)
+                po.put("t", p.timeNanos)
+                putFinite(po, "acc", p.accuracyM)
+                po.put("type", p.type.name)
                 putNullable(po, "alt", p.altitudeM)
                 putNullable(po, "speed", p.speedMps)
                 putNullable(po, "bearing", p.bearingDeg)
@@ -133,12 +134,20 @@ object BackupCodec {
             val pArr = o.optJSONArray("points") ?: JSONArray()
             for (j in 0 until pArr.length()) {
                 val p = pArr.optJSONObject(j) ?: continue
+                val lat = p.optDouble("lat", Double.NaN)
+                val lon = p.optDouble("lon", Double.NaN)
+                // A hand-edited or truncated archive must not throw in the middle
+                // of a restore: a point with no usable position is dropped, and the
+                // rest of the file still lands.
+                if (!lat.isFinite() || !lon.isFinite()) continue
                 pts.add(
                     StoredPoint(
-                        lat = p.getDouble("lat"),
-                        lon = p.getDouble("lon"),
-                        timeNanos = p.getLong("t"),
-                        accuracyM = p.getDouble("acc"),
+                        lat = lat,
+                        lon = lon,
+                        timeNanos = p.optLong("t", 0L),
+                        // Older backups stored the sentinel as it was: infinity.
+                        accuracyM = p.optDouble("acc", Double.NaN)
+                            .let { if (it.isFinite()) it else UNMEASURED_ACCURACY_M },
                         type = runCatching { WaypointType.valueOf(p.getString("type")) }
                             .getOrDefault(WaypointType.NORMAL),
                         altitudeM = optDoubleOrNull(p, "alt"),
@@ -195,11 +204,27 @@ object BackupCodec {
     }
 
     private fun putNullable(o: JSONObject, key: String, value: Any?) {
+        // org.json refuses to serialise NaN and the infinities. A point whose
+        // accuracy was never measured carries POSITIVE_INFINITY, so a backup that
+        // contained an imported track used to throw halfway through encoding.
+        if (value is Double && !value.isFinite()) {
+            o.put(key, JSONObject.NULL)
+            return
+        }
+        if (value is Float && !value.isFinite()) {
+            o.put(key, JSONObject.NULL)
+            return
+        }
         o.put(key, value ?: JSONObject.NULL)
     }
 
+    /** Writes a mandatory coordinate, keeping the document serialisable. */
+    private fun putFinite(o: JSONObject, key: String, value: Double) {
+        if (value.isFinite()) o.put(key, value) else o.put(key, JSONObject.NULL)
+    }
+
     private fun optDoubleOrNull(o: JSONObject, key: String): Double? =
-        if (o.isNull(key)) null else o.optDouble(key, Double.NaN).takeUnless { it.isNaN() }
+        if (o.isNull(key)) null else o.optDouble(key, Double.NaN).takeIf { it.isFinite() }
 
     private fun optLongOrNull(o: JSONObject, key: String): Long? =
         if (o.isNull(key)) null else o.optLong(key)

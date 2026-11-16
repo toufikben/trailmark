@@ -31,7 +31,14 @@ class FixQualityGate(private val nowNanos: (() -> Long)? = null) {
     var ready: Boolean = false
         private set
     private var goodStreak = 0
+
+    // Written by the fix collector and read by the once-a-second tick on another
+    // thread; without volatile the tick could see the timestamp before the
+    // accuracy and blow up on the assertion below.
+    @Volatile
     private var lastAccuracyM: Double? = null
+
+    @Volatile
     private var lastFixAtNanos: Long? = null
 
     fun add(fix: RawFix): Boolean {
@@ -50,7 +57,8 @@ class FixQualityGate(private val nowNanos: (() -> Long)? = null) {
         get() {
             val last = lastFixAtNanos ?: return GpsQuality.NONE
             if (now() - last >= GPS_LOST_AFTER_NANOS) return GpsQuality.LOST
-            return GpsQualityX.fromAccuracy(lastAccuracyM!!)
+            val acc = lastAccuracyM ?: return GpsQuality.SEARCHING
+            return GpsQualityX.fromAccuracy(acc)
         }
 
     private fun now(): Long = nowNanos?.invoke() ?: System.nanoTime()

@@ -76,6 +76,13 @@ class RecordingService : Service() {
     private var offRouteSinceNanos = 0L
     private var lastOffRouteNanos = 0L
     private var joinedRoute = false
+    /**
+     * A stop is a two-step job: freeze and save the run, then tear the service
+     * down. The button and the notification action can both deliver it, so only
+     * the first request is honoured — a second one used to finish the saved row
+     * again with no engine and zero it out.
+     */
+    private val stopRequested = java.util.concurrent.atomic.AtomicBoolean(false)
 
     @Volatile
     private var sportName: String = "RUN"
@@ -147,6 +154,7 @@ class RecordingService : Service() {
 
     private fun startRecording(sportHint: String?, synthetic: Boolean, userInitiated: Boolean) {
         if (controller != null) return
+        stopRequested.set(false)
         WeatherHolder.update(null)
         createChannel()
         ServiceCompat.startForeground(
@@ -525,6 +533,7 @@ class RecordingService : Service() {
     }
 
     private fun stopRecording() {
+        if (!stopRequested.compareAndSet(false, true)) return
         val c = controller
         val repo = dev.toufik.trailmark.app.AppGraph.repository(this)
         scope.launch {

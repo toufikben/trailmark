@@ -15,6 +15,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -55,8 +56,15 @@ class RecordingController(
     private val _state = MutableStateFlow(RecordingState())
     val state: StateFlow<RecordingState> = _state
 
+    // Written by the pause/resume coroutines and read by the fix collector, so
+    // the flags and the engine handle cross threads on purpose.
+    @Volatile
     private var gate: FixQualityGate? = null
+
+    @Volatile
     private var engine: RecorderEngine? = null
+
+    @Volatile
     private var activityId: Long? = null
     private var segmentWritten = 0
     private var resumeElapsedNanos = 0L
@@ -65,6 +73,8 @@ class RecordingController(
     private var job: Job? = null
     private var tickJob: Job? = null
     private var sessionActive = false
+
+    @Volatile
     private var paused = false
     private var pausedFixCount = 0
     private var pausedRejected = 0
@@ -73,6 +83,8 @@ class RecordingController(
     private var cumRejected = 0
     private var cumMock = false
     private var autoPause = false
+
+    @Volatile
     private var autoPaused = false
     private val writeMutex = Mutex()
 
@@ -117,13 +129,15 @@ class RecordingController(
         val g = gate ?: return
         val ready = g.add(fix)
         if (paused) {
-            _state.value = _state.value.copy(
-                quality = g.quality,
-                currentLat = fix.lat,
-                currentLon = fix.lon,
-                currentBearing = fix.bearingDeg,
-                currentSpeedMps = null,
-            )
+            _state.update {
+                it.copy(
+                    quality = g.quality,
+                    currentLat = fix.lat,
+                    currentLon = fix.lon,
+                    currentBearing = fix.bearingDeg,
+                    currentSpeedMps = null,
+                )
+            }
             if (autoPaused) {
                 val s = fix.speedMps
                 if (s != null && s > 0.8) {
@@ -136,7 +150,7 @@ class RecordingController(
         var e = engine
         if (e == null) {
             if (!ready) {
-                _state.value = _state.value.copy(quality = g.quality)
+                _state.update { it.copy(quality = g.quality) }
                 return
             }
             e = RecorderEngine(
@@ -149,19 +163,21 @@ class RecordingController(
             segmentWritten = 0
         }
         e.onFix(fix)
-        _state.value = _state.value.copy(
-            phase = Phase.RECORDING,
-            quality = g.quality,
-            distanceM = e.distanceMeters,
-            elapsedNanos = resumeElapsedNanos + e.elapsedNanos,
-            fixCount = e.stats.fixCount,
-            isIdle = e.isIdle,
-            currentLat = fix.lat,
-            currentLon = fix.lon,
-            currentBearing = fix.bearingDeg,
-            currentSpeedMps = fix.speedMps,
-            activityId = activityId,
-        )
+        _state.update {
+            it.copy(
+                phase = Phase.RECORDING,
+                quality = g.quality,
+                distanceM = e.distanceMeters,
+                elapsedNanos = resumeElapsedNanos + e.elapsedNanos,
+                fixCount = e.stats.fixCount,
+                isIdle = e.isIdle,
+                currentLat = fix.lat,
+                currentLon = fix.lon,
+                currentBearing = fix.bearingDeg,
+                currentSpeedMps = fix.speedMps,
+                activityId = activityId,
+            )
+        }
         persist(e)
         if (autoPause && !paused && e.isIdle) {
             autoPaused = true
@@ -172,7 +188,10 @@ class RecordingController(
     private fun refreshQuality() {
         val g = gate ?: return
         val q = g.quality
-        if (q != _state.value.quality) _state.value = _state.value.copy(quality = q)
+        // Atomic read-modify-write: the tick and the fix collector run on
+        // different threads, and a plain copy from a stale snapshot used to put
+        // the previous distance back on screen for a second.
+        _state.update { if (it.quality == q) it else it.copy(quality = q) }
     }
     private suspend fun persist(e: RecorderEngine) {
         if (!sessionActive) return
@@ -184,13 +203,13 @@ class RecordingController(
             val slice = e.storedSlice(written, e.storedCount)
             try {
                 val id = activityId ?: repo.insertActivity(newUuid(), sport.name, wallMillis())
-                    .also { activityId = it; _state.value = _state.value.copy(activityId = it) }
+                    .also { activityId = it; _state.update { s -> s.copy(activityId = it) } }
                 repo.appendPoints(id, slice)
                 segmentWritten = written + slice.size
                 repo.saveResume(id, slice.last(), e.distanceMeters, resumeElapsedNanos + e.elapsedNanos)
             } catch (t: Throwable) {
                 if (sessionActive) {
-                    _state.value = _state.value.copy(storageError = "storage write failed: ${t.message}")
+                    _state.update { it.copy(storageError = "storage write failed: ${t.message}") }
                 }
             }
         }
@@ -223,7 +242,7 @@ class RecordingController(
             }
             engine = null
         }
-        _state.value = _state.value.copy(phase = Phase.PAUSED, autoPaused = autoPaused)
+        _state.update { it.copy(phase = Phase.PAUSED, autoPaused = autoPaused) }
     }
 
     /** Continues the session in a fresh segment; the paused gap is never counted. */
@@ -231,10 +250,12 @@ class RecordingController(
         if (!paused) return
         paused = false
         autoPaused = false
-        _state.value = _state.value.copy(
-            phase = if (activityId == null) Phase.STARTING else Phase.RECORDING,
-            autoPaused = false,
-        )
+        _state.update {
+            it.copy(
+                phase = if (activityId == null) Phase.STARTING else Phase.RECORDING,
+                autoPaused = false,
+            )
+        }
     }
 
     private fun pauseReportedStats(e: RecorderEngine) {
@@ -256,6 +277,10 @@ class RecordingController(
         sessionActive = false
         val e = engine
         val id = activityId
+        // The row must never be finished twice. A second stop — the notification
+        // action racing the in-app button, or a double tap — arrives with no
+        // engine and would rewrite the just-saved effort as 0 m / 0 s.
+        activityId = null
         if (id != null) {
             try {
                 repo.finishActivity(

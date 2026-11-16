@@ -101,86 +101,107 @@ object BackupStore {
         val input = context.contentResolver.openInputStream(uri)
             ?: return RestoreResult(activities = -1, skippedMedia = 0)
         var json: String? = null
-        val mediaBytes = HashMap<String, ByteArray>()
-        ZipInputStream(BufferedInputStream(input)).use { zip ->
-            while (true) {
-                val entry = zip.nextEntry ?: break
-                when {
-                    entry.isDirectory -> Unit
-                    entry.name == JSON_ENTRY -> {
-                        json = zip.readBytes().toString(Charsets.UTF_8)
-                    }
-                    entry.name.startsWith("media/") -> mediaBytes[entry.name] = zip.readBytes()
-                }
-                zip.closeEntry()
-            }
-        }
-        val backup = json?.let { BackupCodec.decode(it) }
-            ?: return RestoreResult(activities = -1, skippedMedia = 0)
-        val repo = AppGraph.repository(context)
-        var restored = 0
-        var skippedMedia = 0
-        for (a in backup.activities) {
-            val id = runCatching {
-                val newId = repo.insertActivity(
-                    uuid = "backup-${System.currentTimeMillis()}-${restored}",
-                    sport = a.sport,
-                    startWallMillis = a.startWallMillis,
-                )
-                if (a.points.isNotEmpty()) repo.appendPoints(newId, a.points)
-                repo.finishActivity(
-                    activityId = newId,
-                    elapsedNanos = a.elapsedNanos,
-                    distanceM = a.distanceM,
-                    fixCount = a.fixCount,
-                    rejectedCount = a.rejectedCount,
-                    mockDetected = a.mockDetected,
-                )
-                val temp = a.weatherTempC
-                val wind = a.weatherWindKmh
-                val deg = a.weatherWindDeg
-                val code = a.weatherCode
-                if (temp != null && wind != null && deg != null && code != null) {
-                    repo.setWeather(newId, temp, wind, deg, code)
-                }
-                for (m in a.media) {
-                    val bytes = mediaBytes[m.entry]
-                    if (bytes == null) {
-                        skippedMedia++
-                        continue
-                    }
-                    if (m.sha256 != null && !sha256Hex(bytes).equals(m.sha256, ignoreCase = true)) {
-                        skippedMedia++
-                        continue
-                    }
-                    val file = if (m.kind == "VIDEO") {
-                        MediaCapture.newVideoFile(context)
-                    } else {
-                        MediaCapture.newPhotoFile(context)
-                    }
-                    runCatching { file.outputStream().use { it.write(bytes) } }
-                        .getOrNull()
-                        ?.let {
-                            repo.insertMedia(
-                                activityId = newId,
-                                kind = m.kind,
-                                filePath = file.absolutePath,
-                                lat = m.lat,
-                                lon = m.lon,
-                                bearingDeg = m.bearingDeg,
-                                distanceM = m.distanceM,
-                                elapsedNanos = m.elapsedNanos,
-                                createdWallMillis = m.createdWallMillis,
-                                durationMs = m.durationMs,
-                                caption = m.caption,
-                            )
+        // Media is spooled to the cache, never held in RAM: a backup with a few
+        // clips used to exhaust the heap before the restore had even decoded its
+        // manifest, and the app died halfway through writing activities.
+        val spool = File(context.cacheDir, "restore-${System.nanoTime()}").apply { mkdirs() }
+        val mediaFiles = HashMap<String, File>()
+        try {
+            ZipInputStream(BufferedInputStream(input)).use { zip ->
+                while (true) {
+                    val entry = zip.nextEntry ?: break
+                    when {
+                        entry.isDirectory -> Unit
+                        entry.name == JSON_ENTRY -> {
+                            json = zip.readBytes().toString(Charsets.UTF_8)
                         }
+                        entry.name.startsWith("media/") -> {
+                            val name = entry.name.removePrefix("media/").replace('/', '_')
+                            val target = File(spool, name)
+                            val copied = runCatching {
+                                target.outputStream().use { out -> zip.copyTo(out) }
+                            }.isSuccess
+                            if (copied) mediaFiles[entry.name] = target
+                        }
+                    }
+                    zip.closeEntry()
                 }
-                newId
-            }.getOrNull() ?: continue
-            if (id > 0) restored++
+            }
+            val backup = json?.let { BackupCodec.decode(it) }
+                ?: return RestoreResult(activities = -1, skippedMedia = 0)
+            val repo = AppGraph.repository(context)
+            var restored = 0
+            var skippedMedia = 0
+            for (a in backup.activities) {
+                val id = runCatching {
+                    val newId = repo.insertActivity(
+                        uuid = "backup-${System.currentTimeMillis()}-${restored}",
+                        sport = a.sport,
+                        startWallMillis = a.startWallMillis,
+                    )
+                    if (a.points.isNotEmpty()) repo.appendPoints(newId, a.points)
+                    repo.finishActivity(
+                        activityId = newId,
+                        elapsedNanos = a.elapsedNanos,
+                        distanceM = a.distanceM,
+                        fixCount = a.fixCount,
+                        rejectedCount = a.rejectedCount,
+                        mockDetected = a.mockDetected,
+                    )
+                    val temp = a.weatherTempC
+                    val wind = a.weatherWindKmh
+                    val deg = a.weatherWindDeg
+                    val code = a.weatherCode
+                    if (temp != null && wind != null && deg != null && code != null) {
+                        repo.setWeather(newId, temp, wind, deg, code)
+                    }
+                    for (m in a.media) {
+                        val source = mediaFiles[m.entry]
+                        if (source == null) {
+                            skippedMedia++
+                            continue
+                        }
+                        if (m.sha256 != null &&
+                            !sha256Hex(source).equals(m.sha256, ignoreCase = true)
+                        ) {
+                            skippedMedia++
+                            continue
+                        }
+                        val file = if (m.kind == "VIDEO") {
+                            MediaCapture.newVideoFile(context)
+                        } else {
+                            MediaCapture.newPhotoFile(context)
+                        }
+                        runCatching {
+                            source.inputStream().use { from ->
+                                file.outputStream().use { to -> from.copyTo(to) }
+                            }
+                        }
+                            .getOrNull()
+                            ?.let {
+                                repo.insertMedia(
+                                    activityId = newId,
+                                    kind = m.kind,
+                                    filePath = file.absolutePath,
+                                    lat = m.lat,
+                                    lon = m.lon,
+                                    bearingDeg = m.bearingDeg,
+                                    distanceM = m.distanceM,
+                                    elapsedNanos = m.elapsedNanos,
+                                    createdWallMillis = m.createdWallMillis,
+                                    durationMs = m.durationMs,
+                                    caption = m.caption,
+                                )
+                            }
+                    }
+                    newId
+                }.getOrNull() ?: continue
+                if (id > 0) restored++
+            }
+            return RestoreResult(activities = restored, skippedMedia = skippedMedia)
+        } finally {
+            spool.deleteRecursively()
         }
-        return RestoreResult(activities = restored, skippedMedia = skippedMedia)
     }
 }
 

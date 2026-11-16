@@ -112,13 +112,15 @@ object MediaCapture {
     }
 
     /** Video length from the container header; null when unreadable. */
-    fun videoDurationMs(file: File): Long? = try {
+    fun videoDurationMs(file: File): Long? {
         val mmr = MediaMetadataRetriever()
-        mmr.setDataSource(file.absolutePath)
-        val d = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
-        mmr.release()
-        d
-    } catch (_: Exception) {
-        null
+        return try {
+            mmr.setDataSource(file.absolutePath)
+            mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+        } catch (_: Exception) {
+            null
+        } finally {
+            runCatching { mmr.release() }
+        }
     }
 }

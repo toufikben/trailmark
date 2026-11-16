@@ -186,17 +186,22 @@ class ActivityRepository(private val db: TrailmarkDb) {
 
     fun activityById(id: Long): ActivityRow? {
         val r = q.selectActivity(id).executeAsOneOrNull() ?: return null
+        // A row that is still being recorded has no final totals yet; the resume
+        // entry carries the live ones, and the history list already peddles it as
+        // an active effort. Without this the detail page of the run in progress
+        // read 0.00 km / 0:00 while the list beside it showed the real numbers.
+        val resume = q.selectResume().executeAsOneOrNull()?.takeIf { it.activity_id == id }
         return ActivityRow(
             id = r.id,
             sport = r.sport,
             startWallMillis = r.start_wall_millis,
-            distanceM = r.distance_m,
-            elapsedNanos = r.elapsed_nanos,
+            distanceM = resume?.distance_m ?: r.distance_m,
+            elapsedNanos = resume?.last_elapsed_nanos ?: r.elapsed_nanos,
             climbM = r.climb_m,
             fixCount = r.fix_count,
             rejectedCount = r.rejected_count,
             mockDetected = r.mock_detected != 0L,
-            isOpen = false,
+            isOpen = resume != null,
             weatherTempC = r.weather_temp_c,
             weatherWindKmh = r.weather_wind_kmh,
             weatherWindDeg = r.weather_wind_deg,

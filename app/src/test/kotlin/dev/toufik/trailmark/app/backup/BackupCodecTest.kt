@@ -100,6 +100,63 @@ class BackupCodecTest {
     }
 
     @Test
+    fun anUnmeasuredAccuracySurvivesTheRoundTrip() {
+        // Points from an imported track have no accuracy at all, and the sentinel
+        // is POSITIVE_INFINITY — which org.json refuses to serialise. A backup of
+        // an imported GPX used to throw halfway through encoding.
+        val file = BackupFile(
+            createdWallMillis = 1L,
+            activities = listOf(
+                BackupActivity(
+                    sport = "RUN",
+                    startWallMillis = 1L,
+                    distanceM = 10.0,
+                    elapsedNanos = 1_000_000_000L,
+                    fixCount = 1,
+                    rejectedCount = 0,
+                    mockDetected = false,
+                    weatherTempC = null,
+                    weatherWindKmh = null,
+                    weatherWindDeg = null,
+                    weatherCode = null,
+                    points = listOf(
+                        StoredPoint(
+                            lat = 36.5,
+                            lon = 2.9,
+                            timeNanos = 1_000_000_000L,
+                            accuracyM = dev.toufik.trailmark.core.model.UNMEASURED_ACCURACY_M,
+                            type = WaypointType.NORMAL,
+                        ),
+                    ),
+                    media = emptyList(),
+                ),
+            ),
+        )
+        val decoded = requireNotNull(BackupCodec.decode(BackupCodec.encode(file)))
+        val p = decoded.activities.single().points.single()
+        assertTrue(p.accuracyM.isInfinite(), "unmeasured accuracy must stay unmeasured")
+        assertEquals(36.5, p.lat)
+    }
+
+    @Test
+    fun aPointWithoutAPositionIsDroppedInsteadOfCrashingTheRestore() {
+        // A truncated or hand-edited archive must decode as well as it can. The
+        // point getters used to throw and take the whole restore down with them.
+        val broken = """
+            {"format":"trailmark-backup","version":1,"created":5,"activities":[
+              {"sport":"RUN","startWallMillis":1,"distanceM":2,"elapsedNanos":3,
+               "fixCount":1,"rejectedCount":0,"mockDetected":false,
+               "points":[{"lon":2.9,"t":5},{"lat":36.5,"lon":2.9,"t":6,"acc":4.0,"type":"NORMAL"}],
+               "media":[]}
+            ]}
+        """.trimIndent()
+        val decoded = requireNotNull(BackupCodec.decode(broken))
+        val points = decoded.activities.single().points
+        assertEquals(1, points.size)
+        assertEquals(36.5, points.single().lat)
+    }
+
+    @Test
     fun refusesForeignOrNewerFiles() {
         assertNull(BackupCodec.decode("""{"format":"something-else","version":1}"""))
         assertNull(
