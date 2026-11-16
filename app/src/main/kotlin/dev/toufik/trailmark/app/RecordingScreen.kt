@@ -66,6 +66,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -653,9 +654,13 @@ fun RecordingScreen(
                         text = extraText(lang, "ghostNoMatch"),
                         color = Palette.textSecondary,
                         fontSize = 11.sp,
+                        textAlign = TextAlign.Center,
                         modifier = Modifier
                             .align(Alignment.TopCenter)
-                            .padding(top = 12.dp)
+                            // The notice is a full sentence, and in Arabic and German
+                            // it ran under the PRO badge and the recording chip. Keep
+                            // it in the middle column instead.
+                            .padding(top = 12.dp, start = 92.dp, end = 92.dp)
                             .clip(RoundedCornerShape(14.dp))
                             .background(Palette.surface.copy(alpha = 0.92f))
                             .padding(horizontal = 12.dp, vertical = 7.dp),
@@ -668,7 +673,7 @@ fun RecordingScreen(
                     Row(
                         modifier = Modifier
                             .align(Alignment.TopCenter)
-                            .padding(top = 12.dp)
+                            .padding(top = 12.dp, start = 92.dp, end = 92.dp)
                             .clip(RoundedCornerShape(14.dp))
                             .background(Palette.surface.copy(alpha = 0.92f))
                             .padding(horizontal = 12.dp, vertical = 7.dp),
