@@ -138,6 +138,15 @@ class MainActivity : ComponentActivity() {
     private var benchStarted = false
     private var splashDone = false
 
+    /** Kept on the activity so [onDestroy] can drop the store connection. */
+    private var billing: BillingManager? = null
+
+    override fun onDestroy() {
+        billing?.dispose()
+        billing = null
+        super.onDestroy()
+    }
+
     override fun onResume() {
         super.onResume()
         val debuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
@@ -207,8 +216,9 @@ class MainActivity : ComponentActivity() {
             dev.toufik.trailmark.app.maps.SavedRoutes.preload(this@MainActivity)
         }
         val entitlements = Entitlements(this)
-        val billing = BillingManager(this, entitlements)
-        billing.connect()
+        val manager = BillingManager(this, entitlements)
+        billing = manager
+        manager.connect()
         // A recreated activity already handled the GPX it was opened with.
         if (savedInstanceState == null) {
             importSharedRoute(intent)
@@ -229,7 +239,7 @@ class MainActivity : ComponentActivity() {
                 LocalTexts provides texts,
                 LocalLang provides lang,
                 LocalPremium provides premiumState,
-                LocalBilling provides billing,
+                LocalBilling provides manager,
             ) {
                 TrailmarkTheme {
                     CompositionLocalProvider(LocalLayoutDirection provides direction) {

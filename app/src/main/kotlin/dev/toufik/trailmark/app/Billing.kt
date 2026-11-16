@@ -41,8 +41,12 @@ class BillingManager(
 
     private var retryCount = 0
 
+    /** Set when the owning activity goes away, so a queued retry cannot resurrect the client. */
+    @Volatile
+    private var closed = false
+
     fun connect() {
-        if (client != null) return
+        if (client != null || closed) return
         val c = BillingClient.newBuilder(appContext)
             .enablePendingPurchases(
                 PendingPurchasesParams.newBuilder().enableOneTimeProducts().build(),
@@ -238,6 +242,18 @@ class BillingManager(
             activity,
             BillingFlowParams.newBuilder().setProductDetailsParamsList(listOf(params)).build(),
         )
+    }
+
+    /**
+     * Drops the store connection when the owning activity goes away. Without
+     * this every rotation left a bound service and a purchase listener holding
+     * the destroyed activity, and the queued reconnect could resurrect it.
+     */
+    fun dispose() {
+        closed = true
+        val c = client
+        client = null
+        if (c != null) runCatching { c.endConnection() }
     }
 
     private fun handle(purchases: List<Purchase>) {

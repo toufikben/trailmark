@@ -79,7 +79,6 @@ import kotlinx.coroutines.withContext
 import java.util.Calendar
 import android.content.Context
 
-private const val WEEK_MS = 7L * 24 * 60 * 60 * 1000
 private val SPORT_ORDER = listOf("RUN", "WALK", "BIKE", "HIKE")
 
 private class Totals {
@@ -228,12 +227,12 @@ fun ProgressScreen(onPaywall: () -> Unit, onOpenActivity: (Long) -> Unit = {}) {
                             SummaryRow(t, filtered)
                             GoalCard(
                                 t,
-                                totalsSince(list, startOfMonth(System.currentTimeMillis())).distanceM,
+                                totalsSince(filtered, startOfMonth(System.currentTimeMillis())).distanceM,
                                 goalKm,
                             )
                             WeekGoalCard(
                                 t,
-                                totalsSince(list, startOfWeek(System.currentTimeMillis())).distanceM,
+                                totalsSince(filtered, startOfWeek(System.currentTimeMillis())).distanceM,
                                 weekGoalKm,
                                 onEdit = { editWeekGoal = true },
                             )
@@ -633,10 +632,13 @@ private fun GoalCard(t: Texts, monthM: Double, goalKm: Int) {
 @Composable
 private fun WeeklyCard(t: Texts, rows: List<ActivityRow>) {
     val now = System.currentTimeMillis()
-    val thisWeek = startOfWeek(now)
     val sums = (11 downTo 0).map { back ->
-        val from = thisWeek - back * WEEK_MS
-        sumsInRange(rows, from, from + WEEK_MS)
+        // Calendar-aware, not thisWeek - n*168h: across a DST change the millisecond
+        // maths puts the boundary an hour off and a late Sunday run lands in the
+        // wrong bar.
+        val from = weekStartBack(now, back)
+        val to = weekStartBack(now, back - 1)
+        sumsInRange(rows, from, to)
     }
     val maxSum = sums.max().coerceAtLeast(1.0)
     var shown by remember { mutableStateOf(false) }
@@ -1017,6 +1019,18 @@ internal fun startOfMonth(millis: Long): Long {
     val c = Calendar.getInstance()
     c.timeInMillis = millis
     c.set(Calendar.DAY_OF_MONTH, 1)
+    zeroTime(c)
+    return c.timeInMillis
+}
+
+/**
+ * Start of the week [weeks] before the one [millis] falls in. Calendar-aware, so
+ * a DST change neither shifts the boundary nor skips a week.
+ */
+internal fun weekStartBack(millis: Long, weeks: Int): Long {
+    val c = Calendar.getInstance()
+    c.timeInMillis = startOfWeek(millis)
+    c.add(Calendar.DAY_OF_YEAR, -7 * weeks)
     zeroTime(c)
     return c.timeInMillis
 }
