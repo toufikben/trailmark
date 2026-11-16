@@ -5,6 +5,7 @@ import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.recording.RecordingState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlin.math.roundToInt
 
 /**
  * A ghost race in progress. It lives here, and not in the recording screen,
@@ -43,6 +44,29 @@ data class GhostSession(
 
     /** True once the ghost has reached the end of its stretch. */
     fun ghostFinished(elapsedNanos: Long): Boolean = elapsedNanos - t0Nanos >= match.ghost.durationNanos
+}
+
+/**
+ * What to show for a race at a given moment: the gap in metres (positive means
+ * the live run leads) and the session to keep. Once the ghost is home the number
+ * is frozen at the value the runner finished with, instead of drifting for the
+ * rest of the run; a frozen session is returned untouched, so calling this every
+ * second allocates nothing and never re-rounds the frozen value.
+ *
+ * Pure on purpose: the service, the screen and the voice all read this one rule,
+ * and it can be tested without a device.
+ */
+data class GhostGap(val metres: Int, val session: GhostSession)
+
+fun ghostGap(session: GhostSession, elapsedNanos: Long, distanceM: Double): GhostGap {
+    val frozen = session.frozenDelta
+    if (frozen != null) return GhostGap(frozen, session)
+    val live = session.deltaM(elapsedNanos, distanceM)
+    if (!session.ghostFinished(elapsedNanos)) return GhostGap(live.roundToInt(), session)
+    // Round, not truncate: -42.7 m must read as -43, not -42, or the display
+    // flatters the runner by up to a metre in both directions.
+    val pinned = live.roundToInt()
+    return GhostGap(pinned, session.copy(frozenDelta = pinned))
 }
 
 /** Shared recording state between the foreground service and the UI. */

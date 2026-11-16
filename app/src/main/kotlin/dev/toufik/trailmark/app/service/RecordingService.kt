@@ -40,6 +40,7 @@ import dev.toufik.trailmark.engine.Sport
 import dev.toufik.trailmark.recording.Phase
 import dev.toufik.trailmark.recording.RecordingController
 import dev.toufik.trailmark.recording.RecordingState
+import kotlin.math.abs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -248,6 +249,9 @@ class RecordingService : Service() {
                 var ghostSpokenAt = 0L
                 var ghostSpokenSign = 0
                 var ghostSpokenM = 0
+                // Dedupe is per rival: the pick can be replaced mid-run, and the
+                // previous rival's 100 m step would gag the new one's first call.
+                var ghostSpokenFor = -1L
                 while (isActive) {
                     val st = c.state.value
                     if (st.phase == Phase.RECORDING) {
@@ -273,18 +277,22 @@ class RecordingService : Service() {
                             getSharedPreferences("trailmark", MODE_PRIVATE)
                                 .getBoolean("ghost_voice", true)
                         ) {
-                            val metres = kotlin.math.abs(gap)
+                            val metres = abs(gap)
                             val sign = if (gap >= 0) 1 else -1
                             val now = System.nanoTime()
+                            val rival = RecordingHolder.session.value?.candidateId ?: -1L
                             val waited = now - ghostSpokenAt
                             val due = ghostSpokenAt == 0L ||
                                 sign != ghostSpokenSign ||
                                 waited > 60_000_000_000L ||
                                 metres - ghostSpokenM >= 100
-                            if (metres >= 30 && due) {
+                            // A new rival starts its own dedupe window.
+                            val fresh = rival != ghostSpokenFor
+                            if (metres >= 30 && (due || fresh)) {
                                 ghostSpokenAt = now
                                 ghostSpokenSign = sign
                                 ghostSpokenM = metres
+                                ghostSpokenFor = rival
                                 // A positive gap means the live run is AHEAD, so the
                                 // ghost is behind: the old mapping spoke it backwards.
                                 val event = if (gap >= 0) {
@@ -366,15 +374,18 @@ class RecordingService : Service() {
         val voiceOn = getSharedPreferences("trailmark", MODE_PRIVATE)
             .getBoolean("voice_coach", true)
         ghostJob = scope.launch {
-            var finishedSpoken = false
+            // Per-rival, not per-run: the first pick can be dropped for sharing no
+            // ground and replaced, and the replacement's finish still has to be
+            // called out. A plain boolean stayed true and swallowed it.
+            var finishedFor = -1L
             while (isActive) {
                 val st = c.state.value
                 publishGhostGap(st)
                 val session = RecordingHolder.session.value
                 if (session != null && session.activityId == st.activityId &&
-                    !finishedSpoken && session.ghostFinished(st.elapsedNanos)
+                    finishedFor != session.candidateId && session.ghostFinished(st.elapsedNanos)
                 ) {
-                    finishedSpoken = true
+                    finishedFor = session.candidateId
                     val lead = RecordingHolder.ghostDelta.value ?: 0
                     if (ttsReady && getSharedPreferences("trailmark", MODE_PRIVATE)
                             .getBoolean("ghost_voice", true)
@@ -382,9 +393,9 @@ class RecordingService : Service() {
                         tts?.speak(
                             Coach.message(
                                 if (lead >= 0) {
-                                    CoachEvent.Overtook(kotlin.math.abs(lead))
+                                    CoachEvent.Overtook(abs(lead))
                                 } else {
-                                    CoachEvent.GotOvertaken(kotlin.math.abs(lead))
+                                    CoachEvent.GotOvertaken(abs(lead))
                                 },
                                 coachLocale(currentLang()),
                                 lead,
@@ -422,20 +433,9 @@ class RecordingService : Service() {
             return
         }
         if (st.phase != Phase.RECORDING) return
-        if (session.frozenDelta != null) {
-            RecordingHolder.setGhostDelta(session.frozenDelta)
-            return
-        }
-        val live = session.deltaM(st.elapsedNanos, st.distanceM)
-        if (session.ghostFinished(st.elapsedNanos)) {
-            // The rival is home: pin the gap at the number the runner finished with
-            // instead of letting it drift for the rest of the run.
-            val frozen = live.toInt()
-            RecordingHolder.setSession(session.copy(frozenDelta = frozen))
-            RecordingHolder.setGhostDelta(frozen)
-            return
-        }
-        RecordingHolder.setGhostDelta(live.toInt())
+        val gap = ghostGap(session, st.elapsedNanos, st.distanceM)
+        if (gap.session !== session) RecordingHolder.setSession(gap.session)
+        RecordingHolder.setGhostDelta(gap.metres)
     }
 
     private fun evaluateNavigation(st: RecordingState, voiceOn: Boolean) {
