@@ -42,7 +42,12 @@ data class GhostMatch(
     /** The part of the old effort still to be raced, for drawing. */
     val ghostRoute: List<StoredPoint> = candidate.points
         .filter { it.type != WaypointType.REJECTED }
-        .let { it.subList(fromIndex.coerceIn(0, it.size - 1), it.size) }
+        .let { points ->
+            // coerceIn(0, -1) throws on an empty list, and a match can be built
+            // from a candidate whose points were dropped after the fact.
+            if (points.isEmpty()) emptyList()
+            else points.subList(fromIndex.coerceIn(0, points.size - 1), points.size)
+        }
 }
 
 private const val MIN_ROUTE_POINTS = 4

@@ -21,28 +21,26 @@ class GhostSessionTest {
     private val baseLon = 3.1856
 
     /** A dead-straight 1 km effort that took 300 s, one fix every 20 m. */
-    private fun straightGhost(): Ghost {
-        val points = (0..50).map { i ->
-            StoredPoint(
-                lat = baseLat,
-                lon = baseLon + i * 20.0 / 89_200.0,
-                timeNanos = i * 6_000_000_000L,
-                accuracyM = 5.0,
-                type = WaypointType.NORMAL,
-            )
-        }
-        return Ghost(points, fromIndex = 0, totalElapsedNanos = 300_000_000_000L)
+    private fun straightPoints(): List<StoredPoint> = (0..50).map { i ->
+        StoredPoint(
+            lat = baseLat,
+            lon = baseLon + i * 20.0 / 89_200.0,
+            timeNanos = i * 6_000_000_000L,
+            accuracyM = 5.0,
+            type = WaypointType.NORMAL,
+        )
     }
 
     private fun session(t0: Long = 0L, baselineM: Double = 0.0): GhostSession {
-        val ghost = straightGhost()
+        val points = straightPoints()
+        val ghost = Ghost(points, fromIndex = 0, totalElapsedNanos = 300_000_000_000L)
         val candidate = GhostCandidate(
             activityId = 7L,
             sport = "RUN",
             startWallMillis = 0L,
             distanceM = ghost.lengthM,
             elapsedNanos = ghost.durationNanos,
-            points = emptyList(),
+            points = points,
         )
         return GhostSession(
             activityId = 99L,

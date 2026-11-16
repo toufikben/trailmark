@@ -323,6 +323,25 @@ class GhostMatchTest {
     // --- ranking, so a rejected pick can be replaced ---
 
     @Test
+    fun aMatchBuiltWithoutPointsDoesNotExplodeWhenDrawn() {
+        // The route slice used to call coerceIn(0, size - 1) on an empty list,
+        // which throws. A match whose candidate lost every point must be empty,
+        // not fatal: the screen draws it on every frame.
+        val m = GhostMatch(
+            candidate = candidate(1, points = emptyList()),
+            startDistanceM = 0.0,
+            startOffsetM = 0.0,
+            fromIndex = 0,
+            remainingM = 0.0,
+            remainingNanos = 0L,
+            headingDeltaDeg = null,
+            routeOverlapM = null,
+            ghost = Ghost(emptyList()),
+        )
+        assertTrue(m.ghostRoute.isEmpty())
+    }
+
+    @Test
     fun ranksEveryUsableRivalBestFirst() {
         val near = routeEast(600.0, steps = 12)
         val sameStart = routeEast(600.0, steps = 12)
