@@ -13,6 +13,10 @@ import java.io.DataOutputStream
  */
 object Fit {
     private const val FIT_EPOCH_OFFSET_S = 631_065_600L
+    /** The FIT "field not measured" sentinels for sint32 coordinates and uint16 altitude. */
+    private const val FIT_INVALID_S32 = 0x7FFFFFFF
+    private const val FIT_INVALID_U16 = 0xFFFF
+    private const val FIT_INVALID_U32 = 0xFFFFFFFFL
     private const val PROFILE_VERSION = 2160
 
     private const val ENUM = 0x00
@@ -239,22 +243,29 @@ object Fit {
                 if (i + size > end) break
                 if (def.global == 20) {
                     var off = i
-                    var lat: Double? = null
-                    var lon: Double? = null
-                    var alt: Double? = null
+                    var latRaw: Int? = null
+                    var lonRaw: Int? = null
+                    var altRaw: Int? = null
                     for (f in def.fields) {
                         val at = off
                         off += f.size
                         if (compressed && f.num == 253) continue
                         when (f.num) {
-                            0 -> if (f.size == 4) lat = deg(readSint32(bytes, at, def.little))
-                            1 -> if (f.size == 4) lon = deg(readSint32(bytes, at, def.little))
-                            2 -> if (f.size == 2) alt = readU16(bytes, at, def.little) / 5.0 - 500.0
+                            0 -> if (f.size == 4) latRaw = readSint32(bytes, at, def.little)
+                            1 -> if (f.size == 4) lonRaw = readSint32(bytes, at, def.little)
+                            2 -> if (f.size == 2) altRaw = readU16(bytes, at, def.little)
                             253 -> if (f.size == 4) lastTimestamp = readU32(bytes, at, def.little)
                         }
                     }
                     if (compressed) lastTimestamp = (lastTimestamp + (h and 0x1F)) and 0xFFFFFFFFL
-                    if (lat != null && lon != null) {
+                    // FIT marks a field it could not measure with the type's
+                    // maximum value. Read as a coordinate, 0x7FFFFFFF is a real
+                    // 180° — one bad record dragged the whole imported track to
+                    // the other side of the planet.
+                    val lat = latRaw?.takeIf { it != FIT_INVALID_S32 }?.let(::deg)
+                    val lon = lonRaw?.takeIf { it != FIT_INVALID_S32 }?.let(::deg)
+                    val alt = altRaw?.takeIf { it != FIT_INVALID_U16 }?.let { it / 5.0 - 500.0 }
+                    if (lat != null && lon != null && lastTimestamp != FIT_INVALID_U32) {
                         out.add(
                             ImportedPoint(
                                 lat,

@@ -156,6 +156,50 @@ class FitTest {
     }
 
     @Test
+    fun aRecordWithTheInvalidCoordinateSentinelIsDropped() {
+        // FIT writes 0x7FFFFFFF for a position it could not measure. Read as a
+        // semicircle that is a perfectly valid 180°, so one bad record used to
+        // drag a whole imported track to the other side of the planet.
+        val pts = listOf(
+            p(36.7538, 3.1856, 0L, alt = 10.0),
+            p(36.7548, 3.1856, 1_000_000_000L, alt = 10.0),
+        )
+        val bytes = Fit.write(pts, startWallMillis = 1_700_000_000_000L)
+        val sizes = IntArray(16)
+        var i = 14
+        var firstRecord = -1
+        while (i < bytes.size - 2) {
+            val header = bytes[i].toInt() and 0xFF
+            i++
+            val local = header and 0x0F
+            if (header and 0x40 != 0) {
+                i += 4
+                val n = bytes[i].toInt() and 0xFF
+                i++
+                var size = 0
+                repeat(n) {
+                    size += bytes[i + 1].toInt() and 0xFF
+                    i += 3
+                }
+                sizes[local] = size
+            } else {
+                if (local == 1 && firstRecord < 0) firstRecord = i
+                i += sizes[local]
+            }
+        }
+        // Definition order: timestamp (4), lat (4), lon (4), altitude (2), ...
+        val latAt = firstRecord + 4
+        bytes[latAt] = 0xFF.toByte()
+        bytes[latAt + 1] = 0xFF.toByte()
+        bytes[latAt + 2] = 0xFF.toByte()
+        bytes[latAt + 3] = 0x7F.toByte()
+
+        val back = Fit.read(bytes)
+        assertEquals(1, back.size)
+        assertEquals(36.7548, back.single().lat, 1e-6)
+    }
+
+    @Test
     fun readerRejectsForeignBytes() {
         assertEquals(0, Fit.read(ByteArray(20)).size)
         assertEquals(0, Fit.read("not a fit file at all".toByteArray()).size)
