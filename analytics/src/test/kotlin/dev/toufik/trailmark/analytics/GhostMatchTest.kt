@@ -3,6 +3,7 @@ package dev.toufik.trailmark.analytics
 import dev.toufik.trailmark.core.model.StoredPoint
 import dev.toufik.trailmark.core.model.WaypointType
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -29,18 +30,29 @@ class GhostMatchTest {
             east(meters * it / steps).copy(timeNanos = it * 1_000_000_000L)
         }
 
+    /** East to [meters], then back to the origin: the same ground twice. */
+    private fun outAndBack(meters: Double, steps: Int = 10): List<StoredPoint> {
+        val out = (0..steps).map { east(meters * it / steps) }
+        val back = (1..steps).map { east(meters - meters * it / steps) }
+        return (out + back).mapIndexed { i, p -> p.copy(timeNanos = i * 1_000_000_000L) }
+    }
+
     private fun candidate(
         id: Long,
         sport: String = "RUN",
         wall: Long = id,
         points: List<StoredPoint>,
+        distanceM: Double = 1000.0,
+        elapsedNanos: Long = 300_000_000_000L,
+        mockDetected: Boolean = false,
     ) = GhostCandidate(
         activityId = id,
         sport = sport,
         startWallMillis = wall,
-        distanceM = 1000.0,
-        elapsedNanos = 300_000_000_000L,
+        distanceM = distanceM,
+        elapsedNanos = elapsedNanos,
         points = points,
+        mockDetected = mockDetected,
     )
 
     @Test
@@ -201,5 +213,171 @@ class GhostMatchTest {
         assertTrue(joined.lengthM < full.lengthM)
         assertEquals(0.0, joined.distanceAt(0L), 1e-9)
         assertEquals(joined.lengthM, joined.distanceAt(joined.durationNanos), 1e-6)
+    }
+
+    // --- joining the right leg of a route that covers the same ground twice ---
+
+    @Test
+    fun joinsTheOutboundLegNotTheReturnOne() {
+        val loop = outAndBack(500.0, steps = 10)
+
+        val match = matchGhost(
+            sport = "RUN",
+            startLat = baseLat,
+            startLon = baseLon + 400.0 / 89_200.0,
+            currentBearing = 90.0,
+            currentRoute = emptyList(),
+            candidates = listOf(candidate(1, points = loop)),
+        )
+
+        assertNotNull(match)
+        assertEquals(8, match!!.fromIndex, "the outbound point at 400 m, not the return one")
+        assertTrue(match.headingDeltaDeg!! < 5.0)
+    }
+
+    @Test
+    fun theReturnLegIsRejectedWhenTheRunnerHeadsBack() {
+        val loop = outAndBack(500.0, steps = 10)
+
+        val match = matchGhost(
+            sport = "RUN",
+            startLat = baseLat,
+            startLon = baseLon + 400.0 / 89_200.0,
+            currentBearing = 270.0,
+            currentRoute = emptyList(),
+            candidates = listOf(candidate(1, points = loop)),
+        )
+
+        assertNotNull(match)
+        assertEquals(12, match!!.fromIndex, "the return point at 400 m")
+    }
+
+    // --- plausibility filters ---
+
+    @Test
+    fun skipsMockedAndTooShortEfforts() {
+        val points = routeEast(1000.0, steps = 20)
+
+        assertNull(
+            matchGhost(
+                sport = "RUN",
+                startLat = baseLat,
+                startLon = baseLon,
+                currentBearing = 90.0,
+                currentRoute = emptyList(),
+                candidates = listOf(candidate(1, points = points, mockDetected = true)),
+            ),
+        )
+        assertNull(
+            matchGhost(
+                sport = "RUN",
+                startLat = baseLat,
+                startLon = baseLon,
+                currentBearing = 90.0,
+                currentRoute = emptyList(),
+                candidates = listOf(candidate(2, points = points, elapsedNanos = 30_000_000_000L)),
+            ),
+        )
+        assertNull(
+            matchGhost(
+                sport = "RUN",
+                startLat = baseLat,
+                startLon = baseLon,
+                currentBearing = 90.0,
+                currentRoute = emptyList(),
+                candidates = listOf(candidate(3, points = points, distanceM = 120.0)),
+            ),
+        )
+    }
+
+    @Test
+    fun skipsAnEffortOlderThanTheAgeLimit() {
+        val now = 1_000_000_000_000L
+        val old = now - 200L * 24 * 60 * 60 * 1000
+        val points = routeEast(1000.0, steps = 20)
+
+        assertNull(
+            matchGhost(
+                sport = "RUN",
+                startLat = baseLat,
+                startLon = baseLon,
+                currentBearing = 90.0,
+                currentRoute = emptyList(),
+                candidates = listOf(candidate(1, wall = old, points = points)),
+                nowWallMillis = now,
+            ),
+        )
+        assertNotNull(
+            matchGhost(
+                sport = "RUN",
+                startLat = baseLat,
+                startLon = baseLon,
+                currentBearing = 90.0,
+                currentRoute = emptyList(),
+                candidates = listOf(candidate(1, wall = now - 1_000L, points = points)),
+                nowWallMillis = now,
+            ),
+        )
+    }
+
+    // --- ranking, so a rejected pick can be replaced ---
+
+    @Test
+    fun ranksEveryUsableRivalBestFirst() {
+        val near = routeEast(600.0, steps = 12)
+        val sameStart = routeEast(600.0, steps = 12)
+
+        val ranked = rankGhosts(
+            sport = "RUN",
+            startLat = baseLat,
+            startLon = baseLon,
+            currentBearing = 90.0,
+            currentRoute = emptyList(),
+            candidates = listOf(
+                candidate(1, wall = 10L, points = near),
+                candidate(2, wall = 20L, points = sameStart),
+            ),
+        )
+
+        assertEquals(2, ranked.size)
+        // Identical geometry: the newer effort is the one to beat.
+        assertEquals(2L, ranked.first().candidate.activityId)
+        assertTrue(ranked[0].score <= ranked[1].score)
+    }
+
+    @Test
+    fun aRivalWhoseRouteDivergesIsNotRankedAtAll() {
+        val live = routeEast(400.0)
+        val turnedAway = listOf(east(0.0), east(30.0), north(120.0), north(240.0), north(360.0))
+
+        val ranked = rankGhosts(
+            sport = "RUN",
+            startLat = baseLat,
+            startLon = baseLon,
+            currentBearing = null,
+            currentRoute = live,
+            candidates = listOf(candidate(1, points = turnedAway)),
+        )
+
+        assertTrue(ranked.isEmpty())
+    }
+
+    @Test
+    fun theMatchCarriesTheRaceableGhost() {
+        val match = matchGhost(
+            sport = "RUN",
+            startLat = baseLat,
+            startLon = baseLon + 300.0 / 89_200.0,
+            currentBearing = 90.0,
+            currentRoute = emptyList(),
+            candidates = listOf(candidate(1, points = routeEast(1000.0, steps = 20))),
+        )
+
+        assertNotNull(match)
+        val ghost = match!!.ghost
+        assertEquals(0.0, ghost.distanceAt(0L), 1e-9)
+        assertEquals(match.remainingM, ghost.lengthM, 1e-6)
+        assertFalse(ghost.isFinished(0L))
+        assertTrue(ghost.isFinished(ghost.durationNanos))
     }
 }

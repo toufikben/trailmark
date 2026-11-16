@@ -16,6 +16,8 @@ data class GhostCandidate(
     val distanceM: Double,
     val elapsedNanos: Long,
     val points: List<StoredPoint>,
+    /** True when the platform flagged the fixes as mocked; never used as a rival. */
+    val mockDetected: Boolean = false,
 )
 
 /**
@@ -32,12 +34,26 @@ data class GhostMatch(
     val remainingNanos: Long,
     val headingDeltaDeg: Double?,
     val routeOverlapM: Double?,
-)
+    /** The rival itself, ready to race from [fromIndex] with its own clock. */
+    val ghost: Ghost,
+    /** Lower is better. Exposed so a rejected pick can be skipped for the next one. */
+    val score: Double = 0.0,
+) {
+    /** The part of the old effort still to be raced, for drawing. */
+    val ghostRoute: List<StoredPoint> = candidate.points
+        .filter { it.type != WaypointType.REJECTED }
+        .let { it.subList(fromIndex.coerceIn(0, it.size - 1), it.size) }
+}
 
 private const val MIN_ROUTE_POINTS = 4
 private const val MIN_ROUTE_M = 40.0
 private const val MIN_GHOST_REMAINING_M = 100.0
 private const val BEARING_STEP_M = 20.0
+
+/** Screens out implausibly short efforts that make a pointless rival. */
+const val MIN_GHOST_DURATION_NANOS = 60_000_000_000L
+const val MIN_GHOST_DISTANCE_M = 300.0
+const val MAX_GHOST_AGE_MILLIS = 180L * 24 * 60 * 60 * 1000
 
 /**
  * Picks a previous activity whose route passes through the current position.
@@ -49,8 +65,15 @@ private const val BEARING_STEP_M = 20.0
  * clock and distance both start from that point, and the heading is compared
  * with the direction the ghost travels at that spot.
  *
+ * On an out-and-back or a self-crossing route the same ground is covered twice,
+ * so "nearest point" alone can join the return leg and race the runner
+ * backwards. Every point within reach is therefore scored by distance *and* by
+ * how well its direction agrees with the live heading, and the point that keeps
+ * enough route ahead wins.
+ *
  * Once a few fixes exist, [routeOverlapM] rejects candidates that merely passed
- * nearby but took another road.
+ * nearby but took another road. [rankGhosts] exposes the whole ranking so the
+ * caller can fall back to the next rival instead of giving up.
  */
 fun matchGhost(
     sport: String,
@@ -63,63 +86,172 @@ fun matchGhost(
     maxHeadingDeg: Double = 55.0,
     maxRouteOverlapM: Double = 45.0,
     minRemainingM: Double = MIN_GHOST_REMAINING_M,
-): GhostMatch? {
+    minDurationNanos: Long = MIN_GHOST_DURATION_NANOS,
+    minDistanceM: Double = MIN_GHOST_DISTANCE_M,
+    maxAgeMillis: Long = MAX_GHOST_AGE_MILLIS,
+    nowWallMillis: Long = 0L,
+): GhostMatch? = rankGhosts(
+    sport = sport,
+    startLat = startLat,
+    startLon = startLon,
+    currentBearing = currentBearing,
+    currentRoute = currentRoute,
+    candidates = candidates,
+    maxStartM = maxStartM,
+    maxHeadingDeg = maxHeadingDeg,
+    maxRouteOverlapM = maxRouteOverlapM,
+    minRemainingM = minRemainingM,
+    minDurationNanos = minDurationNanos,
+    minDistanceM = minDistanceM,
+    maxAgeMillis = maxAgeMillis,
+    nowWallMillis = nowWallMillis,
+).firstOrNull()
+
+/**
+ * Every candidate that could be raced, best first. The caller keeps this list
+ * so a rival that later turns out to share no ground can be replaced without
+ * another database pass.
+ */
+fun rankGhosts(
+    sport: String,
+    startLat: Double,
+    startLon: Double,
+    currentBearing: Double?,
+    currentRoute: List<StoredPoint>,
+    candidates: List<GhostCandidate>,
+    maxStartM: Double = 250.0,
+    maxHeadingDeg: Double = 55.0,
+    maxRouteOverlapM: Double = 45.0,
+    minRemainingM: Double = MIN_GHOST_REMAINING_M,
+    minDurationNanos: Long = MIN_GHOST_DURATION_NANOS,
+    minDistanceM: Double = MIN_GHOST_DISTANCE_M,
+    maxAgeMillis: Long = MAX_GHOST_AGE_MILLIS,
+    nowWallMillis: Long = 0L,
+): List<GhostMatch> {
     val live = currentRoute.filter { it.type != WaypointType.REJECTED }
     val liveBearing = currentBearing ?: startBearing(live)
     val hasEnoughLiveRoute = live.size >= MIN_ROUTE_POINTS && routeLengthM(live) >= MIN_ROUTE_M
 
-    data class Scored(val match: GhostMatch, val score: Double)
-
     return candidates.asSequence()
         .filter { it.sport == sport }
+        .filter { !it.mockDetected }
+        .filter { it.elapsedNanos >= minDurationNanos }
+        .filter { it.distanceM >= minDistanceM }
+        .filter { maxAgeMillis <= 0L || nowWallMillis <= 0L || nowWallMillis - it.startWallMillis <= maxAgeMillis }
         .mapNotNull { candidate ->
             val points = candidate.points.filter { it.type != WaypointType.REJECTED }
             if (points.size < 2) return@mapNotNull null
 
-            val fromIndex = nearestIndex(points, startLat, startLon)
-            val startDistance = haversineMeters(
-                startLat,
-                startLon,
-                points[fromIndex].lat,
-                points[fromIndex].lon,
-            )
-            if (startDistance > maxStartM) return@mapNotNull null
+            val prefix = prefixDistances(points)
+            val total = prefix.last()
+            val join = chooseJoinIndex(
+                points = points,
+                prefix = prefix,
+                lat = startLat,
+                lon = startLon,
+                bearing = liveBearing,
+                maxStartM = maxStartM,
+                maxHeadingDeg = maxHeadingDeg,
+                minRemainingM = minRemainingM,
+                totalM = total,
+            ) ?: return@mapNotNull null
 
-            val offset = distanceUpTo(points, fromIndex)
-            val ghost = Ghost(points, fromIndex)
+            val fromIndex = join.index
+            val ghost = Ghost(points, fromIndex, candidate.elapsedNanos)
             if (ghost.lengthM < minRemainingM) return@mapNotNull null
-
-            val candidateBearing = bearingAt(points, fromIndex)
-            val headingDelta = if (liveBearing != null && candidateBearing != null) {
-                angleDelta(liveBearing, candidateBearing)
-            } else {
-                null
-            }
-            if (headingDelta != null && headingDelta > maxHeadingDeg) return@mapNotNull null
 
             val overlap = if (hasEnoughLiveRoute) routeOverlapM(live, points) else null
             if (overlap != null && overlap > maxRouteOverlapM) return@mapNotNull null
 
-            val score = startDistance +
-                (headingDelta ?: 0.0) * 0.8 +
+            val score = join.startDistanceM +
+                (join.headingDeltaDeg ?: 0.0) * 0.8 +
                 (overlap ?: 0.0) * 2.0
-            Scored(
-                GhostMatch(
-                    candidate = candidate,
-                    startDistanceM = startDistance,
-                    startOffsetM = offset,
-                    fromIndex = fromIndex,
-                    remainingM = ghost.lengthM,
-                    remainingNanos = ghost.durationNanos,
-                    headingDeltaDeg = headingDelta,
-                    routeOverlapM = overlap,
-                ),
-                score,
+
+            GhostMatch(
+                candidate = candidate,
+                startDistanceM = join.startDistanceM,
+                startOffsetM = prefix[fromIndex],
+                fromIndex = fromIndex,
+                remainingM = ghost.lengthM,
+                remainingNanos = ghost.durationNanos,
+                headingDeltaDeg = join.headingDeltaDeg,
+                routeOverlapM = overlap,
+                ghost = ghost,
+                score = score,
             )
         }
-        .sortedWith(compareBy<Scored> { it.score }.thenByDescending { it.match.candidate.startWallMillis })
-        .firstOrNull()
-        ?.match
+        // Best match first; on a tie the most recent effort wins, because it is
+        // the one the runner is most likely trying to beat.
+        .sortedWith(
+            compareBy<GhostMatch> { it.score }
+                .thenByDescending { it.candidate.startWallMillis },
+        )
+        .toList()
+}
+
+private class Join(
+    val index: Int,
+    val startDistanceM: Double,
+    val headingDeltaDeg: Double?,
+)
+
+/**
+ * Where the race joins the old track. Points beyond [maxStartM] are ignored; the
+ * rest are scored by distance to the live position plus how far their direction
+ * disagrees with [bearing]. A wrong leg of an out-and-back is the same ground
+ * but the opposite heading, so the heading term keeps it from winning.
+ *
+ * The join is the point nearest *and* most aligned with the runner — it is never
+ * slid along the route to manufacture a longer race, because that would start
+ * the ghost behind a runner who never covered the ground in between.
+ */
+private fun chooseJoinIndex(
+    points: List<StoredPoint>,
+    prefix: DoubleArray,
+    lat: Double,
+    lon: Double,
+    bearing: Double?,
+    maxStartM: Double,
+    maxHeadingDeg: Double,
+    minRemainingM: Double,
+    totalM: Double,
+): Join? {
+    var best: Join? = null
+    var bestScore = Double.MAX_VALUE
+    for (i in points.indices) {
+        val p = points[i]
+        val d = haversineMeters(lat, lon, p.lat, p.lon)
+        if (d > maxStartM) continue
+        val delta = if (bearing != null) {
+            bearingAt(points, i)?.let { angleDelta(bearing, it) }
+        } else {
+            null
+        }
+        if (delta != null && delta > maxHeadingDeg) continue
+        val score = d + (delta ?: 0.0) * 0.8
+        if (score < bestScore) {
+            bestScore = score
+            best = Join(i, d, delta)
+        }
+    }
+    val join = best ?: return null
+    // Standing at the end of the old route leaves nothing to race.
+    if (totalM - prefix[join.index] < minRemainingM) return null
+    return join
+}
+
+/** Cumulative distance from the first point to each index. */
+private fun prefixDistances(points: List<StoredPoint>): DoubleArray {
+    val out = DoubleArray(points.size)
+    for (i in 1 until points.size) {
+        out[i] = out[i - 1] + haversineMeters(
+            points[i - 1].lat,
+            points[i - 1].lon,
+            points[i].lat,
+            points[i].lon,
+        )
+    }
+    return out
 }
 
 /** Median distance from live route samples to the candidate polyline, or null when too short. */
@@ -164,32 +296,6 @@ private fun bearingAt(points: List<StoredPoint>, index: Int): Double? {
         }
     }
     return null
-}
-
-private fun nearestIndex(points: List<StoredPoint>, lat: Double, lon: Double): Int {
-    var best = 0
-    var bestM = Double.MAX_VALUE
-    points.forEachIndexed { i, p ->
-        val d = haversineMeters(lat, lon, p.lat, p.lon)
-        if (d < bestM) {
-            bestM = d
-            best = i
-        }
-    }
-    return best
-}
-
-private fun distanceUpTo(points: List<StoredPoint>, index: Int): Double {
-    var out = 0.0
-    for (i in 1..index.coerceAtMost(points.lastIndex)) {
-        out += haversineMeters(
-            points[i - 1].lat,
-            points[i - 1].lon,
-            points[i].lat,
-            points[i].lon,
-        )
-    }
-    return out
 }
 
 private fun routeLengthM(points: List<StoredPoint>): Double {

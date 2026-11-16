@@ -69,13 +69,15 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import dev.toufik.trailmark.analytics.Ghost
 import dev.toufik.trailmark.analytics.GhostCandidate
 import dev.toufik.trailmark.analytics.GhostMatch
-import dev.toufik.trailmark.analytics.ghostDeltaM
-import dev.toufik.trailmark.analytics.matchGhost
+import dev.toufik.trailmark.analytics.MAX_GHOST_AGE_MILLIS
+import dev.toufik.trailmark.analytics.MIN_GHOST_DISTANCE_M
+import dev.toufik.trailmark.analytics.MIN_GHOST_DURATION_NANOS
+import dev.toufik.trailmark.analytics.rankGhosts
 import dev.toufik.trailmark.analytics.routeOverlapM
 import dev.toufik.trailmark.app.maps.MapPacks
+import dev.toufik.trailmark.app.service.GhostSession
 import dev.toufik.trailmark.app.service.PlanRouteHolder
 import dev.toufik.trailmark.app.service.RecordingHolder
 import dev.toufik.trailmark.app.service.RecordingService
@@ -179,24 +181,32 @@ fun RecordingScreen(
     val weather by WeatherHolder.state.collectAsState()
     val planRoute by PlanRouteHolder.state.collectAsState()
     val nav by RouteNavHolder.state.collectAsState()
-    var ghost by remember { mutableStateOf<Ghost?>(null) }
-    var ghostRoute by remember { mutableStateOf<List<StoredPoint>>(emptyList()) }
+    // The race itself lives in the holder: this screen is destroyed on every tab
+    // change and rotation, and rebuilt state restarted the clock and reported the
+    // whole run as a lead.
+    val ghostSession by RecordingHolder.session.collectAsState()
+    val ghostPool by RecordingHolder.pool.collectAsState()
+    val ghostNoMatch by RecordingHolder.noMatch.collectAsState()
+    val holderDelta by RecordingHolder.ghostDelta.collectAsState()
     var ghostCandidates by remember { mutableStateOf<List<GhostCandidate>?>(null) }
-    var ghostMatch by remember { mutableStateOf<GhostMatch?>(null) }
-    var ghostValidated by remember { mutableStateOf(false) }
-    // Ghost time starts at the moment the race joins the old track, not at recorder start.
-    var ghostT0Nanos by remember { mutableStateOf(0L) }
     var mapFix by remember { mutableStateOf<StoredPoint?>(null) }
     var barHeightPx by remember { mutableStateOf(0) }
     var showSpeedometer by remember { mutableStateOf(false) }
+    val lang = LocalLang.current
 
     LaunchedEffect(state.activityId) {
         val id = state.activityId
         if (id == null) {
             route = emptyList()
             media = emptyList()
+            // The run is over: no rival can still be racing.
+            RecordingHolder.clearGhost()
             return@LaunchedEffect
         }
+        // A session that belongs to another effort is stale (a run finished while
+        // this screen was gone); drop it, but never clear the live one.
+        val live = RecordingHolder.session.value
+        if (live != null && live.activityId != id) RecordingHolder.clearGhost()
         route = emptyList()
         var cursor = 0L
         while (true) {
@@ -213,11 +223,42 @@ fun RecordingScreen(
         }
     }
 
-    LaunchedEffect(state.lastActivityId) {
+    // Rivals are loaded once per finished run. Mocked fixes, very short efforts
+    // and stale attempts are dropped here so the ranking never has to carry them.
+    // The open row also restores the sport after a rotation, so a resumed bike
+    // ride is not compared against runs. It is skipped once a race has joined,
+    // because changing the sport then would undo the pick.
+    LaunchedEffect(state.activityId) {
+        val id = state.activityId ?: return@LaunchedEffect
+        if (RecordingHolder.session.value?.activityId == id) return@LaunchedEffect
+        val row = withContext(Dispatchers.IO) {
+            AppGraph.repository(context).activityById(id)
+        }
+        val recorded = row?.sport?.let { name ->
+            Sport.entries.firstOrNull { it.name == name }
+        }
+        if (recorded != null) sport = recorded
+    }
+
+    // Rivals are loaded when a run starts and again when one finishes. Keyed only
+    // on the finished run, the very first run after the app launched had no pool
+    // at all and silently raced nothing.
+    LaunchedEffect(state.activityId, state.lastActivityId) {
+        if (state.activityId == null && state.lastActivityId == null) {
+            ghostCandidates = emptyList()
+            return@LaunchedEffect
+        }
         ghostCandidates = withContext(Dispatchers.IO) {
             val repo = AppGraph.repository(context)
+            val now = System.currentTimeMillis()
             repo.listActivities()
-                .filter { !it.isOpen && it.distanceM >= 40.0 }
+                .filter {
+                    !it.isOpen &&
+                        !it.mockDetected &&
+                        it.elapsedNanos >= MIN_GHOST_DURATION_NANOS &&
+                        it.distanceM >= MIN_GHOST_DISTANCE_M &&
+                        now - it.startWallMillis <= MAX_GHOST_AGE_MILLIS
+                }
                 .sortedByDescending { it.startWallMillis }
                 .take(30)
                 .mapNotNull { row ->
@@ -232,6 +273,7 @@ fun RecordingScreen(
                             distanceM = row.distanceM,
                             elapsedNanos = row.elapsedNanos,
                             points = points,
+                            mockDetected = row.mockDetected,
                         )
                     }
                 }
@@ -240,29 +282,24 @@ fun RecordingScreen(
 
     // Pick the ghost once the first real fix lands, using the same sport, the
     // start point, the heading and (a little later) the actual route overlap.
+    // The join is deliberately deferred while a live session for this activity
+    // already exists, which is what makes a tab switch free.
     val stateRef = rememberUpdatedState(state)
     val routeRef = rememberUpdatedState(route)
     val mapFixRef = rememberUpdatedState(mapFix)
+    val sessionRef = rememberUpdatedState(ghostSession)
     LaunchedEffect(state.activityId, sport, ghostCandidates, pro) {
         val id = state.activityId
         if (id == null) {
-            ghost = null
-            ghostRoute = emptyList()
-            ghostMatch = null
-            ghostValidated = false
-            ghostT0Nanos = 0L
+            RecordingHolder.clearGhost()
             return@LaunchedEffect
         }
         if (!pro) {
             // Ghost racing is a Pro feature: free users record without a rival.
-            ghost = null
-            ghostRoute = emptyList()
-            ghostMatch = null
-            ghostValidated = false
-            ghostT0Nanos = 0L
+            RecordingHolder.clearGhost()
             return@LaunchedEffect
         }
-        if (ghostMatch != null) return@LaunchedEffect
+        if (sessionRef.value?.activityId == id) return@LaunchedEffect
         val candidates = ghostCandidates ?: return@LaunchedEffect
         if (candidates.isEmpty()) return@LaunchedEffect
 
@@ -283,47 +320,74 @@ fun RecordingScreen(
             }
         }
         val from = start ?: return@LaunchedEffect
-        val m = matchGhost(
-            sport = sport.name,
-            startLat = from.lat,
-            startLon = from.lon,
-            currentBearing = startBearing,
-            currentRoute = routeRef.value,
-            candidates = candidates,
-        ) ?: return@LaunchedEffect
-
-        val points = m.candidate.points.filter { it.type != WaypointType.REJECTED }
-        if (points.size < 2) return@LaunchedEffect
-        ghostMatch = m
-        // Race the rest of the old effort, starting where this run joined it.
-        val slice = points.subList(m.fromIndex.coerceIn(0, points.size - 1), points.size)
-        ghost = Ghost(points, m.fromIndex)
-        ghostRoute = slice
-        ghostT0Nanos = stateRef.value.elapsedNanos
+        // Ranking walks every stored point of up to 30 efforts: keep it off the
+        // UI thread, which also draws the map.
+        val ranked = withContext(Dispatchers.Default) {
+            rankGhosts(
+                sport = sport.name,
+                startLat = from.lat,
+                startLon = from.lon,
+                currentBearing = startBearing,
+                currentRoute = routeRef.value,
+                candidates = candidates,
+                nowWallMillis = System.currentTimeMillis(),
+            )
+        }
+        // Another instance may have joined while this one was waiting for a fix.
+        if (sessionRef.value?.activityId == id) return@LaunchedEffect
+        val best = ranked.firstOrNull()
+        if (best == null) {
+            // Rivals existed but none of them started near this run: say so
+            // instead of leaving the runner wondering where the ghost went.
+            RecordingHolder.setNoMatch(true)
+            return@LaunchedEffect
+        }
+        RecordingHolder.setPool(ranked.drop(1))
+        RecordingHolder.setNoMatch(false)
+        RecordingHolder.setSession(
+            sessionOf(best, id, stateRef.value.elapsedNanos, stateRef.value.distanceM),
+        )
         coachLine = Coach.message(
             CoachEvent.PreviousBest(
-                distanceM = m.remainingM,
-                seconds = m.remainingNanos / 1_000_000_000L,
-                targetM = m.remainingM,
+                distanceM = best.remainingM,
+                seconds = best.remainingNanos / 1_000_000_000L,
+                targetM = best.remainingM,
             ),
             coachLocale(langRef.value),
         )
     }
 
-    // A heading match at the start is only a guess. Once ~4 fixes exist, drop
-    // the ghost if the two routes do not actually share the same ground.
-    LaunchedEffect(state.activityId, route.size) {
-        val m = ghostMatch ?: return@LaunchedEffect
-        if (ghostValidated || route.size < 4) return@LaunchedEffect
-        val overlap = routeOverlapM(route, m.candidate.points) ?: return@LaunchedEffect
-        ghostValidated = true
-        if (overlap > 45.0) {
-            ghost = null
-            ghostRoute = emptyList()
-            ghostMatch = null
-            ghostT0Nanos = 0L
+    // A heading match at the start is only a guess. Once ~4 fixes exist, check
+    // that the two routes share the same ground; if they do not, race the next
+    // rival instead of silently dropping the ghost for the rest of the run.
+    LaunchedEffect(state.activityId, route.size, ghostSession?.candidateId) {
+        val s = ghostSession ?: return@LaunchedEffect
+        if (s.activityId != state.activityId || s.validated || route.size < 4) return@LaunchedEffect
+        val liveRoute = route
+        val overlap = withContext(Dispatchers.Default) {
+            routeOverlapM(liveRoute, s.match.candidate.points)
+        } ?: return@LaunchedEffect
+        if (overlap <= 45.0) {
+            RecordingHolder.setSession(s.copy(validated = true))
+            return@LaunchedEffect
         }
+        val liveId = s.activityId
+        val next = withContext(Dispatchers.Default) {
+            ghostPool.firstOrNull { m ->
+                (routeOverlapM(route, m.candidate.points) ?: Double.MAX_VALUE) <= 45.0
+            }
+        }
+        if (next == null) {
+            RecordingHolder.clearGhost()
+            RecordingHolder.setNoMatch(true)
+            return@LaunchedEffect
+        }
+        val st = stateRef.value
+        RecordingHolder.setPool(ghostPool - next)
+        RecordingHolder.setNoMatch(false)
+        RecordingHolder.setSession(sessionOf(next, liveId, st.elapsedNanos, st.distanceM))
     }
+
 
     val moveBearing = remember(route) { movementBearing(route) }
     val current: StoredPoint? = state.currentLat?.let { la ->
@@ -339,22 +403,16 @@ fun RecordingScreen(
         }
     }
 
-    val ghostElapsed = (state.elapsedNanos - ghostT0Nanos).coerceAtLeast(0L)
-    val ghostNow: StoredPoint? = ghost?.positionAt(ghostElapsed)
-
-    val gLive = ghost
-    val liveDelta: Int? = if (gLive != null && state.phase == Phase.RECORDING) {
-        ghostDeltaM(gLive, state.distanceM, ghostElapsed).toInt()
-    } else {
-        null
-    }
+    val session = ghostSession?.takeIf { it.activityId == state.activityId }
+    val ghostNow: StoredPoint? = session
+        ?.takeIf { state.phase == Phase.RECORDING || state.phase == Phase.PAUSED }
+        ?.match?.ghost
+        ?.positionAt(session.raceElapsed(state.elapsedNanos))
+    // The gap is measured and published by the foreground service, so it keeps
+    // running while this screen is gone. The screen only draws what it is told.
+    val liveDelta: Int? = if (session != null && state.phase == Phase.RECORDING) holderDelta else null
     var lastAhead by remember { mutableStateOf<Boolean?>(null) }
     var overtakeFlash by remember { mutableStateOf<String?>(null) }
-    // The service speaks the gap; the screen keeps owning what is drawn.
-    LaunchedEffect(liveDelta) { RecordingHolder.setGhostDelta(liveDelta) }
-    androidx.compose.runtime.DisposableEffect(Unit) {
-        onDispose { RecordingHolder.setGhostDelta(null) }
-    }
     val liveDeltaRef = rememberUpdatedState(liveDelta)
     LaunchedEffect(liveDelta?.let { it >= 0 }, state.phase) {
         val d = liveDeltaRef.value
@@ -479,7 +537,7 @@ fun RecordingScreen(
                     planChunks = planRoute,
                     fitPlan = true,
                     ghostRoute = if (state.phase == Phase.RECORDING || state.phase == Phase.PAUSED) {
-                        ghostRoute
+                        session?.route ?: emptyList()
                     } else {
                         emptyList()
                     },
@@ -590,9 +648,23 @@ fun RecordingScreen(
                             .padding(horizontal = 10.dp, vertical = 6.dp),
                     )
                 }
-                if (ghostMatch != null && liveDelta != null && state.phase == Phase.RECORDING) {
+                if (ghostNoMatch && session == null && state.phase == Phase.RECORDING) {
+                    Text(
+                        text = extraText(lang, "ghostNoMatch"),
+                        color = Palette.textSecondary,
+                        fontSize = 11.sp,
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 12.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Palette.surface.copy(alpha = 0.92f))
+                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                    )
+                }
+                if (session != null && liveDelta != null && state.phase == Phase.RECORDING) {
                     val d = liveDelta
                     val ahead = d >= 0
+                    val done = session.ghostFinished(state.elapsedNanos)
                     Row(
                         modifier = Modifier
                             .align(Alignment.TopCenter)
@@ -604,7 +676,11 @@ fun RecordingScreen(
                         horizontalArrangement = Arrangement.spacedBy(7.dp),
                     ) {
                         Text("👻", fontSize = 13.sp)
-                        Text(t.ghost, color = Palette.textSecondary, fontSize = 11.sp)
+                        Text(
+                            if (done) extraText(lang, "ghostFinished") else t.ghost,
+                            color = Palette.textSecondary,
+                            fontSize = 11.sp,
+                        )
                         Text(
                             (if (ahead) "+" else "−") +
                                 formatElevation(Math.abs(d).toDouble()) + " " + elevationUnit(t),
@@ -995,6 +1071,15 @@ private fun RoundRecordButton(
         }
     }
 }
+
+/** Starts a race from a ranked match, anchored at the moment the runner joins it. */
+private fun sessionOf(match: GhostMatch, activityId: Long, t0Nanos: Long, baselineM: Double) =
+    GhostSession(
+        activityId = activityId,
+        match = match,
+        t0Nanos = t0Nanos,
+        baselineM = baselineM,
+    )
 
 /** Bearing of the last meaningful movement, used when GPS does not report one. */
 private fun movementBearing(route: List<StoredPoint>): Double? {

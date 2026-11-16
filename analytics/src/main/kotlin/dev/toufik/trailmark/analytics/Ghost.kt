@@ -7,13 +7,16 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Longest real gap between two stored fixes that still counts as racing time.
- * A pause, a lost fix or a crash gap is clamped, so the ghost neither freezes
- * for minutes nor teleports ahead of the live run. Stored timestamps include
- * pause time while `elapsedNanos` excludes it; the clamp keeps both clocks
- * close without needing the pause history.
+ * Longest gap between two stored fixes that still counts as racing time when the
+ * clock has to be rebuilt. Stored timestamps include pause time while
+ * `elapsedNanos` excludes it, so a pause looks like one long gap; the clamp keeps
+ * a single gap from swallowing the whole race.
  */
 private const val MAX_GAP_NANOS = 15_000_000_000L
+
+/** How far the rebuilt clock may be stretched to reach the stored duration. */
+private const val MIN_CLOCK_SCALE = 0.5
+private const val MAX_CLOCK_SCALE = 3.0
 
 /**
  * A previous effort as a distance-vs-time curve. Interpolates linearly between
@@ -23,23 +26,50 @@ private const val MAX_GAP_NANOS = 15_000_000_000L
  * [fromIndex] lets the race begin in the middle of the previous effort: the
  * ghost clock and its distance both start at that point, which is what makes a
  * match useful when the new run starts a little before or after the old one.
+ *
+ * [totalElapsedNanos] is the effort's own recorded moving time. The per-point
+ * clock is rebuilt from the stored stamps (which include pauses), then scaled so
+ * the whole curve lasts exactly that long. Without it, every stop in the old
+ * effort inflates the ghost by up to [MAX_GAP_NANOS], which makes the ghost
+ * slower than the run it is supposed to replay. A zero or missing duration keeps
+ * the raw stamps.
  */
-class Ghost(points: List<StoredPoint>, fromIndex: Int = 0) {
-    private val pts = if (points.isEmpty()) {
-        emptyList()
-    } else {
-        points.subList(fromIndex.coerceIn(0, points.size - 1), points.size)
-    }
-    private val times = LongArray(pts.size)
-    private val distances = DoubleArray(pts.size)
+class Ghost(
+    points: List<StoredPoint>,
+    fromIndex: Int = 0,
+    totalElapsedNanos: Long = 0L,
+) {
+    private val pts: List<StoredPoint>
+    private val times: LongArray
+    private val distances: DoubleArray
 
     init {
-        for (i in 1 until pts.size) {
-            val prev = pts[i - 1]
-            val p = pts[i]
-            distances[i] = distances[i - 1] + haversineMeters(prev.lat, prev.lon, p.lat, p.lon)
-            val rawGap = (p.timeNanos - prev.timeNanos).coerceAtLeast(0L)
-            times[i] = times[i - 1] + rawGap.coerceAtMost(MAX_GAP_NANOS)
+        if (points.size < 2) {
+            pts = points
+            times = LongArray(points.size)
+            distances = DoubleArray(points.size)
+        } else {
+            val start = fromIndex.coerceIn(0, points.size - 1)
+            pts = points.subList(start, points.size)
+
+            val raw = LongArray(points.size)
+            for (i in 1 until points.size) {
+                val rawGap = (points[i].timeNanos - points[i - 1].timeNanos).coerceAtLeast(0L)
+                raw[i] = raw[i - 1] + rawGap.coerceAtMost(MAX_GAP_NANOS)
+            }
+            val scale = clockScale(raw.last(), totalElapsedNanos)
+            val origin = raw[start]
+
+            times = LongArray(pts.size) { i -> ((raw[start + i] - origin) * scale).toLong() }
+            distances = DoubleArray(pts.size)
+            for (i in 1 until pts.size) {
+                distances[i] = distances[i - 1] + haversineMeters(
+                    pts[i - 1].lat,
+                    pts[i - 1].lon,
+                    pts[i].lat,
+                    pts[i].lon,
+                )
+            }
         }
     }
 
@@ -72,6 +102,9 @@ class Ghost(points: List<StoredPoint>, fromIndex: Int = 0) {
         return a.copy(lat = lat, lon = lon, bearingDeg = bearing)
     }
 
+    /** True once the ghost has reached the end of the stretch it is racing. */
+    fun isFinished(elapsedNanos: Long): Boolean = elapsedNanos >= durationNanos
+
     /** Index pair and fraction, or null when outside the timed range. */
     private fun segmentAt(elapsedNanos: Long): Triple<Int, Int, Double>? {
         if (times.size < 2) return null
@@ -88,6 +121,16 @@ class Ghost(points: List<StoredPoint>, fromIndex: Int = 0) {
         val f = if (t1 > t0) (elapsedNanos - t0).toDouble() / (t1 - t0) else 0.0
         return Triple(lo, hi, f)
     }
+}
+
+/**
+ * Factor that makes the rebuilt clock last [targetNanos]. A missing duration, or
+ * a curve with no measurable time, keeps the raw stamps; an absurd ratio is
+ * bounded so one corrupt row cannot turn a ghost into a rocket.
+ */
+private fun clockScale(rawTotalNanos: Long, targetNanos: Long): Double {
+    if (rawTotalNanos <= 0L || targetNanos <= 0L) return 1.0
+    return (targetNanos.toDouble() / rawTotalNanos).coerceIn(MIN_CLOCK_SCALE, MAX_CLOCK_SCALE)
 }
 
 private fun legBearing(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {

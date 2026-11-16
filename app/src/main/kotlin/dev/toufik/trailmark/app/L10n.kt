@@ -939,6 +939,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "saveRecipe" to "حفظ كإعداد افتراضي",
         "restoreSkipped" to "تخطّي %d ملفًا تالفًا",
         "splits" to "التقسيمات",
+        "ghostNoMatch" to "لا يوجد شبح مطابق — لا توجد جولة سابقة على هذا المسار",
+        "ghostFinished" to "انتهى الشبح",
     ),
     Lang.EN to mapOf(
         "search" to "Search", "noResults" to "No results", "media" to "Media",
@@ -958,6 +960,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "saveRecipe" to "Save as default",
         "restoreSkipped" to "Skipped %d damaged files",
         "splits" to "Splits",
+        "ghostNoMatch" to "No matching ghost — no earlier run on this route",
+        "ghostFinished" to "Ghost finished",
     ),
     Lang.FR to mapOf(
         "search" to "Rechercher", "noResults" to "Aucun résultat", "media" to "Médias",
@@ -977,6 +981,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "saveRecipe" to "Enregistrer par défaut",
         "restoreSkipped" to "%d fichiers endommagés ignorés",
         "splits" to "Kilomètres",
+        "ghostNoMatch" to "Aucun fantôme correspondant — aucune sortie précédente sur ce parcours",
+        "ghostFinished" to "Fantôme terminé",
     ),
     Lang.ES to mapOf(
         "search" to "Buscar", "noResults" to "Sin resultados", "media" to "Medios",
@@ -996,6 +1002,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "saveRecipe" to "Guardar como predeterminado",
         "restoreSkipped" to "Se omitieron %d archivos dañados",
         "splits" to "Parciales",
+        "ghostNoMatch" to "Ningún fantasma compatible: no hay una salida anterior en esta ruta",
+        "ghostFinished" to "Fantasma terminado",
     ),
     Lang.PT to mapOf(
         "search" to "Pesquisar", "noResults" to "Sem resultados", "media" to "Mídia",
@@ -1015,6 +1023,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "saveRecipe" to "Guardar como predefinição",
         "restoreSkipped" to "%d ficheiros corrompidos ignorados",
         "splits" to "Parciais",
+        "ghostNoMatch" to "Nenhum fantasma compatível — não há um percurso anterior nesta rota",
+        "ghostFinished" to "Fantasma terminado",
     ),
     Lang.DE to mapOf(
         "search" to "Suchen", "noResults" to "Keine Ergebnisse", "media" to "Medien",
@@ -1034,6 +1044,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "saveRecipe" to "Als Standard speichern",
         "restoreSkipped" to "%d beschädigte Dateien übersprungen",
         "splits" to "Kilometer",
+        "ghostNoMatch" to "Kein passender Geist — keine frühere Einheit auf dieser Strecke",
+        "ghostFinished" to "Geist beendet",
     ),
     Lang.IT to mapOf(
         "search" to "Cerca", "noResults" to "Nessun risultato", "media" to "Media",
@@ -1053,6 +1065,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "saveRecipe" to "Salva come predefinito",
         "restoreSkipped" to "%d file danneggiati ignorati",
         "splits" to "Parziali",
+        "ghostNoMatch" to "Nessun fantasma corrispondente — nessuna uscita precedente su questo percorso",
+        "ghostFinished" to "Fantasma terminato",
     ),
     Lang.NL to mapOf(
         "search" to "Zoeken", "noResults" to "Geen resultaten", "media" to "Media",
@@ -1072,6 +1086,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "saveRecipe" to "Opslaan als standaard",
         "restoreSkipped" to "%d beschadigde bestanden overgeslagen",
         "splits" to "Kilometers",
+        "ghostNoMatch" to "Geen passend spook — geen eerdere rit op deze route",
+        "ghostFinished" to "Spook voltooid",
     ),
     Lang.PL to mapOf(
         "search" to "Szukaj", "noResults" to "Brak wyników", "media" to "Multimedia",
@@ -1091,6 +1107,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "saveRecipe" to "Zapisz jako domyślne",
         "restoreSkipped" to "Pominięto %d uszkodzonych plików",
         "splits" to "Kilometry",
+        "ghostNoMatch" to "Brak pasującego ducha — brak wcześniejszego przejazdu na tej trasie",
+        "ghostFinished" to "Duch ukończony",
     ),
     Lang.RU to mapOf(
         "search" to "Поиск", "noResults" to "Нет результатов", "media" to "Медиа",
@@ -1110,6 +1128,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "saveRecipe" to "Сохранить по умолчанию",
         "restoreSkipped" to "Пропущено повреждённых файлов: %d",
         "splits" to "Километры",
+        "ghostNoMatch" to "Подходящего призрака нет — на этом маршруте не было прошлых забегов",
+        "ghostFinished" to "Призрак финишировал",
     ),
     Lang.TR to mapOf(
         "search" to "Ara", "noResults" to "Sonuç yok", "media" to "Medya",
@@ -1129,6 +1149,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "saveRecipe" to "Varsayılan olarak kaydet",
         "restoreSkipped" to "%d bozuk dosya atlandı",
         "splits" to "Kilometreler",
+        "ghostNoMatch" to "Eşleşen hayalet yok — bu rotada önceki bir kayıt yok",
+        "ghostFinished" to "Hayalet bitti",
     ),
     Lang.ID to mapOf(
         "search" to "Cari", "noResults" to "Tidak ada hasil", "media" to "Media",
@@ -1148,6 +1170,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "saveRecipe" to "Simpan sebagai bawaan",
         "restoreSkipped" to "%d file rusak dilewati",
         "splits" to "Per kilometer",
+        "ghostNoMatch" to "Tidak ada hantu yang cocok — belum ada rute sebelumnya di jalur ini",
+        "ghostFinished" to "Hantu selesai",
     ),
     Lang.HI to mapOf(
         "search" to "खोजें", "noResults" to "कोई परिणाम नहीं", "media" to "मीडिया",
@@ -1167,6 +1191,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "saveRecipe" to "डिफ़ॉल्ट के रूप में सहेजें",
         "restoreSkipped" to "%d खराब फ़ाइलें छोड़ी गईं",
         "splits" to "किलोमीटर",
+        "ghostNoMatch" to "कोई मेल खाता भूत नहीं — इस मार्ग पर पहले कोई दौड़ नहीं",
+        "ghostFinished" to "भूत समाप्त",
     ),
     Lang.JA to mapOf(
         "search" to "検索", "noResults" to "結果なし", "media" to "メディア",
@@ -1186,6 +1212,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "saveRecipe" to "既定として保存",
         "restoreSkipped" to "壊れたファイル %d 件をスキップしました",
         "splits" to "ラップ",
+        "ghostNoMatch" to "一致するゴーストがありません — このルートの過去の記録がありません",
+        "ghostFinished" to "ゴースト完走",
     ),
     Lang.KO to mapOf(
         "search" to "검색", "noResults" to "결과 없음", "media" to "미디어",
@@ -1205,6 +1233,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "saveRecipe" to "기본값으로 저장",
         "restoreSkipped" to "손상된 파일 %d개를 건너뛰었습니다",
         "splits" to "구간",
+        "ghostNoMatch" to "일치하는 고스트가 없습니다 — 이 경로의 이전 기록이 없습니다",
+        "ghostFinished" to "고스트 완료",
     ),
     Lang.ZH to mapOf(
         "search" to "搜索", "noResults" to "无结果", "media" to "媒体",
@@ -1224,6 +1254,8 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
         "saveRecipe" to "保存为默认",
         "restoreSkipped" to "已跳过 %d 个损坏的文件",
         "splits" to "分段",
+        "ghostNoMatch" to "没有匹配的幽灵 — 此路线没有更早的记录",
+        "ghostFinished" to "幽灵已完成",
     ),
 )
 

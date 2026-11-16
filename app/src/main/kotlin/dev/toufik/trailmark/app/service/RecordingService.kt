@@ -59,6 +59,7 @@ class RecordingService : Service() {
     private var stateJob: Job? = null
     private var notifJob: Job? = null
     private var voiceJob: Job? = null
+    private var ghostJob: Job? = null
     private var navJob: Job? = null
     private var weatherJob: Job? = null
     private var wakeLock: PowerManager.WakeLock? = null
@@ -284,10 +285,12 @@ class RecordingService : Service() {
                                 ghostSpokenAt = now
                                 ghostSpokenSign = sign
                                 ghostSpokenM = metres
+                                // A positive gap means the live run is AHEAD, so the
+                                // ghost is behind: the old mapping spoke it backwards.
                                 val event = if (gap >= 0) {
-                                    CoachEvent.GhostAhead(metres)
-                                } else {
                                     CoachEvent.GhostBehind(metres)
+                                } else {
+                                    CoachEvent.GhostAhead(metres)
                                 }
                                 tts?.speak(
                                     Coach.message(event, coachLocale(currentLang()), metres),
@@ -362,6 +365,40 @@ class RecordingService : Service() {
         }
         val voiceOn = getSharedPreferences("trailmark", MODE_PRIVATE)
             .getBoolean("voice_coach", true)
+        ghostJob = scope.launch {
+            var finishedSpoken = false
+            while (isActive) {
+                val st = c.state.value
+                publishGhostGap(st)
+                val session = RecordingHolder.session.value
+                if (session != null && session.activityId == st.activityId &&
+                    !finishedSpoken && session.ghostFinished(st.elapsedNanos)
+                ) {
+                    finishedSpoken = true
+                    val lead = RecordingHolder.ghostDelta.value ?: 0
+                    if (ttsReady && getSharedPreferences("trailmark", MODE_PRIVATE)
+                            .getBoolean("ghost_voice", true)
+                    ) {
+                        tts?.speak(
+                            Coach.message(
+                                if (lead >= 0) {
+                                    CoachEvent.Overtook(kotlin.math.abs(lead))
+                                } else {
+                                    CoachEvent.GotOvertaken(kotlin.math.abs(lead))
+                                },
+                                coachLocale(currentLang()),
+                                lead,
+                            ),
+                            TextToSpeech.QUEUE_ADD,
+                            null,
+                            "ghost-done",
+                        )
+                    }
+                    buzz(longArrayOf(0, 180, 90, 180))
+                }
+                delay(1_000L)
+            }
+        }
         navJob = scope.launch {
             while (isActive) {
                 val st = c.state.value
@@ -370,6 +407,35 @@ class RecordingService : Service() {
             }
         }
         scope.launch { c.start() }
+    }
+
+    /**
+     * Measures the race against the ghost and publishes the gap, so a run keeps
+     * its rival — and its voice — while no screen is attached. The value is
+     * frozen once the ghost reaches the end of its stretch instead of growing
+     * forever.
+     */
+    private fun publishGhostGap(st: RecordingState) {
+        val session = RecordingHolder.session.value
+        if (session == null || session.activityId != st.activityId) {
+            if (st.phase == Phase.STOPPED) RecordingHolder.clearGhost()
+            return
+        }
+        if (st.phase != Phase.RECORDING) return
+        if (session.frozenDelta != null) {
+            RecordingHolder.setGhostDelta(session.frozenDelta)
+            return
+        }
+        val live = session.deltaM(st.elapsedNanos, st.distanceM)
+        if (session.ghostFinished(st.elapsedNanos)) {
+            // The rival is home: pin the gap at the number the runner finished with
+            // instead of letting it drift for the rest of the run.
+            val frozen = live.toInt()
+            RecordingHolder.setSession(session.copy(frozenDelta = frozen))
+            RecordingHolder.setGhostDelta(frozen)
+            return
+        }
+        RecordingHolder.setGhostDelta(live.toInt())
     }
 
     private fun evaluateNavigation(st: RecordingState, voiceOn: Boolean) {
@@ -511,6 +577,7 @@ class RecordingService : Service() {
                 }
             }
             RecordingHolder.update(RecordingState(phase = Phase.STOPPED, lastActivityId = finished))
+            RecordingHolder.clearGhost()
             stateJob?.cancel()
             notifJob?.cancel()
             notifJob = null
@@ -518,6 +585,8 @@ class RecordingService : Service() {
             weatherJob = null
             voiceJob?.cancel()
             voiceJob = null
+            ghostJob?.cancel()
+            ghostJob = null
             navJob?.cancel()
             navJob = null
             RouteNavHolder.update(null)

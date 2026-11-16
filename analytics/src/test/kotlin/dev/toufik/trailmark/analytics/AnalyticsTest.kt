@@ -80,6 +80,38 @@ class GhostTest {
     }
 
     @Test
+    fun aStoredDurationRebuildsTheClockWithoutThePauseTime() {
+        // Same track as above: 10 s of running, a 10-minute pause, 10 s more.
+        // The effort really took 20 s of moving time.
+        val paused = Ghost(
+            listOf(
+                p(0L, 36.7538),
+                p(10_000_000_000L, 36.7548),
+                p(610_000_000_000L, 36.7558),
+            ),
+            totalElapsedNanos = 20_000_000_000L,
+        )
+        // The pause is scaled out: 25 s of clamped stamps become 20 s of race.
+        assertEquals(20_000_000_000L, paused.durationNanos)
+        // The first leg is over when it really was: 10/25 of the 20 s clock.
+        assertEquals(paused.lengthM / 2, paused.distanceAt(8_000_000_000L), 5.0)
+    }
+
+    @Test
+    fun aMissingDurationFallsBackToTheStoredStamps() {
+        val points = listOf(p(0L, 36.7538), p(10_000_000_000L, 36.7548))
+        assertEquals(10_000_000_000L, Ghost(points).durationNanos)
+        assertEquals(10_000_000_000L, Ghost(points, totalElapsedNanos = 0L).durationNanos)
+    }
+
+    @Test
+    fun aCorruptDurationCannotStretchTheGhostWithoutLimit() {
+        val points = listOf(p(0L, 36.7538), p(10_000_000_000L, 36.7548))
+        // A wild stored duration is bounded instead of turning the ghost into a rocket.
+        assertEquals(30_000_000_000L, Ghost(points, totalElapsedNanos = 900_000_000_000L).durationNanos)
+    }
+
+    @Test
     fun positionInterpolatesAndPointsAlongTheLeg() {
         val mid = ghost.positionAt(5_000_000_000L)!!
         assertTrue(mid.lat > 36.7538 && mid.lat < 36.7548)
