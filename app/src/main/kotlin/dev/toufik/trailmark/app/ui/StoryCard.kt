@@ -61,7 +61,6 @@ internal fun renderStoryCard(
     t: Texts,
     lang: Lang,
     sport: String,
-    puckStyle: PuckStyle,
 ): Bitmap {
     val bmp = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bmp)
@@ -95,7 +94,7 @@ internal fun renderStoryCard(
         drawText(canvas, value, 58f, textColor, 668f, align, x = x, width = colW - 24, bold = true)
     }
 
-    drawRoute(canvas, points, top = 830f, height = 620f, accent = accent, end = textColor, puckStyle = puckStyle)
+    drawRoute(canvas, points, top = 830f, height = 620f, accent = accent, end = textColor)
 
     val speedPart = if (maxSpeedMps.isFinite() && maxSpeedMps < 1000.0) {
         "   ·   ${t.maxSpeed} ${formatSpeed(maxSpeedMps)} ${speedUnit(t)}"
@@ -118,7 +117,6 @@ private fun drawRoute(
     height: Float,
     accent: Int,
     end: Int,
-    puckStyle: PuckStyle,
 ) {
     val route = points.filter { it.type != WaypointType.REJECTED }
     if (route.size < 2) return
@@ -172,14 +170,8 @@ private fun drawRoute(
     val (sx, sy) = px(runs.firstOrNull()?.first() ?: route.first())
     canvas.drawCircle(sx, sy, 20f, dot)
     val (ex, ey) = px(route.last())
-    if (puckStyle == PuckStyle.ARROW) {
-        dot.color = end
-        canvas.drawCircle(ex, ey, 20f, dot)
-    } else {
-        // The finish keeps the marker the user chose, so the shared card and the
-        // video it came from show the same puck.
-        PuckArt.draw(canvas, ex, ey, 26f, puckStyle)
-    }
+    dot.color = end
+    canvas.drawCircle(ex, ey, 20f, dot)
 }
 
 private fun drawText(
