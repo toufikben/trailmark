@@ -69,6 +69,12 @@ private const val DIVE_ZOOM = 0.75
 /** How many vertices the drawn line may have: more is invisible at 720 px. */
 private const val MAX_LINE_VERTICES = 260
 
+/** Route drawn behind the athlete in the follow cameras, in metres. */
+private const val TRAIL_BEHIND_M = 260.0
+
+/** How far a projected point may sit outside the frame and still be drawn. */
+private const val EDGE_PX = 8f
+
 /** Per-second camera heading smoothing: the heading settles over about half a second. */
 private const val BEARING_TAU_S = 0.5
 
@@ -286,14 +292,16 @@ internal class HeadlessFlyover(
                         val base = projection.bitmap
                         val trail = when {
                             frame.phase == FlyoverPhase.INTRO -> emptyList()
-                            // A fixed overview can afford the whole trace; a moving
-                            // chase camera cannot. Projecting the line from the start
-                            // on every frame put most of it behind the camera, where
-                            // the projection folds and the trail read as a writhing
-                            // thread. The closing shot still shows the full route.
+                            // The closing shot and a fixed overview can afford the
+                            // whole trace: every point is on screen. A chase camera
+                            // cannot - projecting the line from the start put most
+                            // of it behind the tilted camera, where the projection
+                            // folds and the trail read as a writhing thread. There
+                            // only the short stretch just behind the athlete is
+                            // drawn, clipped to the frame.
                             frame.phase == FlyoverPhase.OUTRO || !follow ->
                                 routeScreen(projection, path, frame.distanceM)
-                            else -> emptyList()
+                            else -> trailBehind(projection, path, frame.distanceM)
                         }
                         val here = if (frame.phase == FlyoverPhase.INTRO) {
                             null
@@ -462,6 +470,37 @@ internal class HeadlessFlyover(
         }
         project(snapshot, path.at(distanceM))?.let(out::add)
         return out
+    }
+
+    /**
+     * The short line behind the athlete under a chase camera. It is walked
+     * backwards from the puck and stops at the first point that leaves the
+     * frame, so the line can never fold around behind the tilted camera while
+     * still giving the run its tail.
+     */
+    private fun trailBehind(
+        snapshot: MapSnapshot,
+        path: FlyoverPath,
+        distanceM: Double,
+    ): List<PointF> {
+        val start = (distanceM - TRAIL_BEHIND_M).coerceAtLeast(0.0)
+        val step = ((distanceM - start) / 96.0).coerceAtLeast(2.0)
+        val back = ArrayList<PointF>(96)
+        var d = distanceM
+        while (d > start) {
+            val p = project(snapshot, path.at(d))
+            if (p == null ||
+                p.x < -EDGE_PX || p.x > VIDEO_WIDTH + EDGE_PX ||
+                p.y < -EDGE_PX || p.y > VIDEO_HEIGHT + EDGE_PX
+            ) {
+                break
+            }
+            back.add(p)
+            d -= step
+        }
+        if (back.size < 2) return emptyList()
+        back.reverse()
+        return back
     }
 
     private fun project(snapshot: MapSnapshot, p: PathSample): PointF? {
