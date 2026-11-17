@@ -232,6 +232,18 @@ class ActivityRepository(private val db: TrailmarkDb) {
         }
     }
 
+    /**
+     * The wall span the track itself covers, in nanoseconds: first to last
+     * stored fix. This includes pauses, so a session with a long pause is not
+     * reported to Health Connect as ending before it really did.
+     */
+    fun trackSpanNanos(activityId: Long): Long {
+        val span = q.pointsSpan(activityId = activityId).executeAsOne()
+        val first = span.first_nanos ?: return 0L
+        val last = span.last_nanos ?: return 0L
+        return (last - first).coerceAtLeast(0L)
+    }
+
     fun loadPoints(activityId: Long): List<StoredPoint> =
         q.selectPoints(activity_id = activityId).executeAsList().map { p ->
             StoredPoint(

@@ -94,6 +94,10 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 countPoints:
 SELECT count(*) FROM track_point WHERE activity_id = ?;
 
+pointsSpan:
+SELECT min(time_nanos) AS first_nanos, max(time_nanos) AS last_nanos
+FROM track_point WHERE activity_id = ?;
+
 finishActivity:
 UPDATE activity SET elapsed_nanos = ?, distance_m = ?, fix_count = ?, rejected_count = ?, mock_detected = ? WHERE id = ?;
 

@@ -45,7 +45,12 @@ object HealthSync {
         if (!available(context) || !granted(context)) return false
         if (row.elapsedNanos <= 0L || row.distanceM <= 0.0) return false
         val start = Instant.ofEpochMilli(row.startWallMillis)
-        val end = start.plusNanos(row.elapsedNanos)
+        // A paused session's elapsed time excludes the pause, but Health
+        // Connect needs the real end. The stored track spans it.
+        val spanNanos = runCatching {
+            AppGraph.repository(context).trackSpanNanos(row.id)
+        }.getOrDefault(0L)
+        val end = start.plusNanos(maxOf(row.elapsedNanos, spanNanos))
         val offset = ZoneId.systemDefault().rules.getOffset(start)
         val records = ArrayList<Record>(3)
         records.add(
