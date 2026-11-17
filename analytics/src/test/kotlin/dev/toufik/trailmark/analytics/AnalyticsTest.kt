@@ -26,7 +26,8 @@ class AnalysisTest {
         // Two 1 km legs; the 5 km drive in the middle must be absent.
         assertTrue(a.distanceM < 2500.0, "pause gap billed: ${a.distanceM} m")
         assertTrue(a.distanceM > 1500.0)
-        assertTrue(a.movingNanos < 400_000_000_000L)
+        // 200 s + 200 s of walking; billing the 300 s gap would give 700 s.
+        assertTrue(a.movingNanos < 500_000_000_000L, "pause gap billed: ${a.movingNanos} ns")
     }
 
     @Test
