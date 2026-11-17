@@ -703,8 +703,12 @@ internal fun importTrackBytes(context: Context, bytes: ByteArray): List<Long> {
     val isFit = bytes.size >= 12 &&
         bytes[8] == '.'.code.toByte() && bytes[9] == 'F'.code.toByte() &&
         bytes[10] == 'I'.code.toByte() && bytes[11] == 'T'.code.toByte()
-    val imported = if (isFit) Fit.read(bytes) else Gpx.read(bytes.toString(Charsets.UTF_8))
+    val text = if (isFit) null else bytes.toString(Charsets.UTF_8)
+    val imported = if (isFit) Fit.read(bytes) else Gpx.read(text!!)
     if (imported.size < 2) return emptyList()
+    // Keep the sport the file declares. Every import used to land as RUN, so
+    // rides and hikes polluted run records and the run-only splits.
+    val sport = if (isFit) Fit.sport(bytes) else text?.let { Gpx.type(it) }
     val t0 = imported.first().timeMillis ?: System.currentTimeMillis()
     var dist = 0.0
     val pts = ArrayList<StoredPoint>(imported.size)
@@ -716,8 +720,29 @@ internal fun importTrackBytes(context: Context, bytes: ByteArray): List<Long> {
         pts.add(StoredPoint(p.lat, p.lon, tn, 5.0, WaypointType.NORMAL, altitudeM = p.altitudeM))
     }
     val repo = AppGraph.repository(context)
-    val id = repo.insertActivity("import-${System.currentTimeMillis()}", "RUN", t0)
+    val id = repo.insertActivity(
+        "import-${System.currentTimeMillis()}",
+        sportHintToSport(sport),
+        t0,
+    )
     repo.appendPoints(id, pts)
     repo.finishActivity(id, pts.last().timeNanos, dist, pts.size.toLong(), 0, false)
     return listOf(id)
+}
+
+/**
+ * Maps the free-text activity hint files carry ("cycling", "hiking", "Running",
+ * "E-Bike", …) onto the app's four sports. Unknown or missing hints keep the
+ * historical default of a run.
+ */
+internal fun sportHintToSport(hint: String?): String {
+    val h = hint?.trim()?.lowercase() ?: return "RUN"
+    return when {
+        h.contains("bike") || h.contains("cycl") || h.contains("bicycl") ||
+            h.contains("biking") || h.contains("velo") || h.contains("fahrrad") -> "BIKE"
+        h.contains("hik") || h.contains("trek") || h.contains("wander") -> "HIKE"
+        h.contains("walk") || h.contains("gehen") || h.contains("marche") -> "WALK"
+        h.contains("run") || h.contains("jog") || h.contains("lauf") || h.contains("trail") -> "RUN"
+        else -> "RUN"
+    }
 }

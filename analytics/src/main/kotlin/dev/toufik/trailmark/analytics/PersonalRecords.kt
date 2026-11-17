@@ -2,7 +2,7 @@ package dev.toufik.trailmark.analytics
 
 import dev.toufik.trailmark.core.geo.haversineMeters
 import dev.toufik.trailmark.core.model.StoredPoint
-import dev.toufik.trailmark.core.model.WaypointType
+import dev.toufik.trailmark.core.model.routeSegments
 
 /** Fastest personal records found across a set of recorded routes. */
 data class PersonalRecords(
@@ -18,8 +18,12 @@ data class PersonalRecords(
  * using a two-pointer scan over cumulative distance. Null when the route never
  * reaches the distance. Rejected points are evidence, never path.
  */
-fun fastestSplitSeconds(points: List<StoredPoint>, targetM: Double): Double? {
-    val route = points.filter { it.type != WaypointType.REJECTED }
+fun fastestSplitSeconds(points: List<StoredPoint>, targetM: Double): Double? =
+    // Per segment: a pause gap is not travelled distance, and counting it would
+    // hand out a personal record for a stretch nobody ran.
+    routeSegments(points).mapNotNull { fastestOnOneLeg(it, targetM) }.minOrNull()
+
+private fun fastestOnOneLeg(route: List<StoredPoint>, targetM: Double): Double? {
     if (route.size < 2) return null
 
     val cum = DoubleArray(route.size)

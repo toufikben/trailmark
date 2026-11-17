@@ -50,6 +50,8 @@ fun zoneTimes(points: List<StoredPoint>, scale: ZoneScale): LongArray {
         val a = prev
         prev = p
         if (a == null || p.type == WaypointType.IDLE || a.type == WaypointType.IDLE) continue
+        // A pause gap is not a step: the two ends are not one continuous effort.
+        if (p.type == WaypointType.RESUME) continue
         val dt = p.timeNanos - a.timeNanos
         if (dt <= 0L || dt > MAX_STEP_NANOS) continue
         val speed = haversineMeters(a.lat, a.lon, p.lat, p.lon) / (dt / 1e9)

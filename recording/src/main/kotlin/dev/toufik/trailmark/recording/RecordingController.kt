@@ -158,6 +158,13 @@ class RecordingController(
                 startNanos = fix.timeNanos,
                 resumeFrom = resumeFrom,
                 resumeDistanceM = resumeDistanceM,
+                // Any engine that is not the first one of the session starts a
+                // new segment: the leg between the previous segment's last point
+                // and this one spans a pause (or a killed process) and was never
+                // travelled. Splits and moving time must not bill it.
+                startsNewSegment = resumeFrom != null ||
+                    resumeDistanceM > 0.0 ||
+                    resumeElapsedNanos > 0L,
             )
             engine = e
             segmentWritten = 0

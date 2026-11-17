@@ -25,10 +25,13 @@ data class SportConfig(
 
     companion object {
         fun forSport(s: Sport): SportConfig = when (s) {
-            Sport.WALK -> SportConfig(Sport.WALK, maxSpeedMps = 2.5)
-            Sport.RUN -> SportConfig(Sport.RUN, maxSpeedMps = 6.0)
-            Sport.BIKE -> SportConfig(Sport.BIKE, maxSpeedMps = 20.0)
-            Sport.HIKE -> SportConfig(Sport.HIKE, maxSpeedMps = 2.0)
+            // Ceilings are "physically impossible", not "faster than average":
+            // a sprint, a fast descent or a brisk walk used to be thrown away as
+            // a GPS jump and needed three consistent pairs to recover.
+            Sport.WALK -> SportConfig(Sport.WALK, maxSpeedMps = 4.0)
+            Sport.RUN -> SportConfig(Sport.RUN, maxSpeedMps = 12.0)
+            Sport.BIKE -> SportConfig(Sport.BIKE, maxSpeedMps = 25.0)
+            Sport.HIKE -> SportConfig(Sport.HIKE, maxSpeedMps = 4.0)
         }
     }
 }

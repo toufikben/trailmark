@@ -58,6 +58,25 @@ class PersonalRecordsTest {
     }
 
     @Test
+    fun aPauseGapIsNotTravelledDistanceForARecord() {
+        // Pause, drive 5 km, resume. The two legs are separate; the drive used
+        // to count as distance and hand out a record nobody ran.
+        var nanos = 0L
+        val points = ArrayList<StoredPoint>()
+        for (i in 0..10) {
+            points += StoredPoint(0.0, i * 0.001, nanos, 5.0, WaypointType.NORMAL)
+            nanos += 10_000_000_000L
+        }
+        // 5 km east, then a RESUME point, then one more short leg.
+        points += StoredPoint(0.0, 0.045, nanos, 5.0, WaypointType.RESUME)
+        nanos += 10_000_000_000L
+        points += StoredPoint(0.0, 0.046, nanos, 5.0, WaypointType.NORMAL)
+
+        // The first leg is only ~1.1 km, so a 5 km record cannot exist at all.
+        assertNull(fastestSplitSeconds(points, 5000.0))
+    }
+
+    @Test
     fun personalRecordsPicksBestAcrossRoutes() {
         val slow = route(List(60) { 10.0 })
         val fast = route(List(60) { 8.0 })

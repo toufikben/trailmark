@@ -156,6 +156,15 @@ class FitTest {
     }
 
     @Test
+    fun theSportSurvivesAWriteAndRead() {
+        val pts = listOf(p(36.7538, 3.1856, 0L), p(36.7548, 3.1856, 1_000_000_000L))
+        // A ride used to come back as a run, polluting run records and splits.
+        assertEquals("cycling", Fit.sport(Fit.write(pts, 1_700_000_000_000L, sport = "cycling")))
+        assertEquals("hiking", Fit.sport(Fit.write(pts, 1_700_000_000_000L, sport = "hiking")))
+        assertNull(Fit.sport(ByteArray(3)))
+    }
+
+    @Test
     fun aRecordWithTheInvalidCoordinateSentinelIsDropped() {
         // FIT writes 0x7FFFFFFF for a position it could not measure. Read as a
         // semicircle that is a perfectly valid 180°, so one bad record used to

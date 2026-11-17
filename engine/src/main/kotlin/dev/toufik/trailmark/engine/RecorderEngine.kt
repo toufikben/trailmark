@@ -33,6 +33,12 @@ class RecorderEngine(
     private val rawSink: RawFixSink? = null,
     resumeFrom: StoredPoint? = null,
     resumeDistanceM: Double = 0.0,
+    /**
+     * True when this engine starts the first segment after a pause. The first
+     * stored point is then flagged RESUME, so every consumer of the stored
+     * track knows the leg from the previous segment was never walked.
+     */
+    private val startsNewSegment: Boolean = false,
 ) {
     private val ticker = MonotonicTicker()
     private val sessionStartNanos = startNanos
@@ -87,8 +93,9 @@ class RecorderEngine(
     private fun process(fix: RawFix): WaypointType {
         val a = anchor
         if (a == null) {
-            store(fix, WaypointType.NORMAL, addDistance = false)
-            return WaypointType.NORMAL
+            val first = if (startsNewSegment) WaypointType.RESUME else WaypointType.NORMAL
+            store(fix, first, addDistance = false)
+            return first
         }
 
         val dt = ticker.secondsSince(a.timeNanos)
@@ -111,6 +118,17 @@ class RecorderEngine(
             ticker.secondsSince(lastAppendNanos) >= config.forceStoreAfterS
 
         if (idle) {
+            // A device can report a measured speed of zero while the runner is
+            // in fact moving. The gate is the honest arbiter: displacement
+            // beyond it is real, so bill it and leave idle. Before this, every
+            // heartbeat moved the anchor and threw the movement away, and a
+            // walk logged while the phone reported 0 speed recorded nothing.
+            if (d >= gateM) {
+                idle = false
+                idleSinceNanos = null
+                store(fix, WaypointType.NORMAL, addDistance = true)
+                return WaypointType.NORMAL
+            }
             if (heartbeatDue || idleEvent == IdleTransition.ENTERED) {
                 store(fix, WaypointType.IDLE, addDistance = false)
             }

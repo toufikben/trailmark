@@ -39,7 +39,11 @@ fun analyze(points: List<StoredPoint>, elapsedNanos: Long): Analysis {
     var prev: StoredPoint? = null
     for (p in route) {
         val a = prev
-        if (a != null) {
+        // A RESUME point opens a segment that follows a pause. The leg from the
+        // previous segment's last point to this one spans the pause, which the
+        // runner never travelled — billing it made the detail page disagree
+        // with the stored distance and invented a bogus split after a drive.
+        if (a != null && p.type != WaypointType.RESUME) {
             val d = haversineMeters(a.lat, a.lon, p.lat, p.lon)
             distanceM += d
             val dt = p.timeNanos - a.timeNanos

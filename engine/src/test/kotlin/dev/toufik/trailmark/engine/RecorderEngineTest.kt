@@ -78,6 +78,41 @@ class RecorderEngineTest {
     }
 
     @Test
+    fun aFastRunIsNotAnImpossibleJump() {
+        // 8 m/s is a 2:05/km sprint — rare, but real. The old 6 m/s ceiling
+        // rejected it and needed three consistent pairs to recover.
+        val e = RecorderEngine(SportConfig.forSport(Sport.RUN), 0L)
+        e.onFix(walk(0.0, 0))
+        e.onFix(walk(8.0, 1))
+        assertEquals(WaypointType.NORMAL, e.storedPoints.last().type)
+        assertTrue(e.distanceMeters > 7.9)
+    }
+
+    @Test
+    fun aMeasuredZeroSpeedDoesNotEraseRealMovement() {
+        // Plenty of phones report speed 0 in a canyon or under trees while the
+        // runner is moving. The engine entered idle, then moved its anchor on
+        // every heartbeat, so that whole walk was billed as nothing.
+        val e = RecorderEngine(SportConfig.forSport(Sport.RUN), 0L)
+        var sec = 0L
+        var northM = 0.0
+        while (sec <= 60L) {
+            e.onFix(
+                RawFix(
+                    36.7538 + northM / 111111.0,
+                    3.1856,
+                    sec * 1_000_000_000L,
+                    4.0,
+                    speedMps = 0.0,
+                ),
+            )
+            sec += 5L
+            northM += 12.0
+        }
+        assertTrue(e.distanceMeters > 100.0, "movement during a false idle must still be billed")
+    }
+
+    @Test
     fun theSinkSeesOneVerdictPerAcceptedFixAndNeverADrop() {
         val seen = ArrayList<Pair<Long, WaypointType>>()
         val e = RecorderEngine(cfg, 0L, RawFixSink { f, v -> seen.add(f.timeNanos / 1_000_000_000L to v) })

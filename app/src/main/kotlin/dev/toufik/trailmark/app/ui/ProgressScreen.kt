@@ -988,6 +988,9 @@ private fun achievementProgress(t: Texts, st: AchievementState): String = when {
 private fun totalsSince(rows: List<ActivityRow>, fromMillis: Long): Totals {
     val out = Totals()
     for (r in rows) {
+        // A run still in progress has no final totals; its checkpoint numbers
+        // would change the goal ring every second.
+        if (r.isOpen) continue
         if (r.startWallMillis >= fromMillis) {
             out.distanceM += r.distanceM
             out.elapsedNanos += r.elapsedNanos
@@ -1000,7 +1003,10 @@ private fun totalsSince(rows: List<ActivityRow>, fromMillis: Long): Totals {
 private fun sumsInRange(rows: List<ActivityRow>, fromMillis: Long, toMillis: Long): Double {
     var out = 0.0
     for (r in rows) {
-        if (r.startWallMillis >= fromMillis && r.startWallMillis < toMillis) out += r.distanceM
+        if (r.isOpen) continue
+        if (r.startWallMillis >= fromMillis && r.startWallMillis < toMillis) {
+            out += r.distanceM
+        }
     }
     return out
 }

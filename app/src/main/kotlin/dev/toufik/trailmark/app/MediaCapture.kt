@@ -14,11 +14,20 @@ object MediaCapture {
     fun mediaDir(context: Context): File =
         File(context.getExternalFilesDir(null), "media").apply { mkdirs() }
 
+    /**
+     * Photo target for a capture. The name carries a random suffix: two photos
+     * taken inside the same millisecond used to collide and silently overwrite
+     * each other.
+     */
     fun newPhotoFile(context: Context): File =
-        File(mediaDir(context), "IMG_${System.currentTimeMillis()}.jpg")
+        File(mediaDir(context), "IMG_${System.currentTimeMillis()}_${uniqueSuffix()}.jpg")
 
+    /** Video target for a capture, with the same collision-free naming. */
     fun newVideoFile(context: Context): File =
-        File(mediaDir(context), "VID_${System.currentTimeMillis()}.mp4")
+        File(mediaDir(context), "VID_${System.currentTimeMillis()}_${uniqueSuffix()}.mp4")
+
+    private fun uniqueSuffix(): String =
+        java.util.UUID.randomUUID().toString().take(8)
 
     fun uriFor(context: Context, file: File): Uri =
         FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)

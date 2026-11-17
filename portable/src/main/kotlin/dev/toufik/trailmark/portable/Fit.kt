@@ -282,6 +282,76 @@ object Fit {
         return out
     }
 
+    /**
+     * The activity the file declares, as a free-text hint ("cycling", "hiking"…),
+     * read from the session message's sport enum. Null when absent — written
+     * files use the same enum, so an import of our own export round-trips.
+     */
+    fun sport(bytes: ByteArray): String? {
+        if (bytes.size < 14) return null
+        val headerSize = bytes[0].toInt() and 0xFF
+        if (headerSize < 12 || bytes.size < headerSize) return null
+        val dataSize = le32(bytes, 4).toInt()
+        val end = minOf(bytes.size, headerSize + dataSize)
+        val defs = HashMap<Int, MsgDef>()
+        var i = headerSize
+        while (i < end) {
+            val h = bytes[i].toInt() and 0xFF
+            i++
+            val compressed = h and 0x80 != 0
+            val local = if (compressed) (h ushr 5) and 0x03 else h and 0x0F
+            if (!compressed && h and 0x40 != 0) {
+                if (i + 5 > end) break
+                val arch = bytes[i + 1].toInt() and 0xFF
+                val little = arch == 0
+                val global = if (little) le16(bytes, i + 2) else be16(bytes, i + 2)
+                val n = bytes[i + 4].toInt() and 0xFF
+                i += 5
+                val fields = ArrayList<FieldDef>(n)
+                repeat(n) {
+                    if (i + 3 <= end) {
+                        fields.add(
+                            FieldDef(
+                                bytes[i].toInt() and 0xFF,
+                                bytes[i + 1].toInt() and 0xFF,
+                                bytes[i + 2].toInt() and 0xFF,
+                            ),
+                        )
+                    }
+                    i += 3
+                }
+                defs[local] = MsgDef(global, fields, little)
+            } else {
+                val def = defs[local] ?: break
+                val size = def.fields.sumOf { it.size }
+                if (i + size > end) break
+                if (def.global == 18) {
+                    var off = i
+                    for (f in def.fields) {
+                        val at = off
+                        off += f.size
+                        if (compressed && f.num == 253) continue
+                        if (f.num == 5 && f.size == 1) {
+                            val id = bytes[at].toInt() and 0xFF
+                            if (id != 0xFF) return sportHint(id)
+                        }
+                    }
+                }
+                i += size
+            }
+        }
+        return null
+    }
+
+    /** FIT sport enum to the free-text hint the importer matches on. */
+    private fun sportHint(id: Int): String? = when (id) {
+        1, 21 -> "running"
+        2, 3 -> "cycling"
+        11 -> "walking"
+        17 -> "hiking"
+        else -> null
+    }
+
     private class FieldDef(val num: Int, val size: Int, val type: Int)
     private class MsgDef(val global: Int, val fields: List<FieldDef>, val little: Boolean)
 

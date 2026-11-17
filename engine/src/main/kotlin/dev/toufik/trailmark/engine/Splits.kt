@@ -31,7 +31,10 @@ fun computeSplits(points: List<StoredPoint>): List<Split> {
     for (p in points) {
         if (p.type == WaypointType.REJECTED) continue
         val a = prev
-        if (a != null) {
+        // The first point after a pause opens a new segment: the leg from the
+        // previous segment ends at a place the run never reached on foot, so it
+        // contributes neither distance nor split time.
+        if (a != null && p.type != WaypointType.RESUME) {
             val seg = haversineMeters(a.lat, a.lon, p.lat, p.lon)
             val segTime = p.timeNanos - a.timeNanos
             var remaining = seg

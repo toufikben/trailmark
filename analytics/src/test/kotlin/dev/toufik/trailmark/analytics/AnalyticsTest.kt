@@ -12,6 +12,24 @@ private fun p(t: Long, lat: Double, alt: Double? = null, speed: Double? = null) 
 
 class AnalysisTest {
     @Test
+    fun aPauseGapIsNotTravelledDistance() {
+        // Record 1 km, pause, drive 5 km, resume. The drive is not path: it used
+        // to be added to the detail page's distance and moving time, so the page
+        // disagreed with the stored total and sorted a bogus split.
+        val pts = listOf(
+            StoredPoint(36.7538, 3.1856, 0L, 5.0, WaypointType.NORMAL),
+            StoredPoint(36.7628, 3.1856, 200_000_000_000L, 5.0, WaypointType.NORMAL),
+            StoredPoint(36.8078, 3.1856, 500_000_000_000L, 5.0, WaypointType.RESUME),
+            StoredPoint(36.8168, 3.1856, 700_000_000_000L, 5.0, WaypointType.NORMAL),
+        )
+        val a = analyze(pts, 700_000_000_000L)
+        // Two 1 km legs; the 5 km drive in the middle must be absent.
+        assertTrue(a.distanceM < 2500.0, "pause gap billed: ${a.distanceM} m")
+        assertTrue(a.distanceM > 1500.0)
+        assertTrue(a.movingNanos < 400_000_000_000L)
+    }
+
+    @Test
     fun computesGainLossAndMaxSpeed() {
         val pts = listOf(
             p(0L, 36.7538, alt = 100.0, speed = 1.0),
