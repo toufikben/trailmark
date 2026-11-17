@@ -9,6 +9,7 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -50,12 +51,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -87,6 +91,8 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
     var ghostVoice by remember { mutableStateOf(prefs.getBoolean("ghost_voice", true)) }
     var snapRoad by remember { mutableStateOf(prefs.getBoolean("snap_road", true)) }
     var autoPauseOn by remember { mutableStateOf(prefs.getBoolean("auto_pause", true)) }
+    var puck by remember { mutableStateOf(PuckStyle.current(context)) }
+    var showPucks by remember { mutableStateOf(false) }
     var pitchIndex by remember {
         mutableStateOf(
             TtsVoice.PITCH_LEVELS.indexOfFirst {
@@ -281,6 +287,21 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                         prefs.edit().putBoolean("auto_pause", it).apply()
                     }
                 }
+                CardDivider()
+                SettingsRow(extraText(lang, "puckStyle")) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { showPucks = true }
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    ) {
+                        PuckPreview(puck, 22.dp)
+                        Spacer(Modifier.width(6.dp))
+                        Text(puckLabel(lang, puck), color = Palette.accent, fontSize = 12.sp)
+                    }
+                }
+                SettingsHint(extraText(lang, "puckStyleHint"))
             }
             Spacer(Modifier.height(20.dp))
 
@@ -320,6 +341,57 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                     },
                     confirmButton = {
                         TextButton(onClick = { showVoices = false }) {
+                            Text(t.cancel, color = Palette.accent)
+                        }
+                    },
+                )
+            }
+
+            if (showPucks) {
+                AlertDialog(
+                    onDismissRequest = { showPucks = false },
+                    containerColor = Palette.surface,
+                    title = {
+                        Text(extraText(lang, "puckStyle"), color = Palette.text, fontSize = 17.sp)
+                    },
+                    text = {
+                        Column {
+                            Text(
+                                extraText(lang, "puckStyleHint"),
+                                color = Palette.textSecondary,
+                                fontSize = 12.sp,
+                            )
+                            Spacer(Modifier.height(10.dp))
+                            PuckStyle.entries.chunked(4).forEach { line ->
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                ) {
+                                    line.forEach { style ->
+                                        PuckOption(
+                                            style = style,
+                                            label = puckLabel(lang, style),
+                                            selected = style == puck,
+                                            locked = style.pro && premium?.isPro(now) != true,
+                                            modifier = Modifier.weight(1f),
+                                        ) {
+                                            if (style.pro && premium?.isPro(now) != true) {
+                                                showPucks = false
+                                                onPaywall()
+                                            } else {
+                                                puck = style
+                                                prefs.edit().putString(PuckStyle.KEY, style.key).apply()
+                                                showPucks = false
+                                            }
+                                        }
+                                    }
+                                    repeat(4 - line.size) { Spacer(Modifier.weight(1f)) }
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showPucks = false }) {
                             Text(t.cancel, color = Palette.accent)
                         }
                     },
@@ -815,5 +887,70 @@ private fun VoiceRow(label: String, selected: Boolean, onClick: () -> Unit) {
         )
         Spacer(Modifier.weight(1f))
         if (selected) Text("\u2713", color = Palette.accent, fontSize = 14.sp)
+    }
+}
+
+private fun puckLabel(lang: Lang, style: PuckStyle): String = extraText(
+    lang,
+    when (style) {
+        PuckStyle.ARROW -> "puckArrow"
+        PuckStyle.RUNNER -> "puckRunner"
+        PuckStyle.BICYCLE -> "puckBike"
+        PuckStyle.STAR -> "puckStar"
+        PuckStyle.RINGS -> "puckRings"
+        PuckStyle.FLAME -> "puckFlame"
+        PuckStyle.COMPASS -> "puckCompass"
+    },
+)
+
+/** A live vector preview of one marker shape, at the same proportions as the map. */
+@Composable
+private fun PuckPreview(style: PuckStyle, size: Dp) {
+    Canvas(Modifier.size(size)) {
+        drawIntoCanvas { canvas ->
+            PuckArt.draw(
+                canvas.nativeCanvas,
+                this.size.width / 2f,
+                this.size.height / 2f,
+                this.size.minDimension * 0.40f,
+                style,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PuckOption(
+    style: PuckStyle,
+    label: String,
+    selected: Boolean,
+    locked: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (selected) Palette.accent.copy(alpha = 0.12f) else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp, horizontal = 4.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .alpha(if (locked) 0.35f else 1f),
+            contentAlignment = Alignment.Center,
+        ) {
+            PuckPreview(style, 42.dp)
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            label,
+            color = if (selected) Palette.accent else Palette.textSecondary,
+            fontSize = 10.sp,
+            maxLines = 1,
+        )
+        if (locked) Text("PRO", color = Palette.accent, fontSize = 8.sp)
     }
 }

@@ -380,6 +380,7 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                                         t = t,
                                         lang = langNow,
                                         sport = d.row.sport,
+                                        puckStyle = PuckStyle.current(context),
                                     )
                                 }
                                 shareStoryCardImage(context, card, d.row.id, t.storyCard)

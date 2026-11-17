@@ -235,10 +235,10 @@ private fun accuracyPolygon(lat: Double, lon: Double, meters: Double): Feature {
 }
 
 /** `["step",["get","frame"],"me-RUN-0",1,"me-RUN-1",…]` — picks the cycle frame image. */
-private fun frameIconExpr(sport: Sport): Expression {
+private fun frameIconExpr(sport: Sport, style: PuckStyle): Expression {
     val sb = StringBuilder()
-    sb.append("""["step",["get","frame"],"${spriteImageId(sport, 0)}"""")
-    for (f in 1 until SPRITE_FRAMES) sb.append(""",$f,"${spriteImageId(sport, f)}"""")
+    sb.append("""["step",["get","frame"],"${spriteImageId(sport, 0, style)}"""")
+    for (f in 1 until SPRITE_FRAMES) sb.append(""",$f,"${spriteImageId(sport, f, style)}"""")
     sb.append("]")
     return Expression.raw(sb.toString())
 }
@@ -291,6 +291,9 @@ fun TrailmarkMap(
     var userFix by remember { mutableStateOf<StoredPoint?>(null) }
     var pendingLocate by remember { mutableStateOf(false) }
     var frameIndex by remember { mutableStateOf(0) }
+    // Read once per composition: the settings screen disposes this map, so
+    // coming back with another shape rebuilt the composition and picks it up.
+    val puckStyle = remember { PuckStyle.current(context) }
     val onMapClickRef = rememberUpdatedState(onMapClick)
     val onUserFixRef = rememberUpdatedState(onUserFix)
     val onMediaTapRef = rememberUpdatedState(onMediaTap)
@@ -537,7 +540,7 @@ fun TrailmarkMap(
                 )
                 Sport.entries.forEach { sp ->
                     for (f in 0 until SPRITE_FRAMES) {
-                        s.addImage(spriteImageId(sp, f), spriteBitmap(context, sp, f))
+                        s.addImage(spriteImageId(sp, f, puckStyle), spriteBitmap(context, sp, f, puckStyle))
                     }
                     s.addImage("me-ghost-" + sp.name, ghostSpriteBitmapFor(context, sp))
                 }
@@ -601,7 +604,7 @@ fun TrailmarkMap(
                 s.addSource(GeoJsonSource("current-source", EMPTY))
                 s.addLayer(
                     SymbolLayer("current-layer", "current-source").withProperties(
-                        iconImage(frameIconExpr(sport)),
+                        iconImage(frameIconExpr(sport, puckStyle)),
                         iconSize(0.98f),
                         iconRotate(lastBearing),
                         iconRotationAlignment("map"),
@@ -632,7 +635,8 @@ fun TrailmarkMap(
 
     LaunchedEffect(sport) {
         val ghostImg = "me-ghost-" + sport.name
-        style.live()?.getLayerAs<SymbolLayer>("current-layer")?.setProperties(iconImage(frameIconExpr(sport)))
+        style.live()?.getLayerAs<SymbolLayer>("current-layer")
+            ?.setProperties(iconImage(frameIconExpr(sport, puckStyle)))
         style.live()?.getLayerAs<SymbolLayer>("ghost-current-layer")?.setProperties(iconImage(ghostImg))
     }
 

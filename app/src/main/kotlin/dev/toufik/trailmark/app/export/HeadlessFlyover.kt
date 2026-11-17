@@ -22,6 +22,8 @@ import dev.toufik.trailmark.app.ui.FlyoverPath
 import dev.toufik.trailmark.app.ui.FlyoverPhase
 import dev.toufik.trailmark.app.ui.FlyoverStats
 import dev.toufik.trailmark.app.ui.PathSample
+import dev.toufik.trailmark.app.ui.PuckArt
+import dev.toufik.trailmark.app.ui.PuckStyle
 import dev.toufik.trailmark.app.ui.autoFlyoverSeconds
 import dev.toufik.trailmark.app.ui.easeInOut
 import dev.toufik.trailmark.app.ui.followZoom
@@ -144,6 +146,7 @@ internal class HeadlessFlyover(
         val lang = Lang.entries.firstOrNull { it.code == job.lang } ?: Lang.EN
         val texts = textsFor(lang)
         val sport = Sport.entries.firstOrNull { it.name == job.sport } ?: Sport.RUN
+        val puckStyle = PuckStyle.current(context)
         val hud = FlyoverHud(texts, stats, sport == Sport.RUN, VIDEO_WIDTH, VIDEO_HEIGHT)
         val card = MediaCard(texts)
 
@@ -318,8 +321,15 @@ internal class HeadlessFlyover(
                                     canvas.drawPath(line, LINE_PAINT)
                                 }
                                 if (here != null) {
-                                    canvas.drawCircle(here.x, here.y, 15f, PUCK_FILL)
-                                    canvas.drawCircle(here.x, here.y, 15f, PUCK_RING)
+                                    if (puckStyle == PuckStyle.ARROW) {
+                                        // The free marker keeps the plain disc the
+                                        // video always had: a chevron would point
+                                        // north even when the camera does not.
+                                        canvas.drawCircle(here.x, here.y, 15f, PUCK_FILL)
+                                        canvas.drawCircle(here.x, here.y, 15f, PUCK_RING)
+                                    } else {
+                                        PuckArt.draw(canvas, here.x, here.y, 22f, puckStyle)
+                                    }
                                 }
                                 drawHud(hud, canvas, frame, path)
                             }

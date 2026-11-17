@@ -76,3 +76,16 @@ class Entitlements(context: Context) {
 }
 
 val LocalPremium = compositionLocalOf<PremiumState?> { null }
+
+/**
+ * The entitlement read straight from prefs, for callers outside the activity's
+ * composition — the video renderer and the map sprites run where the
+ * [LocalPremium] value is not in scope. [Entitlements] writes the same keys.
+ */
+fun isProNow(context: Context, now: Long = System.currentTimeMillis()): Boolean {
+    val prefs = context.applicationContext
+        .getSharedPreferences("trailmark", Context.MODE_PRIVATE)
+    if (prefs.getString("pro_product", null) != null) return true
+    val start = prefs.getLong("trial_start", 0L)
+    return start > 0L && now < start + TRIAL_DAYS * 86_400_000L
+}
