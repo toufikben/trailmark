@@ -238,7 +238,7 @@ class ActivityRepository(private val db: TrailmarkDb) {
      * reported to Health Connect as ending before it really did.
      */
     fun trackSpanNanos(activityId: Long): Long {
-        val span = q.pointsSpan(activityId = activityId).executeAsOne()
+        val span = q.pointsSpan(activity_id = activityId).executeAsOne()
         val first = span.first_nanos ?: return 0L
         val last = span.last_nanos ?: return 0L
         return (last - first).coerceAtLeast(0L)
