@@ -23,7 +23,6 @@ object ExportRecipe {
             media = p.enumOr("media", ExportMedia.entries, ExportMedia.OFF),
             galleryCopy = p.getBoolean("galleryCopy", true),
             pois = p.getBoolean("pois", false),
-            fullTrail = p.getBoolean("fullTrail", true),
             cinematic = p.getBoolean("cinematic", true),
         )
     }
@@ -36,7 +35,6 @@ object ExportRecipe {
             .putString("media", options.media.name)
             .putBoolean("galleryCopy", options.galleryCopy)
             .putBoolean("pois", options.pois)
-            .putBoolean("fullTrail", options.fullTrail)
             .putBoolean("cinematic", options.cinematic)
             .apply()
     }

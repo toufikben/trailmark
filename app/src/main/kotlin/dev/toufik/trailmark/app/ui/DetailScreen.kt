@@ -767,7 +767,6 @@ fun DetailScreen(activityId: Long, onBack: () -> Unit, onPaywall: () -> Unit, on
                                 media = o.media,
                                 galleryCopy = o.galleryCopy,
                                 pois = o.pois,
-                                fullTrail = o.fullTrail,
                                 cinematic = o.cinematic,
                                 dark = darkMap,
                                 lang = langNow.code,

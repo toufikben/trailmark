@@ -24,7 +24,6 @@ data class ExportJob(
     val galleryCopy: Boolean,
     val dark: Boolean,
     val pois: Boolean = false,
-    val fullTrail: Boolean = true,
     /** Drop onto each photo's spot and climb back out, instead of cutting straight to it. */
     val cinematic: Boolean = true,
     val lang: String,
@@ -40,7 +39,6 @@ data class ExportJob(
         .put("galleryCopy", galleryCopy)
         .put("dark", dark)
         .put("pois", pois)
-        .put("fullTrail", fullTrail)
         .put("cinematic", cinematic)
         .put("lang", lang)
         .put("sport", sport)
@@ -61,7 +59,6 @@ data class ExportJob(
                 galleryCopy = o.optBoolean("galleryCopy", true),
                 dark = o.optBoolean("dark", true),
                 pois = o.optBoolean("pois", false),
-                fullTrail = o.optBoolean("fullTrail", true),
                 cinematic = o.optBoolean("cinematic", true),
                 lang = o.optString("lang", "en"),
                 sport = o.optString("sport", "RUN"),

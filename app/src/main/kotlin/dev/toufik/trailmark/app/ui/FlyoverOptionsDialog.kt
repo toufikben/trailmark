@@ -45,7 +45,6 @@ internal fun FlyoverOptionsDialog(
     var media by remember { mutableStateOf(initial.media) }
     var gallery by remember { mutableStateOf(initial.galleryCopy) }
     var pois by remember { mutableStateOf(initial.pois) }
-    var fullTrail by remember { mutableStateOf(initial.fullTrail) }
     var cinematic by remember { mutableStateOf(initial.cinematic) }
     var rememberRecipe by remember { mutableStateOf(remembering) }
     AlertDialog(
@@ -127,23 +126,6 @@ internal fun FlyoverOptionsDialog(
                     )
                     Switch(checked = pois, onCheckedChange = { pois = it })
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        dev.toufik.trailmark.app.extraText(lang, "fullTrail"),
-                        color = Palette.textSecondary,
-                        fontSize = 12.sp,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Switch(checked = fullTrail, onCheckedChange = { fullTrail = it })
-                }
-                Text(
-                    dev.toufik.trailmark.app.extraText(lang, "fullTrailHint"),
-                    color = Palette.textSecondary,
-                    fontSize = 11.sp,
-                )
                 if (media != ExportMedia.OFF) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -194,7 +176,6 @@ internal fun FlyoverOptionsDialog(
                             media = media,
                             galleryCopy = gallery,
                             pois = pois,
-                            fullTrail = fullTrail,
                             cinematic = cinematic,
                         ),
                         rememberRecipe,

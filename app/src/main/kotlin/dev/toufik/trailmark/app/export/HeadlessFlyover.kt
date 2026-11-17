@@ -69,9 +69,6 @@ private const val DIVE_ZOOM = 0.75
 /** How many vertices the drawn line may have: more is invisible at 720 px. */
 private const val MAX_LINE_VERTICES = 260
 
-/** Route drawn behind the athlete in the follow cameras, in metres. */
-private const val TRAIL_BEHIND_M = 260.0
-
 /** Per-second camera heading smoothing: the heading settles over about half a second. */
 private const val BEARING_TAU_S = 0.5
 
@@ -289,13 +286,14 @@ internal class HeadlessFlyover(
                         val base = projection.bitmap
                         val trail = when {
                             frame.phase == FlyoverPhase.INTRO -> emptyList()
-                            // The closing shot always shows everything covered, so the
-                            // clip ends on the full track rather than a short stub.
-                            frame.phase == FlyoverPhase.OUTRO ||
-                                !follow || job.fullTrail ->
-                                routeScreen(projection, path, frame.distanceM, full = true)
-                            else ->
-                                routeScreen(projection, path, frame.distanceM, full = false)
+                            // A fixed overview can afford the whole trace; a moving
+                            // chase camera cannot. Projecting the line from the start
+                            // on every frame put most of it behind the camera, where
+                            // the projection folds and the trail read as a writhing
+                            // thread. The closing shot still shows the full route.
+                            frame.phase == FlyoverPhase.OUTRO || !follow ->
+                                routeScreen(projection, path, frame.distanceM)
+                            else -> emptyList()
                         }
                         val here = if (frame.phase == FlyoverPhase.INTRO) {
                             null
@@ -445,22 +443,19 @@ internal class HeadlessFlyover(
     }
 
     /**
-     * Screen points along the travelled route. [full] keeps everything from the
-     * start; otherwise only the stretch just behind the athlete is kept: it is
-     * the part that is on screen, and it avoids projecting points that sit
-     * behind a tilted camera.
+     * Screen points along the travelled route, start to [distanceM]. Used for
+     * the fixed overview and the closing shot, where the whole trace is on screen
+     * and nothing can fold behind the camera.
      */
     private fun routeScreen(
         snapshot: MapSnapshot,
         path: FlyoverPath,
         distanceM: Double,
-        full: Boolean,
     ): List<PointF> {
-        val from = if (full) 0.0 else (distanceM - TRAIL_BEHIND_M).coerceAtLeast(0.0)
-        val span = (distanceM - from).coerceAtLeast(1.0)
+        val span = distanceM.coerceAtLeast(1.0)
         val step = (span / MAX_LINE_VERTICES).coerceAtLeast(2.0)
         val out = ArrayList<PointF>(MAX_LINE_VERTICES + 2)
-        var d = from
+        var d = 0.0
         while (d < distanceM) {
             project(snapshot, path.at(d))?.let(out::add)
             d += step
