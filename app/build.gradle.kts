@@ -12,8 +12,8 @@ android {
         applicationId = "dev.toufik.trailmark"
         minSdk = 26
         targetSdk = 36
-        versionCode = 16
-        versionName = "0.2.5"
+        versionCode = 17
+        versionName = "1.0.0"
     }
 
     signingConfigs {
