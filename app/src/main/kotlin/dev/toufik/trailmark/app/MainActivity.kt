@@ -90,6 +90,7 @@ import dev.toufik.trailmark.app.ui.ProgressScreen
 import dev.toufik.trailmark.app.ui.RegionsScreen
 import dev.toufik.trailmark.app.ui.SettingsScreen
 import dev.toufik.trailmark.app.ui.SplashScreen
+import dev.toufik.trailmark.app.ui.WelcomeScreen
 import dev.toufik.trailmark.recording.Phase
 import kotlinx.coroutines.delay
 
@@ -137,6 +138,9 @@ class MainActivity : ComponentActivity() {
     private var syntheticStarted = false
     private var benchStarted = false
     private var splashDone = false
+
+    /** True once the first-run tour has been seen; survives restarts via prefs. */
+    private var welcomeSeen = false
 
     /** Kept on the activity so [onDestroy] can drop the store connection. */
     private var billing: BillingManager? = null
@@ -211,6 +215,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         org.maplibre.android.MapLibre.getInstance(this)
         val prefs = getSharedPreferences("trailmark", Context.MODE_PRIVATE)
+        welcomeSeen = prefs.getBoolean("welcome_seen", false)
         dev.toufik.trailmark.app.Units.init(this)
         lifecycleScope.launch(Dispatchers.IO) {
             dev.toufik.trailmark.app.maps.SavedRoutes.preload(this@MainActivity)
@@ -253,6 +258,7 @@ class MainActivity : ComponentActivity() {
                             mutableStateOf<Screen>(Screen.History)
                         }
                         var showSplash by remember { mutableStateOf(!splashDone) }
+                        var showWelcome by remember { mutableStateOf(!welcomeSeen) }
                         val recState by RecordingHolder.state.collectAsState()
                         var cameraOpen by remember { mutableStateOf(false) }
                         // While a run is being recorded the bar slims down to icons so the
@@ -385,6 +391,22 @@ class MainActivity : ComponentActivity() {
                                 onDone = {
                                     splashDone = true
                                     showSplash = false
+                                },
+                            )
+                        }
+                        if (showWelcome && !showSplash) {
+                            WelcomeScreen(
+                                onDone = {
+                                    welcomeSeen = true
+                                    showWelcome = false
+                                    prefs.edit().putBoolean("welcome_seen", true).apply()
+                                },
+                                onBuy = {
+                                    welcomeSeen = true
+                                    showWelcome = false
+                                    prefs.edit().putBoolean("welcome_seen", true).apply()
+                                    paywallFrom = Screen.Record
+                                    screen = Screen.Paywall
                                 },
                             )
                         }
