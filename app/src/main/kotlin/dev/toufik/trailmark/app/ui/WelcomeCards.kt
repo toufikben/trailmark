@@ -266,8 +266,8 @@ private fun SceneArt(page: Int, modifier: Modifier = Modifier) {
         clipPath(frame) {
             drawRect(
                 brush = Brush.verticalGradient(
-                    colors = when (page) {
-                        5 -> listOf(Color(0xFF1B1408), Color(0xFF0D0A05))
+                    colors = when {
+                        page == 5 -> listOf(Color(0xFF1B1408), Color(0xFF0D0A05))
                         page % 2 == 0 -> listOf(NightA, NightB)
                         else -> listOf(DuskA, DuskB)
                     },
