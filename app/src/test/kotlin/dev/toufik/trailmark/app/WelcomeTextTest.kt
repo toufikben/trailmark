@@ -48,11 +48,17 @@ class WelcomeTextTest {
     @Test
     fun cardCopyIsSubstantial() {
         // A truncated translation ("Next" left in a body slot) passes the key check
-        // but ruins the card; bodies are a paragraph, not a label.
+        // but ruins the card; bodies are a paragraph, not a label. CJK scripts pack
+        // a whole sentence into a third of the characters, so they get their own bar.
+        val dense = setOf(Lang.ZH, Lang.JA, Lang.KO)
         Lang.entries.forEach { lang ->
+            val floor = if (lang in dense) 40 else 60
             (1..6).forEach { page ->
                 val body = extraText(lang, "w${page}Body")
-                assertTrue(body.length >= 60, "${lang.code}:w${page}Body too short")
+                assertTrue(
+                    body.length >= floor,
+                    "${lang.code}:w${page}Body is ${body.length} chars, expected at least $floor",
+                )
             }
         }
     }
