@@ -3,10 +3,12 @@ package dev.toufik.trailmark.app.export
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PointF
 import android.graphics.Rect
+import android.graphics.Shader
 import android.os.SystemClock
 import dev.toufik.trailmark.app.Lang
 import dev.toufik.trailmark.app.maps.GlyphStore
@@ -35,6 +37,9 @@ import java.io.File
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.math.exp
+import kotlin.math.hypot
+import kotlin.math.pow
+import kotlin.math.sin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -110,6 +115,9 @@ private val LINE_PAINT = Paint(Paint.ANTI_ALIAS_FLAG).apply {
     strokeCap = Paint.Cap.ROUND
     strokeJoin = Paint.Join.ROUND
 }
+
+/** Widest point of the comet ribbon at the head, in video pixels. */
+private const val COMET_MAX_WIDTH_PX = 62f
 
 private val PUCK_FILL = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFC6FF3D.toInt() }
 private val PUCK_RING = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -311,14 +319,23 @@ internal class HeadlessFlyover(
                         } else {
                             project(projection, path.at(frame.distanceM))
                         }
+                        // The comet replaces the flat trail; on the closing shot the
+                        // full green trace stays and only the last stretch burns.
+                        val cometTail = if (puckStyle == PuckStyle.COMET && here != null) {
+                            trailBehind(projection, path, frame.distanceM)
+                        } else {
+                            emptyList()
+                        }
                         withContext(Dispatchers.Default) {
                             encoder.frame { canvas ->
                                 canvas.drawBitmap(base, null, FULL_RECT, BITMAP_PAINT)
-                                if (trail.size >= 2) {
-                                    val line = Path()
-                                    line.moveTo(trail[0].x, trail[0].y)
-                                    for (k in 1 until trail.size) line.lineTo(trail[k].x, trail[k].y)
-                                    canvas.drawPath(line, LINE_PAINT)
+                                if (puckStyle == PuckStyle.COMET) {
+                                    if (frame.phase == FlyoverPhase.OUTRO || !follow) {
+                                        drawRouteLine(canvas, trail)
+                                    }
+                                    drawCometTail(canvas, cometTail, frame.distanceM)
+                                } else if (trail.size >= 2) {
+                                    drawRouteLine(canvas, trail)
                                 }
                                 if (here != null) {
                                     if (puckStyle == PuckStyle.ARROW) {
@@ -525,6 +542,99 @@ internal class HeadlessFlyover(
 }
 
 // ------------------------------------------------------------------ helpers
+
+private fun drawRouteLine(c: Canvas, trail: List<PointF>) {
+    if (trail.size < 2) return
+    val line = Path()
+    line.moveTo(trail[0].x, trail[0].y)
+    for (k in 1 until trail.size) line.lineTo(trail[k].x, trail[k].y)
+    c.drawPath(line, LINE_PAINT)
+}
+
+private fun cometAlpha(rgb: Int, alpha: Int): Int =
+    (alpha.coerceIn(0, 255) shl 24) or (rgb and 0x00FFFFFF)
+
+/**
+ * The comet's ribbon over the projected trail: a cyan gas pass that drifts to
+ * one side, four warm dust passes, and a thin white filament. Widths grow from
+ * a point behind the athlete to a fan at the head, and every pass fades to
+ * nothing at the far tip, so the tail grows out of the map instead of ending.
+ */
+private fun drawCometTail(c: Canvas, trail: List<PointF>, driftM: Double) {
+    if (trail.size < 2) return
+    val n = trail.size
+    val nx = FloatArray(n)
+    val ny = FloatArray(n)
+    for (i in 0 until n) {
+        val a = trail[if (i == 0) 0 else i - 1]
+        val b = trail[if (i == n - 1) n - 1 else i + 1]
+        var dx = b.x - a.x
+        var dy = b.y - a.y
+        val len = hypot(dx, dy).coerceAtLeast(0.001f)
+        dx /= len
+        dy /= len
+        nx[i] = -dy
+        ny[i] = dx
+    }
+    val tip = trail[0]
+    val head = trail[n - 1]
+
+    fun ribbon(widthScale: Float, shift: Float, color: Int, endAlpha: Int) {
+        val path = Path()
+        var first = true
+        for (side in floatArrayOf(1f, -1f)) {
+            for (k in 0 until n) {
+                val i = if (side > 0f) k else n - 1 - k
+                val u = i / (n - 1).toFloat()
+                val w = COMET_MAX_WIDTH_PX * widthScale * 0.5f *
+                    (0.05f + 0.95f * u.toDouble().pow(0.55).toFloat())
+                val drift = shift * u * sin(u * 3.4 + driftM * 0.015).toFloat()
+                val x = trail[i].x + nx[i] * (side * w + drift)
+                val y = trail[i].y + ny[i] * (side * w + drift)
+                if (first) {
+                    path.moveTo(x, y)
+                    first = false
+                } else {
+                    path.lineTo(x, y)
+                }
+            }
+        }
+        path.close()
+        c.drawPath(
+            path,
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = LinearGradient(
+                    tip.x, tip.y, head.x, head.y,
+                    intArrayOf(cometAlpha(color, 0), cometAlpha(color, endAlpha)),
+                    null,
+                    Shader.TileMode.CLAMP,
+                )
+            },
+        )
+    }
+
+    // Cold gas first, underneath the dust.
+    ribbon(widthScale = 0.34f, shift = 0.42f, color = 0x7FE9FF, endAlpha = 30)
+    ribbon(widthScale = 1.00f, shift = 0f, color = 0xFF6A28, endAlpha = 16)
+    ribbon(widthScale = 0.66f, shift = 0f, color = 0xFF8A3C, endAlpha = 34)
+    ribbon(widthScale = 0.36f, shift = 0f, color = 0xFFC93C, endAlpha = 70)
+    ribbon(widthScale = 0.17f, shift = 0f, color = 0xFFE3A8, endAlpha = 150)
+    ribbon(widthScale = 0.070f, shift = 0f, color = 0xFFFFFF, endAlpha = 235)
+
+    // A few sparks shed by the head, drifting back along the tail.
+    val spark = Paint(Paint.ANTI_ALIAS_FLAG)
+    for (k in 0 until 14) {
+        val u = ((k / 14.0) + (driftM / 2600.0)).mod(1.0)
+        val i = (u * (n - 1)).toInt().coerceIn(0, n - 1)
+        val p = trail[i]
+        val side = if (k % 2 == 0) 1f else -1f
+        val spread = COMET_MAX_WIDTH_PX * (0.10f + 0.55f * ((k * 37) % 100) / 100f) * u.toFloat()
+        val x = p.x + nx[i] * side * spread
+        val y = p.y + ny[i] * side * spread
+        spark.color = cometAlpha(0xFFF0C8, (u * 190).toInt())
+        c.drawCircle(x, y, (1.0f + 2.6f * u).toFloat(), spark)
+    }
+}
 
 private fun drawHud(hud: FlyoverHud, c: Canvas, frame: ExportFrame.Map, path: FlyoverPath) {
     when (frame.phase) {

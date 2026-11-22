@@ -4,9 +4,12 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.DashPathEffect
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.RadialGradient
 import android.graphics.RectF
+import android.graphics.Shader
 import dev.toufik.trailmark.engine.Sport
 import kotlin.math.PI
 import kotlin.math.cos
@@ -37,13 +40,21 @@ private fun paint(color: Int, style: Paint.Style = Paint.Style.FILL): Paint =
     }
 
 /**
+ * The comet head glows past its casing, so its sprite is rendered on a larger
+ * bitmap and scaled back down on the map; otherwise the flare and the halo
+ * would be clipped into a square.
+ */
+const val COMET_SPRITE_SCALE = 1.7f
+
+/**
  * A top-down puck: bright accent core in a white casing, with a dark chevron that
  * always points to the top of the bitmap. The map rotates it by the live bearing,
  * so the arrow follows the real direction of travel.
  */
 fun spriteBitmap(context: Context, sport: Sport, frame: Int, style: PuckStyle): Bitmap {
     val d = context.resources.displayMetrics.density
-    val s = (PLAYER_MARKER_DP * d).roundToInt().coerceAtLeast(96)
+    val scale = if (style == PuckStyle.COMET) COMET_SPRITE_SCALE else 1f
+    val s = (PLAYER_MARKER_DP * d * scale).roundToInt().coerceAtLeast(96)
     val bmp = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888)
     drawPuck(Canvas(bmp), s.toFloat(), sport, frame, ghost = false, style = style)
     return bmp
@@ -68,7 +79,9 @@ private fun drawPuck(
 ) {
     val cx = s / 2f
     val cy = s / 2f
-    val r = s * 0.395f
+    // The comet keeps its flare inside the bitmap, so its solid head is smaller
+    // than the casing of the other shapes.
+    val r = s * if (style == PuckStyle.COMET) 0.24f else 0.395f
     val pulse = ((sin(frame / SPRITE_FRAMES.toFloat() * 2f * PI.toFloat()) + 1.0) / 2.0).toFloat()
 
     if (ghost) {
@@ -178,6 +191,10 @@ private fun drawGlyph(c: Canvas, sport: Sport, ghost: Boolean, inkOverride: Int?
  */
 object PuckArt {
     fun draw(c: Canvas, cx: Float, cy: Float, r: Float, style: PuckStyle, pulse: Float = 0f) {
+        if (style == PuckStyle.COMET) {
+            drawComet(c, cx, cy, r, pulse)
+            return
+        }
         c.drawCircle(cx, cy, r * (1.14f + 0.05f * pulse), paint(0x33C6FF3D))
         c.drawCircle(cx, cy, r, paint(0xFFF7FAF2.toInt()))
         c.drawCircle(cx, cy, r * 0.78f, paint(ACCENT))
@@ -203,7 +220,119 @@ object PuckArt {
             PuckStyle.RINGS -> glyphSpace(c, cx, cy, r * 1.10f) { drawRings(c, ink) }
             PuckStyle.FLAME -> glyphSpace(c, cx, cy, r * 0.90f) { drawFlame(c, ink) }
             PuckStyle.COMPASS -> glyphSpace(c, cx, cy, r * 0.85f) { drawCompass(c, ink) }
+            // Handled above, before the casing is drawn.
+            PuckStyle.COMET -> Unit
         }
+    }
+
+    /**
+     * A star head with a real comet's anatomy: a breathing halo, a rear tongue
+     * that feeds the map ribbon, a slowly turning four-point flare, a white-hot
+     * core, and the app's accent as a thin ring so the shape still belongs to
+     * Trailmark rather than to a stock comet.
+     */
+    private fun drawComet(c: Canvas, cx: Float, cy: Float, r: Float, pulse: Float) {
+        val breathe = 1f + 0.22f * pulse
+
+        val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(
+                cx, cy, r * 0.08f, cx, cy, r * 1.55f * breathe,
+                intArrayOf(
+                    0x8CFFE9A8.toInt(),
+                    0x4DFFC93C.toInt(),
+                    0x1AFF8A3C.toInt(),
+                    0x00FF8A3C,
+                ),
+                floatArrayOf(0f, 0.26f, 0.62f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+        }
+        c.drawCircle(cx, cy, r * 1.55f * breathe, halo)
+
+        c.save()
+        c.translate(cx, cy)
+
+        // The rear tongue bridges the head and the ribbon drawn on the map.
+        val wobble = 0.12f * pulse
+        val tongue = Path().apply {
+            moveTo(-r * 0.20f, r * 0.10f)
+            cubicTo(-r * (0.14f + wobble), r * 0.55f, -r * 0.05f, r * 1.02f, 0f, r * 1.46f)
+            cubicTo(r * 0.08f, r * 1.02f, r * (0.16f - wobble), r * 0.52f, r * 0.20f, r * 0.10f)
+            close()
+        }
+        c.drawPath(
+            tongue,
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = LinearGradient(
+                    0f, r * 0.10f, 0f, r * 1.48f,
+                    intArrayOf(0xE6FFF7DF.toInt(), 0x8CFFD278.toInt(), 0x00FF8A3C),
+                    floatArrayOf(0f, 0.45f, 1f),
+                    Shader.TileMode.CLAMP,
+                )
+            },
+        )
+
+        // Four-point flare, turning a little with every pulse frame.
+        c.rotate(-20f * pulse)
+        val flare = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(
+                0f, -r * 2.02f, 0f, 0f,
+                intArrayOf(0x00FFE9A8, 0x59FFE9A8, 0xE6FFFFFF.toInt()),
+                floatArrayOf(0f, 0.55f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+        }
+        val spike = Path()
+        for (i in 0 until 4) {
+            val long = i % 2 == 0
+            val len = r * (if (long) 2.02f else 1.30f) * (0.94f + 0.10f * pulse)
+            val wid = r * (if (long) 0.085f else 0.055f)
+            spike.reset()
+            spike.moveTo(0f, 0f)
+            spike.lineTo(-wid, -len * 0.30f)
+            spike.lineTo(0f, -len)
+            spike.lineTo(wid, -len * 0.30f)
+            spike.close()
+            c.drawPath(spike, flare)
+            c.rotate(90f)
+        }
+        c.rotate(20f * pulse)
+
+        val core = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(
+                -r * 0.10f, -r * 0.12f, r * 0.04f, 0f, 0f, r * 0.64f,
+                intArrayOf(
+                    0xFFFFFFFF.toInt(),
+                    0xFFFFFBEF.toInt(),
+                    0xFFFFE9A8.toInt(),
+                    0xFFFFC93C.toInt(),
+                    0xFFFF9A3C.toInt(),
+                ),
+                floatArrayOf(0f, 0.24f, 0.52f, 0.78f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+        }
+        c.drawCircle(0f, 0f, r * 0.64f, core)
+
+        val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = r * 0.10f
+            color = ACCENT
+            alpha = (130 + 90 * pulse).toInt().coerceIn(0, 255)
+        }
+        c.drawCircle(0f, 0f, r * 0.61f, ring)
+
+        val spot = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(
+                -r * 0.16f, -r * 0.18f, 0f, -r * 0.16f, -r * 0.18f, r * 0.30f,
+                intArrayOf(0xFFFFFFFF.toInt(), 0x00FFFFFF),
+                null,
+                Shader.TileMode.CLAMP,
+            )
+        }
+        c.drawCircle(-r * 0.16f, -r * 0.18f, r * 0.30f, spot)
+
+        c.restore()
     }
 
     /** Runs [block] in a 0..1 square centred on the puck, so glyphs stay vector. */

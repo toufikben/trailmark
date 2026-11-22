@@ -901,6 +901,7 @@ private fun puckLabel(lang: Lang, style: PuckStyle): String = extraText(
         PuckStyle.RINGS -> "puckRings"
         PuckStyle.FLAME -> "puckFlame"
         PuckStyle.COMPASS -> "puckCompass"
+        PuckStyle.COMET -> "puckComet"
     },
 )
 
@@ -913,7 +914,8 @@ private fun PuckPreview(style: PuckStyle, size: Dp) {
                 canvas.nativeCanvas,
                 this.size.width / 2f,
                 this.size.height / 2f,
-                this.size.minDimension * 0.40f,
+                // The comet's flare reaches past its casing; give it room.
+                this.size.minDimension * (if (style == PuckStyle.COMET) 0.24f else 0.40f),
                 style,
             )
         }

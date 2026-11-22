@@ -87,8 +87,12 @@ import org.maplibre.android.style.layers.PropertyFactory.iconOpacity
 import org.maplibre.android.style.layers.PropertyFactory.iconRotate
 import org.maplibre.android.style.layers.PropertyFactory.iconRotationAlignment
 import org.maplibre.android.style.layers.PropertyFactory.iconSize
+import org.maplibre.android.style.layers.PropertyFactory.lineBlur
+import org.maplibre.android.style.layers.PropertyFactory.lineCap
 import org.maplibre.android.style.layers.PropertyFactory.lineColor
 import org.maplibre.android.style.layers.PropertyFactory.lineDasharray
+import org.maplibre.android.style.layers.PropertyFactory.lineGradient
+import org.maplibre.android.style.layers.PropertyFactory.lineJoin
 import org.maplibre.android.style.layers.PropertyFactory.lineOpacity
 import org.maplibre.android.style.layers.PropertyFactory.lineWidth
 import org.maplibre.android.style.layers.PropertyFactory.textAllowOverlap
@@ -102,6 +106,7 @@ import org.maplibre.android.style.layers.PropertyFactory.textMaxWidth
 import org.maplibre.android.style.layers.PropertyFactory.textOffset
 import org.maplibre.android.style.layers.PropertyFactory.textSize
 import org.maplibre.android.style.layers.PropertyFactory.visibility
+import org.maplibre.android.style.sources.GeoJsonOptions
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
@@ -110,6 +115,7 @@ import org.maplibre.geojson.Point
 import org.maplibre.geojson.Polygon
 import kotlinx.coroutines.delay
 import kotlin.math.cos
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 private fun isOnline(context: Context): Boolean {
@@ -241,6 +247,116 @@ private fun frameIconExpr(sport: Sport, style: PuckStyle): Expression {
     for (f in 1 until SPRITE_FRAMES) sb.append(""",$f,"${spriteImageId(sport, f, style)}"""")
     sb.append("]")
     return Expression.raw(sb.toString())
+}
+
+/** Metres of route that become the comet's tail behind the live marker. */
+private const val COMET_TAIL_M = 260.0
+
+/** The comet sprite is rendered larger so its glow is not clipped; scale it back. */
+private val cometIconScale = 1f / COMET_SPRITE_SCALE
+
+/**
+ * A line gradient that is invisible at the tail tip and reaches [head] at the
+ * puck, so the ribbon grows out of the route instead of starting as a stroke.
+ */
+private fun cometGradient(head: Int): Expression = Expression.interpolate(
+    Expression.linear(),
+    Expression.lineProgress(),
+    Expression.stop(0f, Expression.color(head and 0x00FFFFFF)),
+    Expression.stop(0.45f, Expression.color(withAlpha(head, 0.40f))),
+    Expression.stop(1f, Expression.color(head)),
+)
+
+private fun withAlpha(color: Int, fraction: Float): Int {
+    val a = ((color ushr 24) * fraction).roundToInt().coerceIn(0, 255)
+    return (a shl 24) or (color and 0x00FFFFFF)
+}
+
+/** A width that stays a similar number of metres as the camera zooms. */
+private fun cometWidth(base: Float): Expression = Expression.interpolate(
+    Expression.exponential(2f),
+    Expression.zoom(),
+    Expression.stop(12f, base / 16f),
+    Expression.stop(14f, base / 4f),
+    Expression.stop(16f, base),
+    Expression.stop(18f, base * 4f),
+)
+
+private fun addCometLayer(s: Style, id: String, head: Int, width: Float, blur: Float) {
+    s.addLayer(
+        LineLayer(id, "comet-tail-source").withProperties(
+            lineGradient(cometGradient(head)),
+            lineWidth(cometWidth(width)),
+            lineBlur(blur),
+            lineCap(Property.LINE_CAP_ROUND),
+            lineJoin(Property.LINE_JOIN_ROUND),
+        ),
+    )
+}
+
+/** The ribbon and the shortened route, split around the live marker. */
+private data class CometSplit(val tail: List<StoredPoint>, val runs: List<List<StoredPoint>>)
+
+/**
+ * Walks back from the point nearest [focus] for [meters] and hands that stretch
+ * to the comet. The flat route is cut there, so the athlete does not drag a
+ * green thread inside the glow; the part of the route ahead of a scrubbed
+ * cursor stays visible.
+ *
+ * The walk never crosses a pause: a car trip between two running legs is not
+ * the comet's tail.
+ */
+private fun cometSplit(
+    runs: List<List<StoredPoint>>,
+    focus: StoredPoint,
+    meters: Double,
+): CometSplit {
+    if (runs.isEmpty()) return CometSplit(emptyList(), runs)
+
+    var bestRun = -1
+    var bestIdx = -1
+    var bestDist = Double.MAX_VALUE
+    runs.forEachIndexed { ri, run ->
+        run.forEachIndexed { pi, p ->
+            val d = haversineMeters(p.lat, p.lon, focus.lat, focus.lon)
+            if (d < bestDist) {
+                bestDist = d
+                bestRun = ri
+                bestIdx = pi
+            }
+        }
+    }
+    if (bestRun < 0) return CometSplit(emptyList(), runs)
+
+    val run = runs[bestRun]
+    val tail = ArrayList<StoredPoint>()
+    tail.add(focus)
+    var acc = 0.0
+    var lat = focus.lat
+    var lon = focus.lon
+    var i = bestIdx
+    while (i >= 0) {
+        val p = run[i]
+        acc += haversineMeters(lat, lon, p.lat, p.lon)
+        tail.add(p)
+        lat = p.lat
+        lon = p.lon
+        i--
+        if (acc >= meters) break
+    }
+    if (tail.size < 2) return CometSplit(emptyList(), runs)
+    tail.reverse()
+
+    val kept = ArrayList<List<StoredPoint>>(runs.size + 1)
+    kept.addAll(runs.subList(0, bestRun))
+    // i is the last point before the cut; anything shorter than a line is dropped.
+    val front = run.subList(0, i + 1)
+    if (front.size >= 2) kept.add(front)
+    val back = run.subList(bestIdx, run.size)
+    if (back.size >= 2) kept.add(back)
+    kept.addAll(runs.subList(bestRun + 1, runs.size))
+
+    return CometSplit(tail, kept)
 }
 
 /** A media capture pinned to the map; idx points back into the caller's media list. */
@@ -384,7 +500,9 @@ fun TrailmarkMap(
             delay(ms)
             if (kmh >= 1.0) frameIndex = (frameIndex + 1) % SPRITE_FRAMES
             val size = 0.96f + (kmh.coerceIn(0.0, 30.0) / 30.0 * 0.10).toFloat()
-            style.live()?.getLayerAs<SymbolLayer>("current-layer")?.setProperties(iconSize(size))
+            val iconScale = if (puckStyle == PuckStyle.COMET) cometIconScale else 1f
+            style.live()?.getLayerAs<SymbolLayer>("current-layer")
+                ?.setProperties(iconSize(size * iconScale))
         }
     }
 
@@ -538,6 +656,23 @@ fun TrailmarkMap(
                         lineWidth(5f),
                     ),
                 )
+                if (puckStyle == PuckStyle.COMET) {
+                    // One line, five translucent ribbons: MapLibre cannot taper a
+                    // line, but a wide faint pass that dies early and a narrow hot
+                    // pass that runs the whole way read as a fan of dust.
+                    s.addSource(
+                        GeoJsonSource(
+                            "comet-tail-source",
+                            EMPTY,
+                            GeoJsonOptions().withLineMetrics(true),
+                        ),
+                    )
+                    addCometLayer(s, "comet-tail-ion", 0x2E7FE9FF, 26f, 10f)
+                    addCometLayer(s, "comet-tail-dust", 0x1FFF6A28, 64f, 11f)
+                    addCometLayer(s, "comet-tail-warm", 0x3DFF8A3C, 44f, 8f)
+                    addCometLayer(s, "comet-tail-gold", 0x7AFFC93C, 22f, 4f)
+                    addCometLayer(s, "comet-tail-core", 0xD9FFF0C8.toInt(), 8f, 1.5f)
+                }
                 Sport.entries.forEach { sp ->
                     for (f in 0 until SPRITE_FRAMES) {
                         s.addImage(spriteImageId(sp, f, puckStyle), spriteBitmap(context, sp, f, puckStyle))
@@ -605,7 +740,7 @@ fun TrailmarkMap(
                 s.addLayer(
                     SymbolLayer("current-layer", "current-source").withProperties(
                         iconImage(frameIconExpr(sport, puckStyle)),
-                        iconSize(0.98f),
+                        iconSize(0.98f * if (puckStyle == PuckStyle.COMET) cometIconScale else 1f),
                         iconRotate(lastBearing),
                         iconRotationAlignment("map"),
                         iconAllowOverlap(true),
@@ -715,11 +850,21 @@ fun TrailmarkMap(
             .map { douglasPeucker(it, 4.0, { it.lat }, { it.lon }) }
             .filter { it.size >= 2 }
     }
-    LaunchedEffect(routeRuns, ghostRuns, style) {
+    // With the comet selected the last stretch of route becomes the ribbon, so
+    // the flat accent line stops where the tail starts.
+    val comet = remember(routeRuns, current, puckStyle) {
+        if (puckStyle == PuckStyle.COMET && current != null) {
+            cometSplit(routeRuns, current, COMET_TAIL_M)
+        } else {
+            null
+        }
+    }
+    val drawnRuns = comet?.runs ?: routeRuns
+    LaunchedEffect(drawnRuns, ghostRuns, style) {
         val s = style.live() ?: return@LaunchedEffect
-        val routeFc = if (routeRuns.isNotEmpty()) {
+        val routeFc = if (drawnRuns.isNotEmpty()) {
             FeatureCollection.fromFeatures(
-                routeRuns.map { run ->
+                drawnRuns.map { run ->
                     Feature.fromGeometry(
                         LineString.fromLngLats(run.map { Point.fromLngLat(it.lon, it.lat) }),
                     )
@@ -741,6 +886,23 @@ fun TrailmarkMap(
             EMPTY
         }
         s.getSourceAs<GeoJsonSource>("ghost-source")?.setGeoJson(ghostFc)
+    }
+
+    LaunchedEffect(comet?.tail, style) {
+        val s = style.live() ?: return@LaunchedEffect
+        val tail = comet?.tail.orEmpty()
+        val fc = if (tail.size >= 2) {
+            FeatureCollection.fromFeatures(
+                arrayOf(
+                    Feature.fromGeometry(
+                        LineString.fromLngLats(tail.map { Point.fromLngLat(it.lon, it.lat) }),
+                    ),
+                ),
+            )
+        } else {
+            EMPTY
+        }
+        s.getSourceAs<GeoJsonSource>("comet-tail-source")?.setGeoJson(fc)
     }
 
     LaunchedEffect(current, ghostCurrent, userFix, style, frameIndex) {

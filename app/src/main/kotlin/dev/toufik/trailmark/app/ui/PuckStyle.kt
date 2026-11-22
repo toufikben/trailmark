@@ -4,7 +4,7 @@ import android.content.Context
 import dev.toufik.trailmark.app.isProNow
 
 /**
- * The shape of the live position marker. The arrow is the free default; the six
+ * The shape of the live position marker. The arrow is the free default; the seven
  * other shapes are part of Pro.
  *
  * The choice is stored by key, so a style picked during the trial comes back if
@@ -18,7 +18,8 @@ enum class PuckStyle(val key: String, val pro: Boolean) {
     STAR("star", true),
     RINGS("rings", true),
     FLAME("flame", true),
-    COMPASS("compass", true);
+    COMPASS("compass", true),
+    COMET("comet", true);
 
     companion object {
         const val KEY = "puck_style"
