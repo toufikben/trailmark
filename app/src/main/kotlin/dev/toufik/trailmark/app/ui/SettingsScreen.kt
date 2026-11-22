@@ -915,7 +915,7 @@ private fun PuckPreview(style: PuckStyle, size: Dp) {
                 this.size.width / 2f,
                 this.size.height / 2f,
                 // The comet's flare reaches past its casing; give it room.
-                this.size.minDimension * (if (style == PuckStyle.COMET) 0.24f else 0.40f),
+                this.size.minDimension * (if (style == PuckStyle.COMET) 0.22f else 0.40f),
                 style,
             )
         }

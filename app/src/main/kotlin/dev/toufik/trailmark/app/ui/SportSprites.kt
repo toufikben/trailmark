@@ -236,7 +236,7 @@ object PuckArt {
 
         val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
-                cx, cy, r * 0.08f, cx, cy, r * 1.55f * breathe,
+                cx, cy, r * 1.55f * breathe,
                 intArrayOf(
                     0x8CFFE9A8.toInt(),
                     0x4DFFC93C.toInt(),
@@ -300,7 +300,7 @@ object PuckArt {
 
         val core = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
-                -r * 0.10f, -r * 0.12f, r * 0.04f, 0f, 0f, r * 0.64f,
+                0f, 0f, r * 0.64f,
                 intArrayOf(
                     0xFFFFFFFF.toInt(),
                     0xFFFFFBEF.toInt(),
@@ -324,9 +324,8 @@ object PuckArt {
 
         val spot = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
-                -r * 0.16f, -r * 0.18f, 0f, -r * 0.16f, -r * 0.18f, r * 0.30f,
-                intArrayOf(0xFFFFFFFF.toInt(), 0x00FFFFFF),
-                null,
+                -r * 0.16f, -r * 0.18f, r * 0.30f,
+                0xFFFFFFFF.toInt(), 0x00FFFFFF,
                 Shader.TileMode.CLAMP,
             )
         }

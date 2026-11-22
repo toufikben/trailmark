@@ -344,6 +344,11 @@ internal class HeadlessFlyover(
                                         // north even when the camera does not.
                                         canvas.drawCircle(here.x, here.y, 15f, PUCK_FILL)
                                         canvas.drawCircle(here.x, here.y, 15f, PUCK_RING)
+                                    } else if (puckStyle == PuckStyle.COMET) {
+                                        // The chase camera is already turned along
+                                        // the direction of travel, so the sprite's
+                                        // tongue hangs backwards without a rotation.
+                                        PuckArt.draw(canvas, here.x, here.y, 22f, puckStyle)
                                     } else {
                                         PuckArt.draw(canvas, here.x, here.y, 22f, puckStyle)
                                     }
