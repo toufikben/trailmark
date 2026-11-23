@@ -814,7 +814,7 @@ private fun drawPhoenixTail(c: Canvas, trail: List<PointF>, driftM: Double) {
             barb.color = trailAlpha(0xFFFFD078.toInt(), 0.34f * (1f - u))
             val path = Path().apply {
                 moveTo(ax, ay)
-                quadraticBezierTo(
+                quadTo(
                     ax + bx * side * len * 0.55f - dx * len * 0.05f,
                     ay + by * side * len * 0.55f - dy * len * 0.05f,
                     ex,
@@ -1095,7 +1095,7 @@ private fun drawInkTail(c: Canvas, trail: List<PointF>, driftM: Double) {
         bristle.color = trailAlpha(0xE8F1FF, 0.30f * (1f - u * 6f).coerceAtLeast(0f))
         val path = Path().apply {
             moveTo(q.x + bx * off, q.y + by * off)
-            quadraticBezierTo(
+            quadTo(
                 q.x + bx * off - dx * len * 0.55f + bx * 5f,
                 q.y + by * off - dy * len * 0.55f + by * 5f,
                 q.x + bx * off - dx * len,

@@ -382,8 +382,8 @@ object PuckArt {
                 val lift = -0.52f - f * 0.20f + 0.08f * flap * (1f + f * 0.3f)
                 val feather = Path().apply {
                     moveTo(r * 0.22f, r * 0.08f)
-                    quadraticBezierTo(r * reach * 0.62f, r * (lift - 0.26f), r * reach, r * lift)
-                    quadraticBezierTo(r * reach * 0.58f, r * (lift + 0.26f), r * 0.22f, r * 0.34f)
+                    quadTo(r * reach * 0.62f, r * (lift - 0.26f), r * reach, r * lift)
+                    quadTo(r * reach * 0.58f, r * (lift + 0.26f), r * 0.22f, r * 0.34f)
                     close()
                 }
                 c.drawPath(feather, Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -565,8 +565,8 @@ object PuckArt {
             val wid = r * if (i % 2 == 0) 0.17f else 0.11f
             val ray = Path().apply {
                 moveTo(0f, 0f)
-                quadraticBezierTo(-wid, -len * 0.45f, 0f, -len)
-                quadraticBezierTo(wid, -len * 0.45f, 0f, 0f)
+                quadTo(-wid, -len * 0.45f, 0f, -len)
+                quadTo(wid, -len * 0.45f, 0f, 0f)
                 close()
             }
             c.drawPath(ray, Paint(Paint.ANTI_ALIAS_FLAG).apply {
