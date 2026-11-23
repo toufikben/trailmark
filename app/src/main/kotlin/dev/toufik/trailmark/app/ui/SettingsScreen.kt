@@ -902,6 +902,11 @@ private fun puckLabel(lang: Lang, style: PuckStyle): String = extraText(
         PuckStyle.FLAME -> "puckFlame"
         PuckStyle.COMPASS -> "puckCompass"
         PuckStyle.COMET -> "puckComet"
+        PuckStyle.PHOENIX -> "puckPhoenix"
+        PuckStyle.AURORA -> "puckAurora"
+        PuckStyle.SHOOTING_STAR -> "puckShootingStar"
+        PuckStyle.SPARK -> "puckSpark"
+        PuckStyle.INK -> "puckInk"
     },
 )
 
@@ -914,8 +919,12 @@ private fun PuckPreview(style: PuckStyle, size: Dp) {
                 canvas.nativeCanvas,
                 this.size.width / 2f,
                 this.size.height / 2f,
-                // The comet's flare reaches past its casing; give it room.
-                this.size.minDimension * (if (style == PuckStyle.COMET) 0.22f else 0.40f),
+                // A tailed head's glow reaches past its casing; give it room.
+                this.size.minDimension * when {
+                    style == PuckStyle.COMET -> 0.22f
+                    style.wideArt -> 0.20f
+                    else -> 0.40f
+                },
                 style,
             )
         }

@@ -40,11 +40,14 @@ private fun paint(color: Int, style: Paint.Style = Paint.Style.FILL): Paint =
     }
 
 /**
- * The comet head glows past its casing, so its sprite is rendered on a larger
+ * A tailed head glows past its casing, so its sprite is rendered on a larger
  * bitmap and scaled back down on the map; otherwise the flare and the halo
  * would be clipped into a square.
  */
-const val COMET_SPRITE_SCALE = 1.7f
+const val WIDE_SPRITE_SCALE = 1.7f
+
+/** Kept for the map code that was written against the comet's own name. */
+const val COMET_SPRITE_SCALE = WIDE_SPRITE_SCALE
 
 /**
  * A top-down puck: bright accent core in a white casing, with a dark chevron that
@@ -53,7 +56,7 @@ const val COMET_SPRITE_SCALE = 1.7f
  */
 fun spriteBitmap(context: Context, sport: Sport, frame: Int, style: PuckStyle): Bitmap {
     val d = context.resources.displayMetrics.density
-    val scale = if (style == PuckStyle.COMET) COMET_SPRITE_SCALE else 1f
+    val scale = if (style.wideArt) WIDE_SPRITE_SCALE else 1f
     val s = (PLAYER_MARKER_DP * d * scale).roundToInt().coerceAtLeast(96)
     val bmp = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888)
     drawPuck(Canvas(bmp), s.toFloat(), sport, frame, ghost = false, style = style)
@@ -79,9 +82,13 @@ private fun drawPuck(
 ) {
     val cx = s / 2f
     val cy = s / 2f
-    // The comet keeps its flare inside the bitmap, so its solid head is smaller
-    // than the casing of the other shapes.
-    val r = s * if (style == PuckStyle.COMET) 0.24f else 0.395f
+    // A tailed head keeps its glow inside the bitmap, so its solid core is
+    // smaller than the casing of the other shapes.
+    val r = s * when {
+        style == PuckStyle.COMET -> 0.24f
+        style.wideArt -> 0.20f
+        else -> 0.395f
+    }
     val pulse = ((sin(frame / SPRITE_FRAMES.toFloat() * 2f * PI.toFloat()) + 1.0) / 2.0).toFloat()
 
     if (ghost) {
@@ -191,9 +198,15 @@ private fun drawGlyph(c: Canvas, sport: Sport, ghost: Boolean, inkOverride: Int?
  */
 object PuckArt {
     fun draw(c: Canvas, cx: Float, cy: Float, r: Float, style: PuckStyle, pulse: Float = 0f) {
-        if (style == PuckStyle.COMET) {
-            drawComet(c, cx, cy, r, pulse)
-            return
+        // The tailed shapes carry their own anatomy and skip the white casing.
+        when (style) {
+            PuckStyle.COMET -> return drawComet(c, cx, cy, r, pulse)
+            PuckStyle.PHOENIX -> return drawPhoenix(c, cx, cy, r, pulse)
+            PuckStyle.AURORA -> return drawAurora(c, cx, cy, r, pulse)
+            PuckStyle.SHOOTING_STAR -> return drawShootingStar(c, cx, cy, r, pulse)
+            PuckStyle.SPARK -> return drawSpark(c, cx, cy, r, pulse)
+            PuckStyle.INK -> return drawInk(c, cx, cy, r, pulse)
+            else -> Unit
         }
         c.drawCircle(cx, cy, r * (1.14f + 0.05f * pulse), paint(0x33C6FF3D))
         c.drawCircle(cx, cy, r, paint(0xFFF7FAF2.toInt()))
@@ -221,7 +234,13 @@ object PuckArt {
             PuckStyle.FLAME -> glyphSpace(c, cx, cy, r * 0.90f) { drawFlame(c, ink) }
             PuckStyle.COMPASS -> glyphSpace(c, cx, cy, r * 0.85f) { drawCompass(c, ink) }
             // Handled above, before the casing is drawn.
-            PuckStyle.COMET -> Unit
+            PuckStyle.COMET,
+            PuckStyle.PHOENIX,
+            PuckStyle.AURORA,
+            PuckStyle.SHOOTING_STAR,
+            PuckStyle.SPARK,
+            PuckStyle.INK,
+            -> Unit
         }
     }
 
@@ -332,6 +351,318 @@ object PuckArt {
         c.drawCircle(-r * 0.16f, -r * 0.18f, r * 0.30f, spot)
 
         c.restore()
+    }
+
+    /**
+     * A phoenix head: a white-hot core, two wings of three swept feathers that
+     * beat with the pulse, and a warm halo. The wings sit behind the core so the
+     * silhouette still reads as a bird at nineteen pixels.
+     */
+    private fun drawPhoenix(c: Canvas, cx: Float, cy: Float, r: Float, pulse: Float) {
+        val flap = sin(pulse * 2f * PI.toFloat())
+        val breathe = 1f + 0.06f * pulse
+
+        c.drawCircle(cx, cy, r * 2.3f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(
+                cx, cy, r * 2.3f,
+                intArrayOf(0x66FFD678, 0x2EFF7828, 0x00B3120A),
+                floatArrayOf(0f, 0.34f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+        })
+
+        c.save()
+        c.translate(cx, cy)
+        for (side in floatArrayOf(-1f, 1f)) {
+            c.save()
+            c.scale(side, 1f)
+            c.rotate(-16f + 9f * flap)
+            for (f in 0 until 3) {
+                val reach = 1.78f - f * 0.30f
+                val lift = -0.52f - f * 0.20f + 0.08f * flap * (1f + f * 0.3f)
+                val feather = Path().apply {
+                    moveTo(r * 0.22f, r * 0.08f)
+                    quadraticBezierTo(r * reach * 0.62f, r * (lift - 0.26f), r * reach, r * lift)
+                    quadraticBezierTo(r * reach * 0.58f, r * (lift + 0.26f), r * 0.22f, r * 0.34f)
+                    close()
+                }
+                c.drawPath(feather, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    shader = LinearGradient(
+                        r * 0.2f, 0f, r * reach, 0f,
+                        intArrayOf(
+                            0xE6FFF3D0.toInt(),
+                            0xC4FFA83C.toInt(),
+                            0x66E24A14,
+                            0x0A960C08,
+                        ),
+                        floatArrayOf(0f, 0.42f, 0.78f, 1f),
+                        Shader.TileMode.CLAMP,
+                    )
+                })
+            }
+            c.restore()
+        }
+        c.restore()
+
+        c.drawCircle(cx, cy, r * 1.02f * breathe, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(
+                cx - r * 0.16f, cy - r * 0.18f, r * 1.34f * breathe,
+                intArrayOf(
+                    0xFFFFFFFF.toInt(),
+                    0xFFFFF6D0.toInt(),
+                    0xFFFFC247.toInt(),
+                    0xFFFF7A28.toInt(),
+                    0xB3B3120A.toInt(),
+                ),
+                floatArrayOf(0f, 0.26f, 0.58f, 0.84f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+        })
+
+        c.drawCircle(cx, cy, r, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = r * 0.11f
+            color = ACCENT
+            alpha = (110 + 80 * pulse).toInt().coerceIn(0, 255)
+        })
+    }
+
+    /**
+     * An aurora head: a cold core that breathes, wrapped by three curtain arcs
+     * that turn a little with every frame, green through cyan to violet.
+     */
+    private fun drawAurora(c: Canvas, cx: Float, cy: Float, r: Float, pulse: Float) {
+        val breathe = 1f + 0.10f * pulse
+
+        c.drawCircle(cx, cy, r * 2.3f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(
+                cx, cy, r * 2.3f,
+                intArrayOf(0x66BFFFF0, 0x2E6FE9FF, 0x00A97BFF),
+                floatArrayOf(0f, 0.34f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+        })
+
+        c.save()
+        c.translate(cx, cy)
+        c.rotate(-28f + 36f * pulse)
+        val arc = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+        }
+        val radii = floatArrayOf(1.52f, 1.78f, 2.02f)
+        val starts = floatArrayOf(138f, 166f, 194f)
+        val sweeps = floatArrayOf(214f, 188f, 164f)
+        val alphas = floatArrayOf(0.42f, 0.36f, 0.30f)
+        val tones = intArrayOf(0x3DFFB0, 0x6FE9FF, 0xA97BFF)
+        for (i in 0 until 3) {
+            val rr = r * radii[i]
+            arc.strokeWidth = r * 0.14f
+            arc.color = tones[i]
+            arc.alpha = (alphas[i] * (0.72f + 0.28f * pulse) * 255f).toInt().coerceIn(0, 255)
+            c.drawArc(RectF(-rr, -rr, rr, rr), starts[i], sweeps[i], false, arc)
+        }
+        c.restore()
+
+        c.drawCircle(cx, cy, r * 0.98f * breathe, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(
+                cx - r * 0.20f, cy - r * 0.24f, r * 1.30f * breathe,
+                intArrayOf(
+                    0xFFFFFFFF.toInt(),
+                    0xFFDFFFF6.toInt(),
+                    0xFF6FE9FF.toInt(),
+                    0xD9A97BFF.toInt(),
+                ),
+                floatArrayOf(0f, 0.30f, 0.62f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+        })
+
+        c.drawCircle(cx, cy, r * 0.95f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = r * 0.10f
+            color = ACCENT
+            alpha = (100 + 70 * pulse).toInt().coerceIn(0, 255)
+        })
+    }
+
+    /**
+     * A shooting star head: two long white spikes along the line of travel, two
+     * short ones across it, and a shine that never settles. Deliberately the
+     * plainest core of the five: the needle tail does the talking.
+     */
+    private fun drawShootingStar(c: Canvas, cx: Float, cy: Float, r: Float, pulse: Float) {
+        val shine = 0.70f + 0.30f * sin(pulse * 2f * PI.toFloat())
+
+        c.drawCircle(cx, cy, r * 2.25f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(
+                cx, cy, r * 2.25f,
+                intArrayOf(0x80E6FAFF.toInt(), 0x2E7FE9FF, 0x007FE9FF),
+                floatArrayOf(0f, 0.30f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+            alpha = (shine * 255f).toInt().coerceIn(0, 255)
+        })
+
+        c.save()
+        c.translate(cx, cy)
+        val rays = floatArrayOf(2.05f, 0.95f, 2.05f, 0.95f)
+        for (i in 0 until 4) {
+            val len = r * rays[i] * (0.92f + 0.10f * shine)
+            val wid = r * if (i % 2 == 0) 0.10f else 0.07f
+            val ray = Path().apply {
+                moveTo(0f, 0f)
+                lineTo(-wid, -len * 0.34f)
+                lineTo(0f, -len)
+                lineTo(wid, -len * 0.34f)
+                close()
+            }
+            c.drawPath(ray, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = LinearGradient(
+                    0f, 0f, 0f, -len,
+                    intArrayOf(0xE6FFFFFF.toInt(), 0x99BEEBFF.toInt(), 0x007FE9FF),
+                    floatArrayOf(0f, 0.55f, 1f),
+                    Shader.TileMode.CLAMP,
+                )
+            })
+            c.rotate(90f)
+        }
+        c.restore()
+
+        c.drawCircle(cx, cy, r * 0.46f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(
+                cx, cy, r * 0.50f,
+                intArrayOf(0xFFFFFFFF.toInt(), 0xFFF2FCFF.toInt(), 0x4DBEEBFF),
+                floatArrayOf(0f, 0.58f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+        })
+    }
+
+    /**
+     * A spark head: four tapered rays spilling out of a hot core, flickering at
+     * the video's frame rate, with embers circling the light.
+     */
+    private fun drawSpark(c: Canvas, cx: Float, cy: Float, r: Float, pulse: Float) {
+        val flick = 0.62f + 0.38f * sin(pulse * 2f * PI.toFloat())
+
+        c.drawCircle(cx, cy, r * 2.3f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(
+                cx, cy, r * 2.3f,
+                intArrayOf(0x66FFF6E0, 0x2EFFB450, 0x00FF6A28),
+                floatArrayOf(0f, 0.32f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+            alpha = (255f * (0.55f + 0.45f * flick)).toInt().coerceIn(0, 255)
+        })
+
+        c.save()
+        c.translate(cx, cy)
+        c.rotate(45f * pulse)
+        val rays = floatArrayOf(1.70f, 1.05f, 1.70f, 1.05f)
+        for (i in 0 until 4) {
+            val len = r * rays[i] * (0.92f + 0.10f * flick)
+            val wid = r * if (i % 2 == 0) 0.17f else 0.11f
+            val ray = Path().apply {
+                moveTo(0f, 0f)
+                quadraticBezierTo(-wid, -len * 0.45f, 0f, -len)
+                quadraticBezierTo(wid, -len * 0.45f, 0f, 0f)
+                close()
+            }
+            c.drawPath(ray, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = LinearGradient(
+                    0f, 0f, 0f, -len,
+                    intArrayOf(0xE6FFF8E6.toInt(), 0x99FFC45A.toInt(), 0x00FF8A3C),
+                    floatArrayOf(0f, 0.55f, 1f),
+                    Shader.TileMode.CLAMP,
+                )
+            })
+            c.rotate(90f)
+        }
+        c.restore()
+
+        val ember = Paint(Paint.ANTI_ALIAS_FLAG)
+        for (k in 0 until 4) {
+            val a = Math.toRadians(k * 90.0 + 32.0 + 40.0 * pulse)
+            val rr = r * (1.38f + 0.14f * sin(pulse * 2f * PI.toFloat() + k * 1.3f))
+            ember.color = 0xCCFFD98A.toInt()
+            c.drawCircle(
+                cx + (cos(a) * rr).toFloat(),
+                cy + (sin(a) * rr).toFloat(),
+                r * 0.10f,
+                ember,
+            )
+        }
+
+        c.drawCircle(cx, cy, r * 0.82f * (0.94f + 0.08f * flick), Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(
+                cx, cy, r * 0.86f,
+                intArrayOf(
+                    0xFFFFFFFF.toInt(),
+                    0xFFFFF8E6.toInt(),
+                    0xFFFFD98A.toInt(),
+                    0xD9FFB020.toInt(),
+                ),
+                floatArrayOf(0f, 0.44f, 0.78f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+        })
+
+        c.drawCircle(cx, cy, r * 0.80f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = r * 0.09f
+            color = ACCENT
+            alpha = (90 + 80 * pulse).toInt().coerceIn(0, 255)
+        })
+    }
+
+    /**
+     * An ink head: a soft dab of blue-white, slightly out of round and turned a
+     * few degrees with every frame, ringed in the app accent. No flare — the ink
+     * is the calmest shape of the five.
+     */
+    private fun drawInk(c: Canvas, cx: Float, cy: Float, r: Float, pulse: Float) {
+        val settle = 1f + 0.04f * sin(pulse * 2f * PI.toFloat())
+
+        c.drawCircle(cx, cy, r * 2.25f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(
+                cx, cy, r * 2.25f,
+                intArrayOf(0x4DC8E1FF, 0x1FA0C3FF, 0x007A93B8),
+                floatArrayOf(0f, 0.40f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+        })
+
+        c.save()
+        c.translate(cx, cy)
+        c.rotate(-18f + 8f * pulse)
+        c.scale(1f, 0.86f)
+        c.drawCircle(0f, 0f, r * 0.98f * settle, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(
+                -r * 0.20f, -r * 0.24f, r * 1.36f,
+                intArrayOf(
+                    0xFFFFFFFF.toInt(),
+                    0xFFE8F1FF.toInt(),
+                    0xFFB9D9FF.toInt(),
+                    0xA67A93B8.toInt(),
+                ),
+                floatArrayOf(0f, 0.42f, 0.80f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+        })
+        c.restore()
+
+        c.drawCircle(cx, cy, r * 0.94f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = r * 0.10f
+            color = ACCENT
+            alpha = (85 + 60 * pulse).toInt().coerceIn(0, 255)
+        })
+
+        val speck = Paint(Paint.ANTI_ALIAS_FLAG)
+        speck.color = 0x99E8F1FF.toInt()
+        c.drawCircle(cx - r * 0.72f, cy + r * 0.62f, r * 0.08f, speck)
+        c.drawCircle(cx + r * 0.62f, cy + r * 0.78f, r * 0.06f, speck)
     }
 
     /** Runs [block] in a 0..1 square centred on the puck, so glyphs stay vector. */

@@ -36,9 +36,11 @@ import dev.toufik.trailmark.engine.Sport
 import java.io.File
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlin.math.PI
 import kotlin.math.exp
 import kotlin.math.hypot
 import kotlin.math.pow
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -118,6 +120,13 @@ private val LINE_PAINT = Paint(Paint.ANTI_ALIAS_FLAG).apply {
 
 /** Widest point of the comet ribbon at the head, in video pixels. */
 private const val COMET_MAX_WIDTH_PX = 62f
+
+/** Widest point of each newer tail at the head, in video pixels. */
+private const val PHOENIX_MAX_WIDTH_PX = 96f
+private const val AURORA_MAX_WIDTH_PX = 78f
+private const val STAR_MAX_WIDTH_PX = 46f
+private const val SPARK_MAX_WIDTH_PX = 52f
+private const val INK_MAX_WIDTH_PX = 82f
 
 private val PUCK_FILL = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFC6FF3D.toInt() }
 private val PUCK_RING = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -319,21 +328,35 @@ internal class HeadlessFlyover(
                         } else {
                             project(projection, path.at(frame.distanceM))
                         }
-                        // The comet replaces the flat trail; on the closing shot the
-                        // full green trace stays and only the last stretch burns.
-                        val cometTail = if (puckStyle == PuckStyle.COMET && here != null) {
+                        // A tailed style replaces the flat trail; on the closing
+                        // shot the full green trace stays and only the last
+                        // stretch burns.
+                        val tailStyle = if (puckStyle.hasTrail) puckStyle else null
+                        val tailTrail = if (tailStyle != null && here != null) {
                             trailBehind(projection, path, frame.distanceM)
                         } else {
                             emptyList()
                         }
+                        // The newer heads breathe with the clip, one slow cycle
+                        // every second and a half. The comet is left exactly as
+                        // it was approved.
+                        val headPulse = if (tailStyle != null && tailStyle != PuckStyle.COMET) {
+                            ((sin(i * 0.15f) + 1.0) / 2.0).toFloat()
+                        } else {
+                            0f
+                        }
                         withContext(Dispatchers.Default) {
                             encoder.frame { canvas ->
                                 canvas.drawBitmap(base, null, FULL_RECT, BITMAP_PAINT)
-                                if (puckStyle == PuckStyle.COMET) {
+                                if (tailStyle != null) {
                                     if (frame.phase == FlyoverPhase.OUTRO || !follow) {
                                         drawRouteLine(canvas, trail)
                                     }
-                                    drawCometTail(canvas, cometTail, frame.distanceM)
+                                    if (tailStyle == PuckStyle.COMET) {
+                                        drawCometTail(canvas, tailTrail, frame.distanceM)
+                                    } else {
+                                        drawTrailTail(canvas, tailStyle, tailTrail, frame.distanceM)
+                                    }
                                 } else if (trail.size >= 2) {
                                     drawRouteLine(canvas, trail)
                                 }
@@ -344,13 +367,11 @@ internal class HeadlessFlyover(
                                         // north even when the camera does not.
                                         canvas.drawCircle(here.x, here.y, 15f, PUCK_FILL)
                                         canvas.drawCircle(here.x, here.y, 15f, PUCK_RING)
-                                    } else if (puckStyle == PuckStyle.COMET) {
-                                        // The chase camera is already turned along
-                                        // the direction of travel, so the sprite's
-                                        // tongue hangs backwards without a rotation.
-                                        PuckArt.draw(canvas, here.x, here.y, 22f, puckStyle)
                                     } else {
-                                        PuckArt.draw(canvas, here.x, here.y, 22f, puckStyle)
+                                        // The chase camera is already turned along
+                                        // the direction of travel, so a tailed
+                                        // head hangs backwards without a rotation.
+                                        PuckArt.draw(canvas, here.x, here.y, 22f, puckStyle, headPulse)
                                     }
                                 }
                                 drawHud(hud, canvas, frame, path)
@@ -638,6 +659,450 @@ private fun drawCometTail(c: Canvas, trail: List<PointF>, driftM: Double) {
         val y = p.y + ny[i] * side * spread
         spark.color = cometAlpha(0xFFF0C8, (u * 190).toInt())
         c.drawCircle(x, y, (1.0f + 2.6f * u).toFloat(), spark)
+    }
+}
+
+// ------------------------------------------------------- the newer tails
+
+/** The trail's frame: per-vertex normals plus its two ends. */
+private class TrailAxis(val nx: FloatArray, val ny: FloatArray, val tip: PointF, val head: PointF)
+
+private fun trailAxis(trail: List<PointF>): TrailAxis {
+    val n = trail.size
+    val nx = FloatArray(n)
+    val ny = FloatArray(n)
+    for (i in 0 until n) {
+        val a = trail[if (i == 0) 0 else i - 1]
+        val b = trail[if (i == n - 1) n - 1 else i + 1]
+        var dx = b.x - a.x
+        var dy = b.y - a.y
+        val len = hypot(dx, dy).coerceAtLeast(0.001f)
+        dx /= len
+        dy /= len
+        nx[i] = -dy
+        ny[i] = dx
+    }
+    return TrailAxis(nx, ny, trail[0], trail[n - 1])
+}
+
+private fun trailAlpha(color: Int, fraction: Float): Int {
+    val a = (((color ushr 24) and 0xFF) * fraction.coerceIn(0f, 1f))
+        .roundToInt()
+        .coerceIn(0, 255)
+    return (a shl 24) or (color and 0x00FFFFFF)
+}
+
+/** A paint whose colour fades along the whole trail, tip to puck. */
+private fun trailPaint(axis: TrailAxis, stops: Array<Pair<Float, Int>>): Paint {
+    val colors = IntArray(stops.size) { stops[it].second }
+    val positions = FloatArray(stops.size) { stops[it].first.coerceIn(0f, 1f) }
+    return Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        shader = LinearGradient(
+            axis.tip.x, axis.tip.y, axis.head.x, axis.head.y,
+            colors,
+            positions,
+            Shader.TileMode.CLAMP,
+        )
+    }
+}
+
+/**
+ * A tapered band over the whole trail. [width] receives u = 0 at the far tip and
+ * 1 at the puck; a width of zero makes the band vanish, which is how a shorter
+ * needle stays out of the rest of the tail.
+ */
+private fun trailBand(
+    trail: List<PointF>,
+    axis: TrailAxis,
+    width: (Float) -> Float,
+    shift: ((Float) -> Float)? = null,
+): Path {
+    val n = trail.size
+    val path = Path()
+    for (side in floatArrayOf(1f, -1f)) {
+        for (k in 0 until n) {
+            val i = if (side > 0f) k else n - 1 - k
+            val u = i / (n - 1).toFloat()
+            val half = (width(u) * 0.5f).coerceAtLeast(0f)
+            val off = shift?.invoke(u) ?: 0f
+            val x = trail[i].x + axis.nx[i] * (side * half + off)
+            val y = trail[i].y + axis.ny[i] * (side * half + off)
+            if (k == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+    }
+    path.close()
+    return path
+}
+
+private fun drawTrailTail(c: Canvas, style: PuckStyle, trail: List<PointF>, driftM: Double) {
+    when (style) {
+        PuckStyle.PHOENIX -> drawPhoenixTail(c, trail, driftM)
+        PuckStyle.AURORA -> drawAuroraTail(c, trail, driftM)
+        PuckStyle.SHOOTING_STAR -> drawStarTail(c, trail, driftM)
+        PuckStyle.SPARK -> drawSparkTail(c, trail, driftM)
+        PuckStyle.INK -> drawInkTail(c, trail, driftM)
+        else -> Unit
+    }
+}
+
+/**
+ * Two plumes of five translucent layers that open towards the tip, each spine
+ * carrying nine curved barbs. The layers are the feather's own colours: deep red
+ * at the outer edge to near-white at the quill.
+ */
+private fun drawPhoenixTail(c: Canvas, trail: List<PointF>, driftM: Double) {
+    if (trail.size < 2) return
+    val axis = trailAxis(trail)
+    val n = trail.size
+    val spread = PHOENIX_MAX_WIDTH_PX * 0.34f
+
+    for (side in floatArrayOf(-1f, 1f)) {
+        val drift: (Float) -> Float = { u -> side * spread * (1f - u).pow(1.25f) }
+        val reach = floatArrayOf(1.00f, 0.80f, 0.56f, 0.34f, 0.15f)
+        val colors = intArrayOf(
+            0x18B3120A, 0x26FF6A1F, 0x3BFFB020, 0x66FFE07A, 0x9CFFF3D0.toInt(),
+        )
+        for (p in 0 until 5) {
+            val w = PHOENIX_MAX_WIDTH_PX * 0.42f * reach[p]
+            val path = trailBand(
+                trail,
+                axis,
+                { u -> w * (0.08f + 0.92f * u.pow(1.15f)) },
+                drift,
+            )
+            val tone = colors[p]
+            c.drawPath(
+                path,
+                trailPaint(
+                    axis,
+                    arrayOf(
+                        0f to trailAlpha(tone, 0f),
+                        0.40f to trailAlpha(tone, 0.55f),
+                        1f to tone,
+                    ),
+                ),
+            )
+        }
+    }
+
+    // Barbs: short curved vanes fanning off each plume spine.
+    val barb = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+    }
+    for (side in floatArrayOf(-1f, 1f)) {
+        for (k in 0 until 9) {
+            val u = 0.06f + 0.098f * k
+            val i = (u * (n - 1)).toInt().coerceIn(0, n - 1)
+            val q = trail[i]
+            val bx = axis.nx[i]
+            val by = axis.ny[i]
+            val a = trail[(i - 1).coerceAtLeast(0)]
+            val b = trail[(i + 1).coerceAtMost(n - 1)]
+            var dx = b.x - a.x
+            var dy = b.y - a.y
+            val dl = hypot(dx, dy).coerceAtLeast(0.001f)
+            dx /= dl
+            dy /= dl
+            val len = spread * 0.72f * (1f - u).pow(0.85f)
+            val off = side * spread * (1f - u).pow(1.25f)
+            val ax = q.x + bx * off
+            val ay = q.y + by * off
+            val ex = ax + bx * side * len - dx * len * 0.55f
+            val ey = ay + by * side * len - dy * len * 0.55f
+            barb.strokeWidth = 5.5f * (0.4f + 0.6f * (1f - u))
+            barb.color = trailAlpha(0xFFFFD078.toInt(), 0.34f * (1f - u))
+            val path = Path().apply {
+                moveTo(ax, ay)
+                quadraticBezierTo(
+                    ax + bx * side * len * 0.55f - dx * len * 0.05f,
+                    ay + by * side * len * 0.55f - dy * len * 0.05f,
+                    ex,
+                    ey,
+                )
+            }
+            c.drawPath(path, barb)
+        }
+    }
+}
+
+/**
+ * Four nested bands that sway together, their colour running green through cyan
+ * to violet along the length, with faint cross-curtains flickering over them.
+ */
+private fun drawAuroraTail(c: Canvas, trail: List<PointF>, driftM: Double) {
+    if (trail.size < 2) return
+    val axis = trailAxis(trail)
+    val n = trail.size
+    val t = driftM.toFloat()
+    val sway: (Float) -> Float = { u -> sin(u * 4.4f + t * 0.006f) * 5.5f * u }
+
+    val layers = floatArrayOf(1.00f, 0.66f, 0.38f, 0.16f)
+    val alphas = floatArrayOf(0.16f, 0.24f, 0.34f, 0.50f)
+    for (k in layers.indices) {
+        val w = AURORA_MAX_WIDTH_PX * layers[k]
+        val path = trailBand(
+            trail,
+            axis,
+            { u -> w * (0.12f + 0.88f * u.pow(0.72f)) },
+            sway,
+        )
+        val a = alphas[k]
+        c.drawPath(
+            path,
+            trailPaint(
+                axis,
+                arrayOf(
+                    0f to trailAlpha(0x3DFFB0, 0f),
+                    0.22f to trailAlpha(0x3DFFB0, a * 0.8f),
+                    0.48f to trailAlpha(0x6FE9FF, a),
+                    0.74f to trailAlpha(0xA97BFF, a * 0.9f),
+                    1f to trailAlpha(0xD6B4FF, a * 0.7f),
+                ),
+            ),
+        )
+    }
+
+    // Vertical curtains: the thing that makes an aurora read as an aurora.
+    val curtain = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+    }
+    for (k in 0 until 14) {
+        val u = 0.05f + 0.062f * k
+        val i = (u * (n - 1)).toInt().coerceIn(0, n - 1)
+        val q = trail[i]
+        val bx = axis.nx[i]
+        val by = axis.ny[i]
+        val off = sin(u * 4.4f + t * 0.006f) * 5.5f * u
+        val half = AURORA_MAX_WIDTH_PX * (0.12f + 0.88f * u.pow(0.72f)) * 0.30f
+        val flick = 0.35f + 0.35f * sin(t * 0.02f + k * 1.7f)
+        curtain.color = trailAlpha(0xBEF5FF, 0.16f * flick)
+        curtain.strokeWidth = 3.2f
+        c.drawLine(
+            q.x + bx * (off - half),
+            q.y + by * (off - half),
+            q.x + bx * (off + half),
+            q.y + by * (off + half),
+            curtain,
+        )
+    }
+}
+
+/**
+ * A soft sheath and three needles of different reach: the longest runs white-hot
+ * the whole way, the shorter two die early, so the tail thins in steps instead of
+ * fading as one mass.
+ */
+private fun drawStarTail(c: Canvas, trail: List<PointF>, driftM: Double) {
+    if (trail.size < 2) return
+    val axis = trailAxis(trail)
+    val n = trail.size
+    val t = driftM.toFloat()
+
+    val sheath = trailBand(
+        trail,
+        axis,
+        { u -> STAR_MAX_WIDTH_PX * 0.62f * (0.05f + 0.95f * u) },
+    )
+    c.drawPath(
+        sheath,
+        trailPaint(
+            axis,
+            arrayOf(
+                0f to trailAlpha(0xBEEBFF, 0f),
+                0.55f to trailAlpha(0xBEEBFF, 0.09f),
+                1f to trailAlpha(0xFFFFFF, 0.20f),
+            ),
+        ),
+    )
+
+    val reach = floatArrayOf(1.00f, 0.72f, 0.44f)
+    val wid = floatArrayOf(9.5f, 6.0f, 3.4f)
+    val alpha = floatArrayOf(0.62f, 0.44f, 0.28f)
+    val sideShift = floatArrayOf(0f, 2.4f, -2.8f)
+    for (k in 0 until 3) {
+        val from = 1f - reach[k]
+        val path = trailBand(
+            trail,
+            axis,
+            { u -> if (u < from) 0f else wid[k] * (0.06f + 0.94f * (u - from) / reach[k]) },
+            { u -> sideShift[k] * sin(u * 5f + t * 0.03f) },
+        )
+        val stops = ArrayList<Pair<Float, Int>>(4)
+        stops.add(0f to trailAlpha(0x90E8FF, 0f))
+        if (from > 0f) stops.add(from to trailAlpha(0x90E8FF, 0f))
+        stops.add((from + reach[k] * 0.5f) to trailAlpha(0xBEEBFF, alpha[k] * 0.5f))
+        stops.add(1f to trailAlpha(0xFFFFFF, alpha[k]))
+        c.drawPath(path, trailPaint(axis, stops.toTypedArray()))
+    }
+
+    // Two sparks shed off the needle.
+    val spark = Paint(Paint.ANTI_ALIAS_FLAG)
+    for (k in 0 until 2) {
+        val u = 0.24f + 0.26f * k
+        val i = (u * (n - 1)).toInt().coerceIn(0, n - 1)
+        val p = trail[i]
+        val off = (if (k == 0) -1f else 1f) * (6f + 9f * u)
+        spark.color = trailAlpha(0xE6FAFF, 0.5f * (1f - u))
+        c.drawCircle(
+            p.x + axis.nx[i] * off,
+            p.y + axis.ny[i] * off,
+            2f + 3f * (1f - u),
+            spark,
+        )
+    }
+}
+
+/**
+ * A warm sheath and three jittering bolts at different depths, each flickering on
+ * its own beat, with embers flicked off the streak.
+ */
+private fun drawSparkTail(c: Canvas, trail: List<PointF>, driftM: Double) {
+    if (trail.size < 2) return
+    val axis = trailAxis(trail)
+    val n = trail.size
+    val t = driftM.toFloat()
+
+    val sheath = trailBand(
+        trail,
+        axis,
+        { u -> SPARK_MAX_WIDTH_PX * 0.5f * (0.05f + 0.95f * u) },
+    )
+    c.drawPath(
+        sheath,
+        trailPaint(
+            axis,
+            arrayOf(
+                0f to trailAlpha(0xFF8A3C, 0f),
+                0.5f to trailAlpha(0xFF8A3C, 0.06f),
+                1f to trailAlpha(0xFFB85A, 0.16f),
+            ),
+        ),
+    )
+
+    val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+    for (b in 0 until 3) {
+        val reach = 1f - b * 0.15f
+        val from = 1f - reach
+        val flick = 0.62f + 0.38f * sin(t * 0.035f + b * 2.3f)
+        val path = Path()
+        var started = false
+        for (i in 0 until n) {
+            val u = i / (n - 1).toFloat()
+            if (u < from) continue
+            val amp = (2.5f + 15f * u) * (0.7f + 0.3f * sin(t * 0.02f + b))
+            val jitter = sin(u * 11f + b * 2.1f + t * 0.02f) * amp +
+                sin(u * 26f + t * 0.05f) * amp * 0.30f
+            val x = trail[i].x + axis.nx[i] * jitter
+            val y = trail[i].y + axis.ny[i] * jitter
+            if (!started) {
+                path.moveTo(x, y)
+                started = true
+            } else {
+                path.lineTo(x, y)
+            }
+        }
+        val rgb = intArrayOf(0xFFF3D6, 0xFFC45A, 0xFF7828)[b]
+        stroke.color = trailAlpha(rgb, floatArrayOf(0.92f, 0.72f, 0.50f)[b] * flick)
+        stroke.strokeWidth = 8f - b * 1.2f
+        c.drawPath(path, stroke)
+    }
+
+    val ember = Paint(Paint.ANTI_ALIAS_FLAG)
+    for (k in 0 until 7) {
+        val u = ((k / 7f) + (t / 3600f)) % 1f
+        val i = (u * (n - 1)).toInt().coerceIn(0, n - 1)
+        val p = trail[i]
+        val off = sin(k * 2.7f + t * 0.03f) * (10f + 18f * u)
+        ember.color = trailAlpha(0xFFC878, 0.55f * (1f - u))
+        c.drawCircle(
+            p.x + axis.nx[i] * off,
+            p.y + axis.ny[i] * off,
+            1.6f + 2.6f * (1f - u),
+            ember,
+        )
+    }
+}
+
+/**
+ * A brush stroke: a thin dry tip that swells mid-stroke and tightens at the nib,
+ * with bristles splitting off the far end.
+ */
+private fun drawInkTail(c: Canvas, trail: List<PointF>, driftM: Double) {
+    if (trail.size < 2) return
+    val axis = trailAxis(trail)
+    val n = trail.size
+    val t = driftM.toFloat()
+    val peak = INK_MAX_WIDTH_PX * 0.5f
+
+    val env: (Float) -> Float = { u ->
+        val a = sin(PI * u.toDouble().pow(0.80))
+        if (a <= 0.0) 0f else a.pow(1.25).toFloat()
+    }
+    val drift: (Float) -> Float = { u -> sin(u * 4.2f + t * 0.003f) * 3.2f * u }
+
+    val ws = floatArrayOf(1.00f, 0.68f, 0.36f, 0.15f)
+    val alphas = floatArrayOf(0.12f, 0.20f, 0.38f, 0.62f)
+    for (k in 0 until 4) {
+        val w = peak * ws[k]
+        val path = trailBand(
+            trail,
+            axis,
+            { u -> w * (0.10f + 0.90f * env(u)) },
+            drift,
+        )
+        val a = alphas[k]
+        c.drawPath(
+            path,
+            trailPaint(
+                axis,
+                arrayOf(
+                    0f to trailAlpha(0xE8F1FF, 0f),
+                    0.30f to trailAlpha(0xE8F1FF, a * 0.55f),
+                    0.62f to trailAlpha(0xE8F1FF, a),
+                    1f to trailAlpha(0xFFFFFF, (a * 1.05f).coerceAtMost(1f)),
+                ),
+            ),
+        )
+    }
+
+    // Bristles at the dry tip, dragging backwards off the stroke.
+    val bristle = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+    }
+    for (k in 0 until 7) {
+        val u = 0.03f + 0.030f * k
+        val i = (u * (n - 1)).toInt().coerceIn(0, n - 1)
+        val q = trail[i]
+        val bx = axis.nx[i]
+        val by = axis.ny[i]
+        val a = trail[(i - 1).coerceAtLeast(0)]
+        val b = trail[(i + 1).coerceAtMost(n - 1)]
+        var dx = b.x - a.x
+        var dy = b.y - a.y
+        val dl = hypot(dx, dy).coerceAtLeast(0.001f)
+        dx /= dl
+        dy /= dl
+        val len = 26f + 40f * ((k * 37) % 100) / 100f
+        val off = (k - 3f) * peak * 0.26f
+        bristle.strokeWidth = 2.6f
+        bristle.color = trailAlpha(0xE8F1FF, 0.30f * (1f - u * 6f).coerceAtLeast(0f))
+        val path = Path().apply {
+            moveTo(q.x + bx * off, q.y + by * off)
+            quadraticBezierTo(
+                q.x + bx * off - dx * len * 0.55f + bx * 5f,
+                q.y + by * off - dy * len * 0.55f + by * 5f,
+                q.x + bx * off - dx * len,
+                q.y + by * off - dy * len,
+            )
+        }
+        c.drawPath(path, bristle)
     }
 }
 
