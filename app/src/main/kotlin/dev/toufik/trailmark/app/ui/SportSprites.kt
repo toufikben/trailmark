@@ -365,7 +365,7 @@ object PuckArt {
         c.drawCircle(cx, cy, r * 2.6f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
                 cx, cy, r * 2.6f,
-                intArrayOf(0x80FFD678, 0x38FF7828, 0x00B3120A),
+                intArrayOf(0x80FFD678.toInt(), 0x38FF7828, 0x00B3120A),
                 floatArrayOf(0f, 0.30f, 1f),
                 Shader.TileMode.CLAMP,
             )
@@ -445,7 +445,7 @@ object PuckArt {
         c.drawCircle(cx, cy, r * 2.6f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
                 cx, cy, r * 2.6f,
-                intArrayOf(0x80BFFFF0, 0x386FE9FF, 0x00A97BFF),
+                intArrayOf(0x80BFFFF0.toInt(), 0x386FE9FF, 0x00A97BFF),
                 floatArrayOf(0f, 0.34f, 1f),
                 Shader.TileMode.CLAMP,
             )
@@ -557,7 +557,7 @@ object PuckArt {
         c.drawCircle(cx, cy, r * 2.6f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
                 cx, cy, r * 2.6f,
-                intArrayOf(0x9EFFF6E0, 0x42FFB450, 0x00FF6A28),
+                intArrayOf(0x9EFFF6E0.toInt(), 0x42FFB450, 0x00FF6A28),
                 floatArrayOf(0f, 0.26f, 1f),
                 Shader.TileMode.CLAMP,
             )

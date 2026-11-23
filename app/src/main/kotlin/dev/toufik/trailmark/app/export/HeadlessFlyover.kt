@@ -760,7 +760,7 @@ private fun drawPhoenixTail(c: Canvas, trail: List<PointF>, driftM: Double) {
         val drift: (Float) -> Float = { u -> side * spread * (1f - u).pow(1.25f) }
         val reach = floatArrayOf(1.00f, 0.80f, 0.56f, 0.34f, 0.15f)
         val colors = intArrayOf(
-            0x30B3120A, 0x48FF6A1F, 0x66FFB020, 0x99FFE07A, 0xCCFFF3D0.toInt(),
+            0x30B3120A, 0x48FF6A1F, 0x66FFB020, 0x99FFE07A.toInt(), 0xCCFFF3D0.toInt(),
         )
         for (p in 0 until 5) {
             val w = PHOENIX_MAX_WIDTH_PX * 0.42f * reach[p]
