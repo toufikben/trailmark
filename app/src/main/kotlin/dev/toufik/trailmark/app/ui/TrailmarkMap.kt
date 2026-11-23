@@ -483,6 +483,7 @@ private fun cometSplit(
     runs: List<List<StoredPoint>>,
     focus: StoredPoint,
     meters: Double,
+    attachFocus: Boolean = true,
 ): CometSplit {
     if (runs.isEmpty()) return CometSplit(emptyList(), runs)
 
@@ -503,11 +504,20 @@ private fun cometSplit(
 
     val run = runs[bestRun]
     val tail = ArrayList<StoredPoint>()
-    tail.add(focus)
     var acc = 0.0
-    var lat = focus.lat
-    var lon = focus.lon
+    var lat = run[bestIdx].lat
+    var lon = run[bestIdx].lon
     var i = bestIdx
+    // The comet keeps its live fix as the first point. The newer tails only take
+    // it when the fix still sits on the route: an off-route fix (a GPS wobble, or
+    // the marker already past the last stored point) used to be appended as the
+    // head of the tail, which drew a fork that ran ahead of the puck or off to
+    // one side for a moment.
+    if (attachFocus || bestDist <= 30.0) {
+        tail.add(focus)
+        lat = focus.lat
+        lon = focus.lon
+    }
     while (i >= 0) {
         val p = run[i]
         acc += haversineMeters(lat, lon, p.lat, p.lon)
@@ -1038,7 +1048,7 @@ fun TrailmarkMap(
     // ribbon, so the flat accent line stops where the tail starts.
     val comet = remember(routeRuns, current, puckStyle) {
         if (puckStyle.hasTrail && current != null) {
-            cometSplit(routeRuns, current, COMET_TAIL_M)
+            cometSplit(routeRuns, current, COMET_TAIL_M, attachFocus = puckStyle == PuckStyle.COMET)
         } else {
             null
         }

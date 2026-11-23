@@ -81,6 +81,21 @@ private const val MAX_LINE_VERTICES = 260
 /** Route drawn behind the athlete in the follow cameras, in metres. */
 private const val TRAIL_BEHIND_M = 260.0
 
+/**
+ * Length of each newer tail in video pixels, taken straight from the approved
+ * design (a fraction of the 720 px short side). The old tails were walked back a
+ * fixed number of metres, which collapsed to forty-odd pixels at the zoom these
+ * videos use - shorter than the head's own glow - so no tail could be seen.
+ */
+private fun tailLenPx(style: PuckStyle): Float = when (style) {
+    PuckStyle.PHOENIX -> 360f
+    PuckStyle.AURORA -> 374f
+    PuckStyle.SHOOTING_STAR -> 374f
+    PuckStyle.SPARK -> 317f
+    PuckStyle.INK -> 360f
+    else -> 360f
+}
+
 /** How far a projected point may sit outside the frame and still be drawn. */
 private const val EDGE_PX = 8f
 
@@ -120,13 +135,6 @@ private val LINE_PAINT = Paint(Paint.ANTI_ALIAS_FLAG).apply {
 
 /** Widest point of the comet ribbon at the head, in video pixels. */
 private const val COMET_MAX_WIDTH_PX = 62f
-
-/** Widest point of each newer tail at the head, in video pixels. */
-private const val PHOENIX_MAX_WIDTH_PX = 170f
-private const val AURORA_MAX_WIDTH_PX = 140f
-private const val STAR_MAX_WIDTH_PX = 90f
-private const val SPARK_MAX_WIDTH_PX = 110f
-private const val INK_MAX_WIDTH_PX = 150f
 
 private val PUCK_FILL = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFC6FF3D.toInt() }
 private val PUCK_RING = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -333,7 +341,11 @@ internal class HeadlessFlyover(
                         // stretch burns.
                         val tailStyle = if (puckStyle.hasTrail) puckStyle else null
                         val tailTrail = if (tailStyle != null && here != null) {
-                            trailBehind(projection, path, frame.distanceM)
+                            if (tailStyle == PuckStyle.COMET) {
+                                trailBehind(projection, path, frame.distanceM)
+                            } else {
+                                trailBehindPx(projection, path, frame.distanceM, tailLenPx(tailStyle))
+                            }
                         } else {
                             emptyList()
                         }
@@ -355,7 +367,13 @@ internal class HeadlessFlyover(
                                     if (tailStyle == PuckStyle.COMET) {
                                         drawCometTail(canvas, tailTrail, frame.distanceM)
                                     } else {
-                                        drawTrailTail(canvas, tailStyle, tailTrail, frame.distanceM)
+                                        drawTrailTail(
+                                            canvas,
+                                            tailStyle,
+                                            tailTrail,
+                                            frame.distanceM,
+                                            polylineLengthPx(tailTrail),
+                                        )
                                     }
                                 } else if (trail.size >= 2) {
                                     drawRouteLine(canvas, trail)
@@ -556,6 +574,63 @@ internal class HeadlessFlyover(
         return back
     }
 
+    /**
+     * The stretch of route behind the athlete that is [targetPx] long **on screen**,
+     * whatever the camera zoom is. Walking by metres made a tail that vanished at
+     * the wide zooms the flight uses; walking by pixels keeps the plume the size the
+     * design asks for.
+     *
+     * The step is derived from the local metres-per-pixel so the walk costs a fixed
+     * hundred projections at any zoom, and leaving the frame no longer ends the
+     * walk: the tail runs out of the frame and the canvas clips it, which is what a
+     * plume dragged behind a marker on the frame's edge should do.
+     */
+    private fun trailBehindPx(
+        snapshot: MapSnapshot,
+        path: FlyoverPath,
+        distanceM: Double,
+        targetPx: Float,
+    ): List<PointF> {
+        val hereP = project(snapshot, path.at(distanceM)) ?: return emptyList()
+        // Metres per screen pixel, probed over a short stretch behind the puck.
+        val probeM = 12.0
+        val probeD = (distanceM - probeM).coerceAtLeast(0.0)
+        val probeP = project(snapshot, path.at(probeD))
+        val probePx = if (probeP == null) 0f else hypot(probeP.x - hereP.x, probeP.y - hereP.y)
+        val mPerPx = if (probePx > 0.5f) {
+            (distanceM - probeD) / probePx
+        } else {
+            0.35
+        }
+        val spanM = (targetPx * mPerPx.toFloat()).toDouble().coerceIn(12.0, 6000.0)
+        val step = (spanM / 110.0).coerceAtLeast(1.5)
+
+        val back = ArrayList<PointF>(120)
+        var screen = 0f
+        var d = distanceM
+        while (d >= 0.0) {
+            val p = project(snapshot, path.at(d)) ?: break
+            if (back.isNotEmpty()) {
+                screen += hypot(p.x - back[back.size - 1].x, p.y - back[back.size - 1].y)
+            }
+            back.add(p)
+            if (screen >= targetPx) break
+            d -= step
+        }
+        if (back.size < 2) return emptyList()
+        back.reverse()
+        return back
+    }
+
+    /** Length of a screen polyline, used to keep a tail's proportions on any zoom. */
+    private fun polylineLengthPx(trail: List<PointF>): Float {
+        var sum = 0f
+        for (i in 1 until trail.size) {
+            sum += hypot(trail[i].x - trail[i - 1].x, trail[i].y - trail[i - 1].y)
+        }
+        return sum
+    }
+
     private fun project(snapshot: MapSnapshot, p: PathSample): PointF? {
         val xy = runCatching { snapshot.pixelForLatLng(LatLng(p.lat, p.lon)) }.getOrNull() ?: return null
         if (!xy.x.isFinite() || !xy.y.isFinite()) return null
@@ -685,10 +760,17 @@ private fun trailAxis(trail: List<PointF>): TrailAxis {
     return TrailAxis(nx, ny, trail[0], trail[n - 1])
 }
 
+/**
+ * Re-tints an **RGB** colour (0xRRGGBB) with the given opacity. Every tail colour
+ * used to be written as plain RGB, and the old helper multiplied the colour's own
+ * alpha channel - which those literals do not carry - so every stop came out
+ * fully transparent and no tail was ever painted. Opacity now comes from the
+ * fraction alone; a colour that does carry an alpha is still honoured.
+ */
 private fun trailAlpha(color: Int, fraction: Float): Int {
-    val a = (((color ushr 24) and 0xFF) * fraction.coerceIn(0f, 1f))
-        .roundToInt()
-        .coerceIn(0, 255)
+    val given = (color ushr 24) and 0xFF
+    val base = if (given == 0) 255 else given
+    val a = (base * fraction.coerceIn(0f, 1f)).roundToInt().coerceIn(0, 255)
     return (a shl 24) or (color and 0x00FFFFFF)
 }
 
@@ -710,6 +792,13 @@ private fun trailPaint(axis: TrailAxis, stops: Array<Pair<Float, Int>>): Paint {
  * A tapered band over the whole trail. [width] receives u = 0 at the far tip and
  * 1 at the puck; a width of zero makes the band vanish, which is how a shorter
  * needle stays out of the rest of the tail.
+ *
+ * The two sides are one contour, not two: `moveTo` only ever runs once, on the
+ * very first vertex, so filling the path actually encloses an area. Issuing a
+ * second `moveTo` for the return edge (which this used to do, because `k` starts
+ * at zero in both loops) left two open polylines with no interior at all, and
+ * every band - the phoenix plumes, the aurora sheets, the star's sheath, the
+ * ink stroke - painted absolutely nothing.
  */
 private fun trailBand(
     trail: List<PointF>,
@@ -719,6 +808,7 @@ private fun trailBand(
 ): Path {
     val n = trail.size
     val path = Path()
+    var started = false
     for (side in floatArrayOf(1f, -1f)) {
         for (k in 0 until n) {
             val i = if (side > 0f) k else n - 1 - k
@@ -727,20 +817,31 @@ private fun trailBand(
             val off = shift?.invoke(u) ?: 0f
             val x = trail[i].x + axis.nx[i] * (side * half + off)
             val y = trail[i].y + axis.ny[i] * (side * half + off)
-            if (k == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            if (!started) {
+                path.moveTo(x, y)
+                started = true
+            } else {
+                path.lineTo(x, y)
+            }
         }
     }
     path.close()
     return path
 }
 
-private fun drawTrailTail(c: Canvas, style: PuckStyle, trail: List<PointF>, driftM: Double) {
+private fun drawTrailTail(
+    c: Canvas,
+    style: PuckStyle,
+    trail: List<PointF>,
+    driftM: Double,
+    lengthPx: Float,
+) {
     when (style) {
-        PuckStyle.PHOENIX -> drawPhoenixTail(c, trail, driftM)
-        PuckStyle.AURORA -> drawAuroraTail(c, trail, driftM)
-        PuckStyle.SHOOTING_STAR -> drawStarTail(c, trail, driftM)
-        PuckStyle.SPARK -> drawSparkTail(c, trail, driftM)
-        PuckStyle.INK -> drawInkTail(c, trail, driftM)
+        PuckStyle.PHOENIX -> drawPhoenixTail(c, trail, driftM, lengthPx)
+        PuckStyle.AURORA -> drawAuroraTail(c, trail, driftM, lengthPx)
+        PuckStyle.SHOOTING_STAR -> drawStarTail(c, trail, driftM, lengthPx)
+        PuckStyle.SPARK -> drawSparkTail(c, trail, driftM, lengthPx)
+        PuckStyle.INK -> drawInkTail(c, trail, driftM, lengthPx)
         else -> Unit
     }
 }
@@ -750,35 +851,34 @@ private fun drawTrailTail(c: Canvas, style: PuckStyle, trail: List<PointF>, drif
  * carrying nine curved barbs. The layers are the feather's own colours: deep red
  * at the outer edge to near-white at the quill.
  */
-private fun drawPhoenixTail(c: Canvas, trail: List<PointF>, driftM: Double) {
+private fun drawPhoenixTail(c: Canvas, trail: List<PointF>, driftM: Double, L: Float) {
     if (trail.size < 2) return
     val axis = trailAxis(trail)
     val n = trail.size
-    val spread = PHOENIX_MAX_WIDTH_PX * 0.34f
+    val spread = L * 0.34f
 
     for (side in floatArrayOf(-1f, 1f)) {
         val drift: (Float) -> Float = { u -> side * spread * (1f - u).pow(1.25f) }
-        val reach = floatArrayOf(1.00f, 0.82f, 0.60f, 0.38f, 0.18f)
-        val colors = intArrayOf(
-            0x42B3120A, 0x5CFF6A1F, 0x7AFFB020, 0xA8FFE07A.toInt(), 0xD6FFF3D0.toInt(),
-        )
+        val ws = floatArrayOf(1.00f, 0.78f, 0.55f, 0.34f, 0.15f)
+        val tones = intArrayOf(0xB3120A, 0xFF6A28, 0xFF9428, 0xFFC446, 0xFFE696)
+        val alphas = floatArrayOf(0.07f, 0.11f, 0.17f, 0.26f, 0.44f)
         for (p in 0 until 5) {
-            val w = PHOENIX_MAX_WIDTH_PX * 0.55f * reach[p]
+            val w = L * 0.40f * ws[p]
             val path = trailBand(
                 trail,
                 axis,
                 { u -> w * (0.08f + 0.92f * u.pow(1.15f)) },
                 drift,
             )
-            val tone = colors[p]
+            val tone = tones[p]
             c.drawPath(
                 path,
                 trailPaint(
                     axis,
                     arrayOf(
                         0f to trailAlpha(tone, 0f),
-                        0.40f to trailAlpha(tone, 0.55f),
-                        1f to tone,
+                        0.40f to trailAlpha(tone, alphas[p] * 0.55f),
+                        1f to trailAlpha(tone, alphas[p]),
                     ),
                 ),
             )
@@ -810,8 +910,8 @@ private fun drawPhoenixTail(c: Canvas, trail: List<PointF>, driftM: Double) {
             val ay = q.y + by * off
             val ex = ax + bx * side * len - dx * len * 0.55f
             val ey = ay + by * side * len - dy * len * 0.55f
-            barb.strokeWidth = 6.5f * (0.4f + 0.6f * (1f - u))
-            barb.color = trailAlpha(0xFFFFD078.toInt(), 0.46f * (1f - u))
+            barb.strokeWidth = 3.4f * (0.4f + 0.6f * (1f - u))
+            barb.color = trailAlpha(0xFFFFD078.toInt(), 0.34f * (1f - u))
             val path = Path().apply {
                 moveTo(ax, ay)
                 quadTo(
@@ -830,17 +930,16 @@ private fun drawPhoenixTail(c: Canvas, trail: List<PointF>, driftM: Double) {
  * Four nested bands that sway together, their colour running green through cyan
  * to violet along the length, with faint cross-curtains flickering over them.
  */
-private fun drawAuroraTail(c: Canvas, trail: List<PointF>, driftM: Double) {
+private fun drawAuroraTail(c: Canvas, trail: List<PointF>, driftM: Double, L: Float) {
     if (trail.size < 2) return
     val axis = trailAxis(trail)
     val n = trail.size
-    val t = driftM.toFloat()
-    val sway: (Float) -> Float = { u -> sin(u * 4.4f + t * 0.02f) * 10f * u }
-
+    val sec = (driftM / 2.8).toFloat()
+    val sway: (Float) -> Float = { u -> sin(u * 4.4f + sec * 1.5f) * L * 0.055f * u }
     val layers = floatArrayOf(1.00f, 0.66f, 0.38f, 0.16f)
-    val alphas = floatArrayOf(0.30f, 0.42f, 0.55f, 0.75f)
+    val alphas = floatArrayOf(0.10f, 0.15f, 0.22f, 0.34f)
     for (k in layers.indices) {
-        val w = AURORA_MAX_WIDTH_PX * layers[k]
+        val w = L * 0.34f * layers[k]
         val path = trailBand(
             trail,
             axis,
@@ -868,17 +967,17 @@ private fun drawAuroraTail(c: Canvas, trail: List<PointF>, driftM: Double) {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
     }
-    for (k in 0 until 14) {
-        val u = 0.05f + 0.062f * k
+    for (k in 0 until 16) {
+        val u = 0.05f + 0.058f * k
         val i = (u * (n - 1)).toInt().coerceIn(0, n - 1)
         val q = trail[i]
         val bx = axis.nx[i]
         val by = axis.ny[i]
-        val off = sin(u * 4.4f + t * 0.02f) * 10f * u
-        val half = AURORA_MAX_WIDTH_PX * (0.12f + 0.88f * u.pow(0.72f)) * 0.30f
-        val flick = 0.35f + 0.35f * sin(t * 0.05f + k * 1.7f)
-        curtain.color = trailAlpha(0xBEF5FF, 0.30f * flick)
-        curtain.strokeWidth = 3.6f
+        val off = sin(u * 4.4f + sec * 1.5f) * L * 0.055f * u
+        val half = L * 0.30f * (0.12f + 0.88f * u.pow(0.72f)) * 0.5f
+        val flick = 0.35f + 0.35f * sin(sec * 2.6f + k * 1.7f)
+        curtain.color = trailAlpha(0xBEF5FF, 0.10f * flick)
+        curtain.strokeWidth = 2.6f
         c.drawLine(
             q.x + bx * (off - half),
             q.y + by * (off - half),
@@ -894,16 +993,16 @@ private fun drawAuroraTail(c: Canvas, trail: List<PointF>, driftM: Double) {
  * the whole way, the shorter two die early, so the tail thins in steps instead of
  * fading as one mass.
  */
-private fun drawStarTail(c: Canvas, trail: List<PointF>, driftM: Double) {
+private fun drawStarTail(c: Canvas, trail: List<PointF>, driftM: Double, L: Float) {
     if (trail.size < 2) return
     val axis = trailAxis(trail)
     val n = trail.size
-    val t = driftM.toFloat()
+    val sec = (driftM / 2.8).toFloat()
 
     val sheath = trailBand(
         trail,
         axis,
-        { u -> STAR_MAX_WIDTH_PX * 0.62f * (0.05f + 0.95f * u) },
+        { u -> L * 0.16f * (0.05f + 0.95f * u) },
     )
     c.drawPath(
         sheath,
@@ -918,16 +1017,16 @@ private fun drawStarTail(c: Canvas, trail: List<PointF>, driftM: Double) {
     )
 
     val reach = floatArrayOf(1.00f, 0.72f, 0.44f)
-    val wid = floatArrayOf(14f, 9f, 5f)
-    val alpha = floatArrayOf(0.85f, 0.60f, 0.40f)
-    val sideShift = floatArrayOf(0f, 2.4f, -2.8f)
+    val wid = floatArrayOf(8.5f, 5.4f, 3.0f)
+    val alpha = floatArrayOf(0.62f, 0.42f, 0.26f)
+    val sideShift = floatArrayOf(0f, 2.2f, -2.6f)
     for (k in 0 until 3) {
         val from = 1f - reach[k]
         val path = trailBand(
             trail,
             axis,
             { u -> if (u < from) 0f else wid[k] * (0.06f + 0.94f * (u - from) / reach[k]) },
-            { u -> sideShift[k] * sin(u * 5f + t * 0.03f) },
+            { u -> sideShift[k] * sin(u * 5f + sec * 2.2f) },
         )
         val stops = ArrayList<Pair<Float, Int>>(4)
         stops.add(0f to trailAlpha(0x90E8FF, 0f))
@@ -948,7 +1047,7 @@ private fun drawStarTail(c: Canvas, trail: List<PointF>, driftM: Double) {
         c.drawCircle(
             p.x + axis.nx[i] * off,
             p.y + axis.ny[i] * off,
-            2f + 3f * (1f - u),
+            1.1f + 1.4f * (1f - u),
             spark,
         )
     }
@@ -958,16 +1057,16 @@ private fun drawStarTail(c: Canvas, trail: List<PointF>, driftM: Double) {
  * A warm sheath and three jittering bolts at different depths, each flickering on
  * its own beat, with embers flicked off the streak.
  */
-private fun drawSparkTail(c: Canvas, trail: List<PointF>, driftM: Double) {
+private fun drawSparkTail(c: Canvas, trail: List<PointF>, driftM: Double, L: Float) {
     if (trail.size < 2) return
     val axis = trailAxis(trail)
     val n = trail.size
-    val t = driftM.toFloat()
+    val sec = (driftM / 2.8).toFloat()
 
     val sheath = trailBand(
         trail,
         axis,
-        { u -> SPARK_MAX_WIDTH_PX * 0.5f * (0.05f + 0.95f * u) },
+        { u -> L * 0.10f * (0.05f + 0.95f * u) },
     )
     c.drawPath(
         sheath,
@@ -975,8 +1074,8 @@ private fun drawSparkTail(c: Canvas, trail: List<PointF>, driftM: Double) {
             axis,
             arrayOf(
                 0f to trailAlpha(0xFF8A3C, 0f),
-                0.5f to trailAlpha(0xFF8A3C, 0.12f),
-                1f to trailAlpha(0xFFB85A, 0.30f),
+                0.5f to trailAlpha(0xFF8A3C, 0.08f),
+                1f to trailAlpha(0xFFB85A, 0.20f),
             ),
         ),
     )
@@ -989,15 +1088,15 @@ private fun drawSparkTail(c: Canvas, trail: List<PointF>, driftM: Double) {
     for (b in 0 until 3) {
         val reach = 1f - b * 0.15f
         val from = 1f - reach
-        val flick = 0.62f + 0.38f * sin(t * 0.035f + b * 2.3f)
+        val flick = 0.62f + 0.38f * sin(sec * 9f + b * 2.3f)
         val path = Path()
         var started = false
         for (i in 0 until n) {
             val u = i / (n - 1).toFloat()
             if (u < from) continue
-            val amp = (2.5f + 15f * u) * (0.7f + 0.3f * sin(t * 0.02f + b))
-            val jitter = sin(u * 11f + b * 2.1f + t * 0.02f) * amp +
-                sin(u * 26f + t * 0.05f) * amp * 0.30f
+            val amp = (2.5f + 15f * u) * (0.7f + 0.3f * sin(sec * 5f + b))
+            val jitter = sin(u * 11f + b * 2.1f + sec * 6.5f) * amp +
+                sin(u * 26f + sec * 11f) * amp * 0.30f
             val x = trail[i].x + axis.nx[i] * jitter
             val y = trail[i].y + axis.ny[i] * jitter
             if (!started) {
@@ -1008,22 +1107,22 @@ private fun drawSparkTail(c: Canvas, trail: List<PointF>, driftM: Double) {
             }
         }
         val rgb = intArrayOf(0xFFF3D6, 0xFFC45A, 0xFF7828)[b]
-        stroke.color = trailAlpha(rgb, floatArrayOf(0.92f, 0.72f, 0.50f)[b] * flick)
-        stroke.strokeWidth = 12f - b * 1.6f
+        stroke.color = trailAlpha(rgb, 0.85f * flick * (1f - b * 0.18f))
+        stroke.strokeWidth = 4.4f - b * 0.9f
         c.drawPath(path, stroke)
     }
 
     val ember = Paint(Paint.ANTI_ALIAS_FLAG)
     for (k in 0 until 7) {
-        val u = ((k / 7f) + (t / 3600f)) % 1f
+        val u = ((k / 7f) + (sec * 0.35f)) % 1f
         val i = (u * (n - 1)).toInt().coerceIn(0, n - 1)
         val p = trail[i]
-        val off = sin(k * 2.7f + t * 0.03f) * (10f + 18f * u)
+        val off = sin(k * 2.7f + sec * 3f) * (10f + 18f * u)
         ember.color = trailAlpha(0xFFC878, 0.55f * (1f - u))
         c.drawCircle(
             p.x + axis.nx[i] * off,
             p.y + axis.ny[i] * off,
-            1.6f + 2.6f * (1f - u),
+            1.2f + 1.6f * (1f - u),
             ember,
         )
     }
@@ -1033,21 +1132,21 @@ private fun drawSparkTail(c: Canvas, trail: List<PointF>, driftM: Double) {
  * A brush stroke: a thin dry tip that swells mid-stroke and tightens at the nib,
  * with bristles splitting off the far end.
  */
-private fun drawInkTail(c: Canvas, trail: List<PointF>, driftM: Double) {
+private fun drawInkTail(c: Canvas, trail: List<PointF>, driftM: Double, L: Float) {
     if (trail.size < 2) return
     val axis = trailAxis(trail)
     val n = trail.size
-    val t = driftM.toFloat()
-    val peak = INK_MAX_WIDTH_PX * 0.5f
+    val sec = (driftM / 2.8).toFloat()
+    val peak = L * 0.20f
 
     val env: (Float) -> Float = { u ->
         val a = sin(PI * u.toDouble().pow(0.80))
         if (a <= 0.0) 0f else a.pow(1.25).toFloat()
     }
-    val drift: (Float) -> Float = { u -> sin(u * 4.2f + t * 0.003f) * 3.2f * u }
+    val drift: (Float) -> Float = { u -> sin(u * 4.2f + sec * 0.7f) * 3.2f * u }
 
-    val ws = floatArrayOf(1.00f, 0.68f, 0.36f, 0.15f)
-    val alphas = floatArrayOf(0.25f, 0.40f, 0.60f, 0.85f)
+    val ws = floatArrayOf(1.00f, 0.68f, 0.36f, 0.14f)
+    val alphas = floatArrayOf(0.11f, 0.18f, 0.32f, 0.58f)
     for (k in 0 until 4) {
         val w = peak * ws[k]
         val path = trailBand(
@@ -1089,7 +1188,7 @@ private fun drawInkTail(c: Canvas, trail: List<PointF>, driftM: Double) {
         val dl = hypot(dx, dy).coerceAtLeast(0.001f)
         dx /= dl
         dy /= dl
-        val len = 26f + 40f * ((k * 37) % 100) / 100f
+        val len = L * (0.12f + 0.20f * ((k * 37) % 100) / 100f)
         val off = (k - 3f) * peak * 0.26f
         bristle.strokeWidth = 2.6f
         bristle.color = trailAlpha(0xE8F1FF, 0.30f * (1f - u * 6f).coerceAtLeast(0f))
