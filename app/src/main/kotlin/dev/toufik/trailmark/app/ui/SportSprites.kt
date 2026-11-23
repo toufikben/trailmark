@@ -86,7 +86,7 @@ private fun drawPuck(
     // smaller than the casing of the other shapes.
     val r = s * when {
         style == PuckStyle.COMET -> 0.24f
-        style.wideArt -> 0.20f
+        style.wideArt -> 0.18f
         else -> 0.395f
     }
     val pulse = ((sin(frame / SPRITE_FRAMES.toFloat() * 2f * PI.toFloat()) + 1.0) / 2.0).toFloat()
@@ -362,11 +362,11 @@ object PuckArt {
         val flap = sin(pulse * 2f * PI.toFloat())
         val breathe = 1f + 0.06f * pulse
 
-        c.drawCircle(cx, cy, r * 2.3f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        c.drawCircle(cx, cy, r * 2.6f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
-                cx, cy, r * 2.3f,
-                intArrayOf(0x66FFD678, 0x2EFF7828, 0x00B3120A),
-                floatArrayOf(0f, 0.34f, 1f),
+                cx, cy, r * 2.6f,
+                intArrayOf(0x80FFD678, 0x38FF7828, 0x00B3120A),
+                floatArrayOf(0f, 0.30f, 1f),
                 Shader.TileMode.CLAMP,
             )
         })
@@ -376,26 +376,34 @@ object PuckArt {
         for (side in floatArrayOf(-1f, 1f)) {
             c.save()
             c.scale(side, 1f)
-            c.rotate(-16f + 9f * flap)
-            for (f in 0 until 3) {
-                val reach = 1.78f - f * 0.30f
-                val lift = -0.52f - f * 0.20f + 0.08f * flap * (1f + f * 0.3f)
+            c.rotate(-13f + 11f * flap)
+            for (f in 3 downTo 0) {
+                val reach = 2.60f - f * 0.42f
+                val lift = -0.62f - f * 0.12f + 0.10f * flap * (1f + f * 0.2f)
                 val feather = Path().apply {
-                    moveTo(r * 0.22f, r * 0.08f)
-                    quadTo(r * reach * 0.62f, r * (lift - 0.26f), r * reach, r * lift)
-                    quadTo(r * reach * 0.58f, r * (lift + 0.26f), r * 0.22f, r * 0.34f)
+                    moveTo(r * 0.30f, r * 0.10f)
+                    cubicTo(
+                        r * 1.05f, r * (lift + 0.30f),
+                        r * (reach * 0.70f), r * (lift + 0.05f),
+                        r * reach, r * (lift + 0.30f),
+                    )
+                    cubicTo(
+                        r * (reach * 0.73f), r * (lift + 0.62f),
+                        r * 1.20f, r * (lift + 0.78f),
+                        r * 0.30f, r * 0.34f,
+                    )
                     close()
                 }
                 c.drawPath(feather, Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     shader = LinearGradient(
-                        r * 0.2f, 0f, r * reach, 0f,
+                        r * 0.3f, 0f, r * reach, 0f,
                         intArrayOf(
-                            0xE6FFF3D0.toInt(),
-                            0xC4FFA83C.toInt(),
-                            0x66E24A14,
-                            0x0A960C08,
+                            ((0.95f - f * 0.10f) * 255).toInt().coerceIn(0, 255) shl 24 or 0xFFF0BE,
+                            ((0.80f - f * 0.11f) * 255).toInt().coerceIn(0, 255) shl 24 or 0xFFA83C,
+                            ((0.52f - f * 0.09f) * 255).toInt().coerceIn(0, 255) shl 24 or 0xE24A14,
+                            0x0F960C08,
                         ),
-                        floatArrayOf(0f, 0.42f, 0.78f, 1f),
+                        floatArrayOf(0f, 0.38f, 0.78f, 1f),
                         Shader.TileMode.CLAMP,
                     )
                 })
@@ -434,10 +442,10 @@ object PuckArt {
     private fun drawAurora(c: Canvas, cx: Float, cy: Float, r: Float, pulse: Float) {
         val breathe = 1f + 0.10f * pulse
 
-        c.drawCircle(cx, cy, r * 2.3f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        c.drawCircle(cx, cy, r * 2.6f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
-                cx, cy, r * 2.3f,
-                intArrayOf(0x66BFFFF0, 0x2E6FE9FF, 0x00A97BFF),
+                cx, cy, r * 2.6f,
+                intArrayOf(0x80BFFFF0, 0x386FE9FF, 0x00A97BFF),
                 floatArrayOf(0f, 0.34f, 1f),
                 Shader.TileMode.CLAMP,
             )
@@ -450,21 +458,21 @@ object PuckArt {
             style = Paint.Style.STROKE
             strokeCap = Paint.Cap.ROUND
         }
-        val radii = floatArrayOf(1.52f, 1.78f, 2.02f)
+        val radii = floatArrayOf(1.52f, 1.80f, 2.08f)
         val starts = floatArrayOf(138f, 166f, 194f)
         val sweeps = floatArrayOf(214f, 188f, 164f)
-        val alphas = floatArrayOf(0.42f, 0.36f, 0.30f)
+        val alphas = floatArrayOf(0.62f, 0.54f, 0.46f)
         val tones = intArrayOf(0x3DFFB0, 0x6FE9FF, 0xA97BFF)
         for (i in 0 until 3) {
             val rr = r * radii[i]
-            arc.strokeWidth = r * 0.14f
+            arc.strokeWidth = r * 0.22f
             arc.color = tones[i]
             arc.alpha = (alphas[i] * (0.72f + 0.28f * pulse) * 255f).toInt().coerceIn(0, 255)
             c.drawArc(RectF(-rr, -rr, rr, rr), starts[i], sweeps[i], false, arc)
         }
         c.restore()
 
-        c.drawCircle(cx, cy, r * 0.98f * breathe, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        c.drawCircle(cx, cy, r * 1.05f * breathe, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
                 cx - r * 0.20f, cy - r * 0.24f, r * 1.30f * breathe,
                 intArrayOf(
@@ -494,10 +502,10 @@ object PuckArt {
     private fun drawShootingStar(c: Canvas, cx: Float, cy: Float, r: Float, pulse: Float) {
         val shine = 0.70f + 0.30f * sin(pulse * 2f * PI.toFloat())
 
-        c.drawCircle(cx, cy, r * 2.25f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        c.drawCircle(cx, cy, r * 2.6f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
-                cx, cy, r * 2.25f,
-                intArrayOf(0x80E6FAFF.toInt(), 0x2E7FE9FF, 0x007FE9FF),
+                cx, cy, r * 2.6f,
+                intArrayOf(0x99E6FAFF.toInt(), 0x387FE9FF, 0x007FE9FF),
                 floatArrayOf(0f, 0.30f, 1f),
                 Shader.TileMode.CLAMP,
             )
@@ -506,22 +514,22 @@ object PuckArt {
 
         c.save()
         c.translate(cx, cy)
-        val rays = floatArrayOf(2.05f, 0.95f, 2.05f, 0.95f)
+        val rays = floatArrayOf(2.60f, 1.20f, 2.60f, 1.20f)
         for (i in 0 until 4) {
             val len = r * rays[i] * (0.92f + 0.10f * shine)
-            val wid = r * if (i % 2 == 0) 0.10f else 0.07f
+            val wid = r * if (i % 2 == 0) 0.16f else 0.11f
             val ray = Path().apply {
-                moveTo(0f, 0f)
-                lineTo(-wid, -len * 0.34f)
-                lineTo(0f, -len)
-                lineTo(wid, -len * 0.34f)
+                moveTo(0f, -len)
+                lineTo(-wid, 0f)
+                lineTo(0f, len)
+                lineTo(wid, 0f)
                 close()
             }
             c.drawPath(ray, Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 shader = LinearGradient(
-                    0f, 0f, 0f, -len,
-                    intArrayOf(0xE6FFFFFF.toInt(), 0x99BEEBFF.toInt(), 0x007FE9FF),
-                    floatArrayOf(0f, 0.55f, 1f),
+                    0f, -len, 0f, len,
+                    intArrayOf(0x00FFFFFF, 0xF2FFFFFF.toInt(), 0x00FFFFFF),
+                    floatArrayOf(0f, 0.5f, 1f),
                     Shader.TileMode.CLAMP,
                 )
             })
@@ -529,11 +537,11 @@ object PuckArt {
         }
         c.restore()
 
-        c.drawCircle(cx, cy, r * 0.46f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        c.drawCircle(cx, cy, r * 0.95f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
-                cx, cy, r * 0.50f,
-                intArrayOf(0xFFFFFFFF.toInt(), 0xFFF2FCFF.toInt(), 0x4DBEEBFF),
-                floatArrayOf(0f, 0.58f, 1f),
+                cx, cy, r * 1.0f,
+                intArrayOf(0xFFFFFFFF.toInt(), 0xFFF2FCFF.toInt(), 0x66BEEBFF),
+                floatArrayOf(0f, 0.55f, 1f),
                 Shader.TileMode.CLAMP,
             )
         })
@@ -546,11 +554,11 @@ object PuckArt {
     private fun drawSpark(c: Canvas, cx: Float, cy: Float, r: Float, pulse: Float) {
         val flick = 0.62f + 0.38f * sin(pulse * 2f * PI.toFloat())
 
-        c.drawCircle(cx, cy, r * 2.3f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        c.drawCircle(cx, cy, r * 2.6f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
-                cx, cy, r * 2.3f,
-                intArrayOf(0x66FFF6E0, 0x2EFFB450, 0x00FF6A28),
-                floatArrayOf(0f, 0.32f, 1f),
+                cx, cy, r * 2.6f,
+                intArrayOf(0x9EFFF6E0, 0x42FFB450, 0x00FF6A28),
+                floatArrayOf(0f, 0.26f, 1f),
                 Shader.TileMode.CLAMP,
             )
             alpha = (255f * (0.55f + 0.45f * flick)).toInt().coerceIn(0, 255)
@@ -559,10 +567,10 @@ object PuckArt {
         c.save()
         c.translate(cx, cy)
         c.rotate(45f * pulse)
-        val rays = floatArrayOf(1.70f, 1.05f, 1.70f, 1.05f)
+        val rays = floatArrayOf(2.60f, 1.50f, 2.60f, 1.50f)
         for (i in 0 until 4) {
-            val len = r * rays[i] * (0.92f + 0.10f * flick)
-            val wid = r * if (i % 2 == 0) 0.17f else 0.11f
+            val len = r * rays[i] * (0.94f + 0.10f * flick)
+            val wid = r * if (i % 2 == 0) 0.20f else 0.14f
             val ray = Path().apply {
                 moveTo(0f, 0f)
                 quadTo(-wid, -len * 0.45f, 0f, -len)
@@ -584,7 +592,7 @@ object PuckArt {
         val ember = Paint(Paint.ANTI_ALIAS_FLAG)
         for (k in 0 until 4) {
             val a = Math.toRadians(k * 90.0 + 32.0 + 40.0 * pulse)
-            val rr = r * (1.38f + 0.14f * sin(pulse * 2f * PI.toFloat() + k * 1.3f))
+            val rr = r * (1.60f + 0.14f * sin(pulse * 2f * PI.toFloat() + k * 1.3f))
             ember.color = 0xCCFFD98A.toInt()
             c.drawCircle(
                 cx + (cos(a) * rr).toFloat(),
@@ -594,9 +602,9 @@ object PuckArt {
             )
         }
 
-        c.drawCircle(cx, cy, r * 0.82f * (0.94f + 0.08f * flick), Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        c.drawCircle(cx, cy, r * 1.0f * (0.94f + 0.08f * flick), Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
-                cx, cy, r * 0.86f,
+                cx, cy, r * 1.05f,
                 intArrayOf(
                     0xFFFFFFFF.toInt(),
                     0xFFFFF8E6.toInt(),
@@ -624,10 +632,10 @@ object PuckArt {
     private fun drawInk(c: Canvas, cx: Float, cy: Float, r: Float, pulse: Float) {
         val settle = 1f + 0.04f * sin(pulse * 2f * PI.toFloat())
 
-        c.drawCircle(cx, cy, r * 2.25f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        c.drawCircle(cx, cy, r * 2.6f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
-                cx, cy, r * 2.25f,
-                intArrayOf(0x4DC8E1FF, 0x1FA0C3FF, 0x007A93B8),
+                cx, cy, r * 2.6f,
+                intArrayOf(0x66C8E1FF, 0x2AA0C3FF, 0x007A93B8),
                 floatArrayOf(0f, 0.40f, 1f),
                 Shader.TileMode.CLAMP,
             )
@@ -637,7 +645,7 @@ object PuckArt {
         c.translate(cx, cy)
         c.rotate(-18f + 8f * pulse)
         c.scale(1f, 0.86f)
-        c.drawCircle(0f, 0f, r * 0.98f * settle, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        c.drawCircle(0f, 0f, r * 1.10f * settle, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
                 -r * 0.20f, -r * 0.24f, r * 1.36f,
                 intArrayOf(
