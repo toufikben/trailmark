@@ -758,12 +758,12 @@ private fun drawPhoenixTail(c: Canvas, trail: List<PointF>, driftM: Double) {
 
     for (side in floatArrayOf(-1f, 1f)) {
         val drift: (Float) -> Float = { u -> side * spread * (1f - u).pow(1.25f) }
-        val reach = floatArrayOf(1.00f, 0.80f, 0.56f, 0.34f, 0.15f)
+        val reach = floatArrayOf(1.00f, 0.82f, 0.60f, 0.38f, 0.18f)
         val colors = intArrayOf(
-            0x30B3120A, 0x48FF6A1F, 0x66FFB020, 0x99FFE07A.toInt(), 0xCCFFF3D0.toInt(),
+            0x42B3120A, 0x5CFF6A1F, 0x7AFFB020, 0xA8FFE07A.toInt(), 0xD6FFF3D0.toInt(),
         )
         for (p in 0 until 5) {
-            val w = PHOENIX_MAX_WIDTH_PX * 0.42f * reach[p]
+            val w = PHOENIX_MAX_WIDTH_PX * 0.55f * reach[p]
             val path = trailBand(
                 trail,
                 axis,
@@ -810,8 +810,8 @@ private fun drawPhoenixTail(c: Canvas, trail: List<PointF>, driftM: Double) {
             val ay = q.y + by * off
             val ex = ax + bx * side * len - dx * len * 0.55f
             val ey = ay + by * side * len - dy * len * 0.55f
-            barb.strokeWidth = 5.5f * (0.4f + 0.6f * (1f - u))
-            barb.color = trailAlpha(0xFFFFD078.toInt(), 0.34f * (1f - u))
+            barb.strokeWidth = 6.5f * (0.4f + 0.6f * (1f - u))
+            barb.color = trailAlpha(0xFFFFD078.toInt(), 0.46f * (1f - u))
             val path = Path().apply {
                 moveTo(ax, ay)
                 quadTo(
