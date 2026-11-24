@@ -412,9 +412,20 @@ object PuckArt {
         }
         c.restore()
 
-        c.drawCircle(cx, cy, r * 1.02f * breathe, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        // The core is a beak now, not a disc: the phoenix is the only head that
+        // reads as a bird, so the round dot at its centre pointed the wrong way
+        // and blurred the silhouette. A four-point tear aimed along the line of
+        // travel keeps a hot centre while staying pointed.
+        val beak = Path().apply {
+            moveTo(cx, cy - r * 1.30f * breathe)
+            quadTo(cx + r * 0.46f, cy - r * 0.20f, cx + r * 0.30f, cy + r * 0.52f)
+            quadTo(cx, cy + r * 0.10f, cx - r * 0.30f, cy + r * 0.52f)
+            quadTo(cx - r * 0.46f, cy - r * 0.20f, cx, cy - r * 1.30f * breathe)
+            close()
+        }
+        c.drawPath(beak, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
-                cx - r * 0.16f, cy - r * 0.18f, r * 1.34f * breathe,
+                cx - r * 0.10f, cy - r * 0.30f, r * 1.30f * breathe,
                 intArrayOf(
                     0xFFFFFFFF.toInt(),
                     0xFFFFF6D0.toInt(),
@@ -422,14 +433,16 @@ object PuckArt {
                     0xFFFF7A28.toInt(),
                     0xB3B3120A.toInt(),
                 ),
-                floatArrayOf(0f, 0.26f, 0.58f, 0.84f, 1f),
+                floatArrayOf(0f, 0.28f, 0.60f, 0.86f, 1f),
                 Shader.TileMode.CLAMP,
             )
         })
 
-        c.drawCircle(cx, cy, r, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        // The accent ring follows the beak's own outline; a circle here would
+        // draw the dot straight back over the pointed core.
+        c.drawPath(beak, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
-            strokeWidth = r * 0.11f
+            strokeWidth = r * 0.09f
             color = ACCENT
             alpha = (110 + 80 * pulse).toInt().coerceIn(0, 255)
         })
@@ -442,10 +455,10 @@ object PuckArt {
     private fun drawAurora(c: Canvas, cx: Float, cy: Float, r: Float, pulse: Float) {
         val breathe = 1f + 0.10f * pulse
 
-        c.drawCircle(cx, cy, r * 2.6f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        c.drawCircle(cx, cy, r * 2.3f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
-                cx, cy, r * 2.6f,
-                intArrayOf(0x80BFFFF0.toInt(), 0x386FE9FF, 0x00A97BFF),
+                cx, cy, r * 2.3f,
+                intArrayOf(0x66BFFFF0, 0x2E6FE9FF, 0x00A97BFF),
                 floatArrayOf(0f, 0.34f, 1f),
                 Shader.TileMode.CLAMP,
             )
@@ -458,21 +471,21 @@ object PuckArt {
             style = Paint.Style.STROKE
             strokeCap = Paint.Cap.ROUND
         }
-        val radii = floatArrayOf(1.52f, 1.80f, 2.08f)
+        val radii = floatArrayOf(1.52f, 1.78f, 2.02f)
         val starts = floatArrayOf(138f, 166f, 194f)
         val sweeps = floatArrayOf(214f, 188f, 164f)
-        val alphas = floatArrayOf(0.62f, 0.54f, 0.46f)
+        val alphas = floatArrayOf(0.42f, 0.36f, 0.30f)
         val tones = intArrayOf(0x3DFFB0, 0x6FE9FF, 0xA97BFF)
         for (i in 0 until 3) {
             val rr = r * radii[i]
-            arc.strokeWidth = r * 0.22f
+            arc.strokeWidth = r * 0.14f
             arc.color = tones[i]
             arc.alpha = (alphas[i] * (0.72f + 0.28f * pulse) * 255f).toInt().coerceIn(0, 255)
             c.drawArc(RectF(-rr, -rr, rr, rr), starts[i], sweeps[i], false, arc)
         }
         c.restore()
 
-        c.drawCircle(cx, cy, r * 1.05f * breathe, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        c.drawCircle(cx, cy, r * 0.98f * breathe, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
                 cx - r * 0.20f, cy - r * 0.24f, r * 1.30f * breathe,
                 intArrayOf(

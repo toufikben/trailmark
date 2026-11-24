@@ -88,10 +88,29 @@ private const val TRAIL_BEHIND_M = 260.0
  * while the walk behind the puck stays short.
  */
 private fun tailWidthPx(style: PuckStyle): Float = when (style) {
+    // The phoenix plumes are drawn from this reference alone, so it is also what
+    // shortens the wing: the approved 360 px spread read as a wing across the
+    // whole lower frame, and the ask was to shorten it, not to drop it.
+    PuckStyle.PHOENIX -> 260f
     PuckStyle.SHOOTING_STAR -> 374f
     PuckStyle.SPARK -> 317f
     PuckStyle.INK -> 360f
     else -> 360f
+}
+
+/**
+ * How far behind the puck each style walks its ribbon, in metres. The comet is
+ * the reference and must not move; the newer heads glow wide enough that the
+ * comet's reach left their ribbons looking stubbed, so they get a little more.
+ */
+private fun tailLengthM(style: PuckStyle): Double = when (style) {
+    // The phoenix keeps its wings but at three quarters of the comet's reach: at
+    // full reach the two plumes read as one wing spread over the lower frame.
+    PuckStyle.PHOENIX -> TRAIL_BEHIND_M * 0.85
+    // The streaks glowed wider than the comet, so the comet's reach left their
+    // needles looking stubbed behind their own heads.
+    PuckStyle.SHOOTING_STAR, PuckStyle.SPARK, PuckStyle.INK -> TRAIL_BEHIND_M * 1.75
+    else -> TRAIL_BEHIND_M
 }
 
 /** How far a projected point may sit outside the frame and still be drawn. */
@@ -341,9 +360,9 @@ internal class HeadlessFlyover(
                         val settled = frame.phase == FlyoverPhase.OUTRO || !follow
                         val tailStyle = if (puckStyle.hasVideoTrail && !settled) puckStyle else null
                         val tailTrail = if (tailStyle != null && here != null) {
-                            // Every ribbon is the comet's own length now: the longer
-                            // pixel-measured plumes read as a smear over the footage.
-                            trailBehind(projection, path, frame.distanceM)
+                            // Each style walks its own reach; the comet keeps the
+                            // reference length exactly.
+                            trailBehind(projection, path, frame.distanceM, tailLengthM(tailStyle))
                         } else {
                             emptyList()
                         }
@@ -549,8 +568,9 @@ internal class HeadlessFlyover(
         snapshot: MapSnapshot,
         path: FlyoverPath,
         distanceM: Double,
+        spanM: Double = TRAIL_BEHIND_M,
     ): List<PointF> {
-        val start = (distanceM - TRAIL_BEHIND_M).coerceAtLeast(0.0)
+        val start = (distanceM - spanM).coerceAtLeast(0.0)
         val step = ((distanceM - start) / 96.0).coerceAtLeast(2.0)
         val back = ArrayList<PointF>(96)
         var d = distanceM
@@ -776,6 +796,7 @@ private fun drawTrailTail(
     lengthPx: Float,
 ) {
     when (style) {
+        PuckStyle.PHOENIX -> drawPhoenixTail(c, trail, driftM, lengthPx)
         PuckStyle.SHOOTING_STAR -> drawStarTail(c, trail, driftM, lengthPx)
         PuckStyle.SPARK -> drawSparkTail(c, trail, driftM, lengthPx)
         PuckStyle.INK -> drawInkTail(c, trail, driftM, lengthPx)
@@ -849,7 +870,87 @@ private fun drawStarTail(c: Canvas, trail: List<PointF>, driftM: Double, L: Floa
 }
 
 /**
- * A warm sheath and three jittering bolts at different depths, each flickering on
+ * Two plumes of five translucent layers that open towards the tip, each spine
+ * carrying a row of curved barbs. The layers are the feather's own colours:
+ * deep red at the outer edge to near-white at the quill. The plume reach is the
+ * shape's own width reference, so it stays a trailing feather rather than a wing
+ * spread over the frame.
+ */
+private fun drawPhoenixTail(c: Canvas, trail: List<PointF>, driftM: Double, L: Float) {
+    if (trail.size < 2) return
+    val axis = trailAxis(trail)
+    val n = trail.size
+    val spread = L * 0.34f
+
+    for (side in floatArrayOf(-1f, 1f)) {
+        val drift: (Float) -> Float = { u -> side * spread * (1f - u).pow(1.25f) }
+        val ws = floatArrayOf(1.00f, 0.78f, 0.55f, 0.34f, 0.15f)
+        val tones = intArrayOf(0xB3120A, 0xFF6A28, 0xFF9428, 0xFFC446, 0xFFE696)
+        val alphas = floatArrayOf(0.07f, 0.11f, 0.17f, 0.26f, 0.44f)
+        for (p in 0 until 5) {
+            val w = L * 0.40f * ws[p]
+            val path = trailBand(
+                trail,
+                axis,
+                { u -> w * (0.08f + 0.92f * u.pow(1.15f)) },
+                drift,
+            )
+            val tone = tones[p]
+            c.drawPath(
+                path,
+                trailPaint(
+                    axis,
+                    arrayOf(
+                        0f to trailAlpha(tone, 0f),
+                        0.40f to trailAlpha(tone, alphas[p] * 0.55f),
+                        1f to trailAlpha(tone, alphas[p]),
+                    ),
+                ),
+            )
+        }
+    }
+
+    // Barbs: short curved vanes fanning off each plume spine.
+    val barb = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+    }
+    for (side in floatArrayOf(-1f, 1f)) {
+        for (k in 0 until 7) {
+            val u = 0.06f + 0.126f * k
+            val i = (u * (n - 1)).toInt().coerceIn(0, n - 1)
+            val q = trail[i]
+            val bx = axis.nx[i]
+            val by = axis.ny[i]
+            val a = trail[(i - 1).coerceAtLeast(0)]
+            val b = trail[(i + 1).coerceAtMost(n - 1)]
+            var dx = b.x - a.x
+            var dy = b.y - a.y
+            val dl = hypot(dx, dy).coerceAtLeast(0.001f)
+            dx /= dl
+            dy /= dl
+            val len = spread * 0.72f * (1f - u).pow(0.85f)
+            val off = side * spread * (1f - u).pow(1.25f)
+            val ax = q.x + bx * off
+            val ay = q.y + by * off
+            val ex = ax + bx * side * len - dx * len * 0.55f
+            val ey = ay + by * side * len - dy * len * 0.55f
+            barb.strokeWidth = 2.8f * (0.4f + 0.6f * (1f - u))
+            barb.color = trailAlpha(0xFFFFD078.toInt(), 0.32f * (1f - u))
+            val path = Path().apply {
+                moveTo(ax, ay)
+                quadTo(
+                    ax + bx * side * len * 0.55f - dx * len * 0.05f,
+                    ay + by * side * len * 0.55f - dy * len * 0.05f,
+                    ex,
+                    ey,
+                )
+            }
+            c.drawPath(path, barb)
+        }
+    }
+}
+/** A warm sheath and three jittering bolts at different depths, each flickering on
  * its own beat, with embers flicked off the streak.
  */
 private fun drawSparkTail(c: Canvas, trail: List<PointF>, driftM: Double, L: Float) {

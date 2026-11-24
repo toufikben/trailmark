@@ -37,12 +37,13 @@ enum class PuckStyle(val key: String, val pro: Boolean) {
 
     /**
      * True when the shape paints a ribbon behind the puck in the exported video.
-     * The comet keeps its own; the three streaks keep theirs at the comet's
-     * length. The phoenix and the aurora were reverted: their plumes read as a
-     * long smear over the footage, so they draw as heads over the plain trace.
+     * The comet keeps its own; the phoenix keeps its two plumes and the three
+     * streaks keep their needles. The aurora draws no tail at all - it never had
+     * one before and its band only smeared the footage.
      */
     val hasVideoTrail: Boolean
-        get() = this == COMET || this == SHOOTING_STAR || this == SPARK || this == INK
+        get() = this == COMET || this == PHOENIX || this == SHOOTING_STAR ||
+            this == SPARK || this == INK
 
     /**
      * True when the art glows past its casing. Such a sprite is rendered on a
