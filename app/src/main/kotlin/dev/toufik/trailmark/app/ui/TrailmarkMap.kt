@@ -294,179 +294,6 @@ private fun addCometLayer(s: Style, id: String, head: Int, width: Float, blur: F
     )
 }
 
-/** The source that carries the tail of every style added after the comet. */
-private const val TRAIL_SOURCE = "trail-tail-source"
-
-/**
- * One translucent ribbon of a trail style. A pass either fades along its length
- * with [stops] or is drawn as a solid dashed stroke in [dashColor]; MapLibre
- * cannot combine a line gradient with a dash array, so the two never mix.
- */
-private data class TrailPass(
-    val id: String,
-    val width: Float,
-    val blur: Float,
-    val stops: List<Pair<Float, Int>> = emptyList(),
-    val dashColor: Int = 0,
-    val dash: FloatArray? = null,
-)
-
-private fun trailGradient(stops: List<Pair<Float, Int>>): Expression = Expression.interpolate(
-    Expression.linear(),
-    Expression.lineProgress(),
-    *stops.map { Expression.stop(it.first, Expression.color(it.second)) }.toTypedArray(),
-)
-
-private fun addTrailPass(s: Style, pass: TrailPass) {
-    val dash = pass.dash
-    val layer = LineLayer(pass.id, TRAIL_SOURCE).withProperties(
-        if (dash == null) {
-            lineGradient(trailGradient(pass.stops))
-        } else {
-            lineColor(Expression.color(pass.dashColor))
-        },
-        lineWidth(cometWidth(pass.width)),
-        lineBlur(pass.blur),
-        lineCap(Property.LINE_CAP_ROUND),
-        lineJoin(Property.LINE_JOIN_ROUND),
-    )
-    if (dash != null) layer.setProperties(lineDasharray(dash.toTypedArray()))
-    s.addLayer(layer)
-}
-
-/**
- * The ribbons that make each new shape's tail. Widths are metres at zoom 16,
- * like the comet's, so a tail keeps a similar size on screen as the camera
- * pulls back.
- */
-private fun trailPasses(style: PuckStyle): List<TrailPass> = when (style) {
-    PuckStyle.PHOENIX -> listOf(
-        TrailPass(
-            "phoenix-haze", 72f, 15f,
-            listOf(0f to 0x00FF6A28, 0.45f to 0x14FF6A28, 1f to 0x22FF6A28),
-        ),
-        TrailPass(
-            "phoenix-red", 46f, 8f,
-            listOf(0f to 0x00B3120A, 0.45f to 0x38B3120A, 1f to 0x8CB3120A.toInt()),
-        ),
-        TrailPass(
-            "phoenix-orange", 30f, 5f,
-            listOf(0f to 0x00FF6A1F, 0.45f to 0x4DFF6A1F, 1f to 0xB3FF6A1F.toInt()),
-        ),
-        TrailPass(
-            "phoenix-gold", 14f, 2.5f,
-            listOf(0f to 0x00FFB020, 0.45f to 0x59FFB020, 1f to 0xD9FFB020.toInt()),
-        ),
-        TrailPass(
-            "phoenix-white", 5f, 1f,
-            listOf(0f to 0x00FFE07A, 0.45f to 0x66FFE07A, 1f to 0xF2FFE07A.toInt()),
-        ),
-    )
-
-    PuckStyle.AURORA -> listOf(
-        TrailPass(
-            "aurora-wide", 58f, 14f,
-            listOf(
-                0f to 0x003DFFB0,
-                0.30f to 0x3D3DFFB0,
-                0.62f to 0x476FE9FF,
-                1f to 0x5CA97BFF,
-            ),
-        ),
-        TrailPass(
-            "aurora-mid", 28f, 7f,
-            listOf(
-                0f to 0x003DFFB0,
-                0.30f to 0x663DFFB0,
-                0.62f to 0x736FE9FF,
-                1f to 0x80A97BFF.toInt(),
-            ),
-        ),
-        TrailPass(
-            "aurora-core", 7f, 1.5f,
-            listOf(0f to 0x00DFFFF6, 0.5f to 0x4DDFFFF6, 1f to 0xB3DFFFF6.toInt()),
-        ),
-    )
-
-    PuckStyle.SHOOTING_STAR -> listOf(
-        TrailPass(
-            "star-sheath", 24f, 9f,
-            listOf(0f to 0x00BEEBFF, 0.5f to 0x1FBEEBFF, 1f to 0x33FFFFFF),
-        ),
-        TrailPass(
-            "star-needle-far", 8f, 2f,
-            listOf(0f to 0x00BEEBFF, 0.45f to 0x59BEEBFF, 1f to 0xE6FFFFFF.toInt()),
-        ),
-        TrailPass(
-            "star-needle-mid", 4.5f, 1f,
-            listOf(
-                0f to 0x00BEEBFF,
-                0.28f to 0x00BEEBFF,
-                0.62f to 0x40BEEBFF,
-                1f to 0xC0FFFFFF.toInt(),
-            ),
-        ),
-        TrailPass(
-            "star-needle-near", 2.6f, 0.5f,
-            listOf(
-                0f to 0x00BEEBFF,
-                0.56f to 0x00BEEBFF,
-                1f to 0x8CBEEBFF.toInt(),
-            ),
-        ),
-    )
-
-    PuckStyle.SPARK -> listOf(
-        TrailPass(
-            "spark-sheath", 26f, 10f,
-            listOf(0f to 0x00FF8A3C, 0.5f to 0x14FF8A3C, 1f to 0x2EFFB020),
-        ),
-        TrailPass(
-            "spark-ember", 9f, 1f,
-            dashColor = 0x80FFC45A.toInt(),
-            dash = floatArrayOf(0.5f, 2.2f),
-        ),
-        TrailPass(
-            "spark-bolt", 5f, 0f,
-            dashColor = 0xE6FFF3D6.toInt(),
-            dash = floatArrayOf(1.4f, 1.6f),
-        ),
-    )
-
-    PuckStyle.INK -> listOf(
-        TrailPass(
-            "ink-wash", 60f, 16f,
-            listOf(
-                0f to 0x007A93B8,
-                0.35f to 0x147A93B8,
-                0.70f to 0x1FA0C3FF,
-                1f to 0x29B9D9FF,
-            ),
-        ),
-        TrailPass(
-            "ink-body", 34f, 8f,
-            listOf(
-                0f to 0x00B9D9FF,
-                0.35f to 0x2EB9D9FF,
-                0.62f to 0x47E8F1FF,
-                1f to 0x59E8F1FF,
-            ),
-        ),
-        TrailPass(
-            "ink-core", 13f, 2.5f,
-            listOf(0f to 0x00E8F1FF, 0.40f to 0x59E8F1FF, 1f to 0x99FFFFFF.toInt()),
-        ),
-        TrailPass(
-            "ink-bristle", 2.2f, 0f,
-            dashColor = 0x59E8F1FF,
-            dash = floatArrayOf(3.4f, 2.2f),
-        ),
-    )
-
-    else -> emptyList()
-}
-
-
 /** The ribbon and the shortened route, split around the live marker. */
 private data class CometSplit(val tail: List<StoredPoint>, val runs: List<List<StoredPoint>>)
 
@@ -843,29 +670,18 @@ fun TrailmarkMap(
                     // One line, several translucent ribbons: MapLibre cannot
                     // taper a line, but a wide faint pass that dies early and a
                     // narrow hot pass that runs the whole way read as a tail.
-                    if (puckStyle == PuckStyle.COMET) {
-                        s.addSource(
-                            GeoJsonSource(
-                                "comet-tail-source",
-                                EMPTY,
-                                GeoJsonOptions().withLineMetrics(true),
-                            ),
-                        )
-                        addCometLayer(s, "comet-tail-ion", 0x2E7FE9FF, 26f, 10f)
-                        addCometLayer(s, "comet-tail-dust", 0x1FFF6A28, 64f, 11f)
-                        addCometLayer(s, "comet-tail-warm", 0x3DFF8A3C, 44f, 8f)
-                        addCometLayer(s, "comet-tail-gold", 0x7AFFC93C, 22f, 4f)
-                        addCometLayer(s, "comet-tail-core", 0xD9FFF0C8.toInt(), 8f, 1.5f)
-                    } else {
-                        s.addSource(
-                            GeoJsonSource(
-                                TRAIL_SOURCE,
-                                EMPTY,
-                                GeoJsonOptions().withLineMetrics(true),
-                            ),
-                        )
-                        trailPasses(puckStyle).forEach { addTrailPass(s, it) }
-                    }
+                    s.addSource(
+                        GeoJsonSource(
+                            "comet-tail-source",
+                            EMPTY,
+                            GeoJsonOptions().withLineMetrics(true),
+                        ),
+                    )
+                    addCometLayer(s, "comet-tail-ion", 0x2E7FE9FF, 26f, 10f)
+                    addCometLayer(s, "comet-tail-dust", 0x1FFF6A28, 64f, 11f)
+                    addCometLayer(s, "comet-tail-warm", 0x3DFF8A3C, 44f, 8f)
+                    addCometLayer(s, "comet-tail-gold", 0x7AFFC93C, 22f, 4f)
+                    addCometLayer(s, "comet-tail-core", 0xD9FFF0C8.toInt(), 8f, 1.5f)
                 }
                 Sport.entries.forEach { sp ->
                     for (f in 0 until SPRITE_FRAMES) {
@@ -1082,7 +898,7 @@ fun TrailmarkMap(
         s.getSourceAs<GeoJsonSource>("ghost-source")?.setGeoJson(ghostFc)
     }
 
-    val tailSourceId = if (puckStyle == PuckStyle.COMET) "comet-tail-source" else TRAIL_SOURCE
+    val tailSourceId = "comet-tail-source"
     LaunchedEffect(comet?.tail, style, tailSourceId) {
         val s = style.live() ?: return@LaunchedEffect
         val tail = comet?.tail.orEmpty()

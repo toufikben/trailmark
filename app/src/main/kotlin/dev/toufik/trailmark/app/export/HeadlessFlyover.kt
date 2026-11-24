@@ -82,14 +82,12 @@ private const val MAX_LINE_VERTICES = 260
 private const val TRAIL_BEHIND_M = 260.0
 
 /**
- * Length of each newer tail in video pixels, taken straight from the approved
- * design (a fraction of the 720 px short side). The old tails were walked back a
- * fixed number of metres, which collapsed to forty-odd pixels at the zoom these
- * videos use - shorter than the head's own glow - so no tail could be seen.
+ * Width reference for each ribbon, in video pixels, taken from the approved
+ * design. The trails themselves are now the comet's length, so this is only the
+ * scale the plumes are shaped at: it keeps their silhouette exactly as drawn
+ * while the walk behind the puck stays short.
  */
-private fun tailLenPx(style: PuckStyle): Float = when (style) {
-    PuckStyle.PHOENIX -> 360f
-    PuckStyle.AURORA -> 374f
+private fun tailWidthPx(style: PuckStyle): Float = when (style) {
     PuckStyle.SHOOTING_STAR -> 374f
     PuckStyle.SPARK -> 317f
     PuckStyle.INK -> 360f
@@ -337,15 +335,15 @@ internal class HeadlessFlyover(
                             project(projection, path.at(frame.distanceM))
                         }
                         // A tailed style replaces the flat trail; on the closing
-                        // shot the full green trace stays and only the last
-                        // stretch burns.
-                        val tailStyle = if (puckStyle.hasTrail) puckStyle else null
+                        // shot the full green trace stays and the tail is gone:
+                        // once the whole route is on screen the ribbon would run
+                        // past the end of the line and smear the settled frame.
+                        val settled = frame.phase == FlyoverPhase.OUTRO || !follow
+                        val tailStyle = if (puckStyle.hasVideoTrail && !settled) puckStyle else null
                         val tailTrail = if (tailStyle != null && here != null) {
-                            if (tailStyle == PuckStyle.COMET) {
-                                trailBehind(projection, path, frame.distanceM)
-                            } else {
-                                trailBehindPx(projection, path, frame.distanceM, tailLenPx(tailStyle))
-                            }
+                            // Every ribbon is the comet's own length now: the longer
+                            // pixel-measured plumes read as a smear over the footage.
+                            trailBehind(projection, path, frame.distanceM)
                         } else {
                             emptyList()
                         }
@@ -360,22 +358,20 @@ internal class HeadlessFlyover(
                         withContext(Dispatchers.Default) {
                             encoder.frame { canvas ->
                                 canvas.drawBitmap(base, null, FULL_RECT, BITMAP_PAINT)
-                                if (tailStyle != null) {
-                                    if (frame.phase == FlyoverPhase.OUTRO || !follow) {
-                                        drawRouteLine(canvas, trail)
-                                    }
-                                    if (tailStyle == PuckStyle.COMET) {
-                                        drawCometTail(canvas, tailTrail, frame.distanceM)
-                                    } else {
-                                        drawTrailTail(
-                                            canvas,
-                                            tailStyle,
-                                            tailTrail,
-                                            frame.distanceM,
-                                            polylineLengthPx(tailTrail),
-                                        )
-                                    }
+                                if (tailStyle == PuckStyle.COMET) {
+                                    drawCometTail(canvas, tailTrail, frame.distanceM)
+                                } else if (tailStyle != null) {
+                                    drawTrailTail(
+                                        canvas,
+                                        tailStyle,
+                                        tailTrail,
+                                        frame.distanceM,
+                                        tailWidthPx(tailStyle),
+                                    )
                                 } else if (trail.size >= 2) {
+                                    // No ribbon this frame (settled shot, or a style
+                                    // that draws no tail): the plain trace carries
+                                    // the route, complete to the end of the path.
                                     drawRouteLine(canvas, trail)
                                 }
                                 if (here != null) {
@@ -572,63 +568,6 @@ internal class HeadlessFlyover(
         if (back.size < 2) return emptyList()
         back.reverse()
         return back
-    }
-
-    /**
-     * The stretch of route behind the athlete that is [targetPx] long **on screen**,
-     * whatever the camera zoom is. Walking by metres made a tail that vanished at
-     * the wide zooms the flight uses; walking by pixels keeps the plume the size the
-     * design asks for.
-     *
-     * The step is derived from the local metres-per-pixel so the walk costs a fixed
-     * hundred projections at any zoom, and leaving the frame no longer ends the
-     * walk: the tail runs out of the frame and the canvas clips it, which is what a
-     * plume dragged behind a marker on the frame's edge should do.
-     */
-    private fun trailBehindPx(
-        snapshot: MapSnapshot,
-        path: FlyoverPath,
-        distanceM: Double,
-        targetPx: Float,
-    ): List<PointF> {
-        val hereP = project(snapshot, path.at(distanceM)) ?: return emptyList()
-        // Metres per screen pixel, probed over a short stretch behind the puck.
-        val probeM = 12.0
-        val probeD = (distanceM - probeM).coerceAtLeast(0.0)
-        val probeP = project(snapshot, path.at(probeD))
-        val probePx = if (probeP == null) 0f else hypot(probeP.x - hereP.x, probeP.y - hereP.y)
-        val mPerPx = if (probePx > 0.5f) {
-            (distanceM - probeD) / probePx
-        } else {
-            0.35
-        }
-        val spanM = (targetPx * mPerPx.toFloat()).toDouble().coerceIn(12.0, 6000.0)
-        val step = (spanM / 110.0).coerceAtLeast(1.5)
-
-        val back = ArrayList<PointF>(120)
-        var screen = 0f
-        var d = distanceM
-        while (d >= 0.0) {
-            val p = project(snapshot, path.at(d)) ?: break
-            if (back.isNotEmpty()) {
-                screen += hypot(p.x - back[back.size - 1].x, p.y - back[back.size - 1].y)
-            }
-            back.add(p)
-            if (screen >= targetPx) break
-            d -= step
-        }
-        if (back.size < 2) return emptyList()
-        back.reverse()
-        return back
-    }
-
-    /** Length of a screen polyline, used to keep a tail's proportions on any zoom. */
-    private fun polylineLengthPx(trail: List<PointF>): Float {
-        var sum = 0f
-        for (i in 1 until trail.size) {
-            sum += hypot(trail[i].x - trail[i - 1].x, trail[i].y - trail[i - 1].y)
-        }
-        return sum
     }
 
     private fun project(snapshot: MapSnapshot, p: PathSample): PointF? {
@@ -837,154 +776,10 @@ private fun drawTrailTail(
     lengthPx: Float,
 ) {
     when (style) {
-        PuckStyle.PHOENIX -> drawPhoenixTail(c, trail, driftM, lengthPx)
-        PuckStyle.AURORA -> drawAuroraTail(c, trail, driftM, lengthPx)
         PuckStyle.SHOOTING_STAR -> drawStarTail(c, trail, driftM, lengthPx)
         PuckStyle.SPARK -> drawSparkTail(c, trail, driftM, lengthPx)
         PuckStyle.INK -> drawInkTail(c, trail, driftM, lengthPx)
         else -> Unit
-    }
-}
-
-/**
- * Two plumes of five translucent layers that open towards the tip, each spine
- * carrying nine curved barbs. The layers are the feather's own colours: deep red
- * at the outer edge to near-white at the quill.
- */
-private fun drawPhoenixTail(c: Canvas, trail: List<PointF>, driftM: Double, L: Float) {
-    if (trail.size < 2) return
-    val axis = trailAxis(trail)
-    val n = trail.size
-    val spread = L * 0.34f
-
-    for (side in floatArrayOf(-1f, 1f)) {
-        val drift: (Float) -> Float = { u -> side * spread * (1f - u).pow(1.25f) }
-        val ws = floatArrayOf(1.00f, 0.78f, 0.55f, 0.34f, 0.15f)
-        val tones = intArrayOf(0xB3120A, 0xFF6A28, 0xFF9428, 0xFFC446, 0xFFE696)
-        val alphas = floatArrayOf(0.07f, 0.11f, 0.17f, 0.26f, 0.44f)
-        for (p in 0 until 5) {
-            val w = L * 0.40f * ws[p]
-            val path = trailBand(
-                trail,
-                axis,
-                { u -> w * (0.08f + 0.92f * u.pow(1.15f)) },
-                drift,
-            )
-            val tone = tones[p]
-            c.drawPath(
-                path,
-                trailPaint(
-                    axis,
-                    arrayOf(
-                        0f to trailAlpha(tone, 0f),
-                        0.40f to trailAlpha(tone, alphas[p] * 0.55f),
-                        1f to trailAlpha(tone, alphas[p]),
-                    ),
-                ),
-            )
-        }
-    }
-
-    // Barbs: short curved vanes fanning off each plume spine.
-    val barb = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeCap = Paint.Cap.ROUND
-    }
-    for (side in floatArrayOf(-1f, 1f)) {
-        for (k in 0 until 9) {
-            val u = 0.06f + 0.098f * k
-            val i = (u * (n - 1)).toInt().coerceIn(0, n - 1)
-            val q = trail[i]
-            val bx = axis.nx[i]
-            val by = axis.ny[i]
-            val a = trail[(i - 1).coerceAtLeast(0)]
-            val b = trail[(i + 1).coerceAtMost(n - 1)]
-            var dx = b.x - a.x
-            var dy = b.y - a.y
-            val dl = hypot(dx, dy).coerceAtLeast(0.001f)
-            dx /= dl
-            dy /= dl
-            val len = spread * 0.72f * (1f - u).pow(0.85f)
-            val off = side * spread * (1f - u).pow(1.25f)
-            val ax = q.x + bx * off
-            val ay = q.y + by * off
-            val ex = ax + bx * side * len - dx * len * 0.55f
-            val ey = ay + by * side * len - dy * len * 0.55f
-            barb.strokeWidth = 3.4f * (0.4f + 0.6f * (1f - u))
-            barb.color = trailAlpha(0xFFFFD078.toInt(), 0.34f * (1f - u))
-            val path = Path().apply {
-                moveTo(ax, ay)
-                quadTo(
-                    ax + bx * side * len * 0.55f - dx * len * 0.05f,
-                    ay + by * side * len * 0.55f - dy * len * 0.05f,
-                    ex,
-                    ey,
-                )
-            }
-            c.drawPath(path, barb)
-        }
-    }
-}
-
-/**
- * Four nested bands that sway together, their colour running green through cyan
- * to violet along the length, with faint cross-curtains flickering over them.
- */
-private fun drawAuroraTail(c: Canvas, trail: List<PointF>, driftM: Double, L: Float) {
-    if (trail.size < 2) return
-    val axis = trailAxis(trail)
-    val n = trail.size
-    val sec = (driftM / 2.8).toFloat()
-    val sway: (Float) -> Float = { u -> sin(u * 4.4f + sec * 1.5f) * L * 0.055f * u }
-    val layers = floatArrayOf(1.00f, 0.66f, 0.38f, 0.16f)
-    val alphas = floatArrayOf(0.10f, 0.15f, 0.22f, 0.34f)
-    for (k in layers.indices) {
-        val w = L * 0.34f * layers[k]
-        val path = trailBand(
-            trail,
-            axis,
-            { u -> w * (0.12f + 0.88f * u.pow(0.72f)) },
-            sway,
-        )
-        val a = alphas[k]
-        c.drawPath(
-            path,
-            trailPaint(
-                axis,
-                arrayOf(
-                    0f to trailAlpha(0x3DFFB0, 0f),
-                    0.22f to trailAlpha(0x3DFFB0, a * 0.8f),
-                    0.48f to trailAlpha(0x6FE9FF, a),
-                    0.74f to trailAlpha(0xA97BFF, a * 0.9f),
-                    1f to trailAlpha(0xD6B4FF, a * 0.7f),
-                ),
-            ),
-        )
-    }
-
-    // Vertical curtains: the thing that makes an aurora read as an aurora.
-    val curtain = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeCap = Paint.Cap.ROUND
-    }
-    for (k in 0 until 16) {
-        val u = 0.05f + 0.058f * k
-        val i = (u * (n - 1)).toInt().coerceIn(0, n - 1)
-        val q = trail[i]
-        val bx = axis.nx[i]
-        val by = axis.ny[i]
-        val off = sin(u * 4.4f + sec * 1.5f) * L * 0.055f * u
-        val half = L * 0.30f * (0.12f + 0.88f * u.pow(0.72f)) * 0.5f
-        val flick = 0.35f + 0.35f * sin(sec * 2.6f + k * 1.7f)
-        curtain.color = trailAlpha(0xBEF5FF, 0.10f * flick)
-        curtain.strokeWidth = 2.6f
-        c.drawLine(
-            q.x + bx * (off - half),
-            q.y + by * (off - half),
-            q.x + bx * (off + half),
-            q.y + by * (off + half),
-            curtain,
-        )
     }
 }
 

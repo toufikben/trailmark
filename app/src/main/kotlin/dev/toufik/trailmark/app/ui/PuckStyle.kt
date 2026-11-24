@@ -27,19 +27,30 @@ enum class PuckStyle(val key: String, val pro: Boolean) {
     INK("ink", true);
 
     /**
-     * True when the shape paints a trail on the recording map and in the video,
-     * replacing the flat accent line behind the marker.
+     * True when the shape paints a trail **on the recording map**. Only the comet
+     * keeps one now: the newer shapes read as they should in the video, but on the
+     * live map their ribbons landed behind the puck at the wrong angle, so they
+     * draw as plain markers there.
      */
     val hasTrail: Boolean
-        get() = this == COMET || this == PHOENIX || this == AURORA ||
-            this == SHOOTING_STAR || this == SPARK || this == INK
+        get() = this == COMET
+
+    /**
+     * True when the shape paints a ribbon behind the puck in the exported video.
+     * The comet keeps its own; the three streaks keep theirs at the comet's
+     * length. The phoenix and the aurora were reverted: their plumes read as a
+     * long smear over the footage, so they draw as heads over the plain trace.
+     */
+    val hasVideoTrail: Boolean
+        get() = this == COMET || this == SHOOTING_STAR || this == SPARK || this == INK
 
     /**
      * True when the art glows past its casing. Such a sprite is rendered on a
      * larger bitmap and scaled back down, so the glow is not clipped.
      */
     val wideArt: Boolean
-        get() = hasTrail
+        get() = this == COMET || this == PHOENIX || this == AURORA ||
+            this == SHOOTING_STAR || this == SPARK || this == INK
 
     companion object {
         const val KEY = "puck_style"
