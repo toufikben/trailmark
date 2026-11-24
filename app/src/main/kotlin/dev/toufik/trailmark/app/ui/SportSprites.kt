@@ -13,6 +13,7 @@ import android.graphics.Shader
 import dev.toufik.trailmark.engine.Sport
 import kotlin.math.PI
 import kotlin.math.cos
+import kotlin.math.hypot
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
@@ -353,98 +354,197 @@ object PuckArt {
         c.restore()
     }
 
+    private val TAIL_TONES = intArrayOf(
+        0xF2FFD68C.toInt(), 0xE6F67C2C.toInt(), 0xCCCE3412.toInt(), 0x6B960E08.toInt(),
+    )
+    private val FEATHER_TONES = intArrayOf(
+        0xFAFFF6CC.toInt(), 0xF7FFD674.toInt(), 0xF2FA8A2E.toInt(), 0xD9BC260A.toInt(),
+    )
+
     /**
-     * A phoenix head: a white-hot core, two wings of three swept feathers that
-     * beat with the pulse, and a warm halo. The wings sit behind the core so the
-     * silhouette still reads as a bird at nineteen pixels.
+     * A phoenix seen from above: five swept feather blades a side over a deep red
+     * wing mass, a slim white-hot body, three flame strands for the tail and a
+     * small crest behind the head. The marker is drawn at nineteen pixels on the
+     * map, so the silhouette carries the bird: bright blade edges, dark notches
+     * between them, and a pointed beak instead of a round core.
      */
     private fun drawPhoenix(c: Canvas, cx: Float, cy: Float, r: Float, pulse: Float) {
         val flap = sin(pulse * 2f * PI.toFloat())
-        val breathe = 1f + 0.06f * pulse
+        val breathe = 1f + 0.04f * pulse
 
-        c.drawCircle(cx, cy, r * 2.6f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        c.drawCircle(cx, cy, r * 2.35f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
-                cx, cy, r * 2.6f,
-                intArrayOf(0x80FFD678.toInt(), 0x38FF7828, 0x00B3120A),
+                cx, cy, r * 2.35f,
+                intArrayOf(0x4DFFC86E, 0x21FF6E24, 0x00B3120A),
                 floatArrayOf(0f, 0.30f, 1f),
                 Shader.TileMode.CLAMP,
             )
         })
 
-        c.save()
-        c.translate(cx, cy)
+        // The tail goes down first so the body covers its roots: three flame
+        // strands that curl apart, not one tapered tail.
+        val tailY = cy + r * 0.22f
+        val tailLen = r * 1.75f
+        flameStrand(c, cx, tailY, cx, tailY + tailLen, r * 0.125f, 0f, TAIL_TONES)
+        flameStrand(
+            c, cx, tailY, cx + r * 0.72f, tailY + tailLen * 0.80f,
+            r * 0.125f, r * 0.30f, TAIL_TONES,
+        )
+        flameStrand(
+            c, cx, tailY, cx - r * 0.72f, tailY + tailLen * 0.80f,
+            r * 0.125f, -r * 0.30f, TAIL_TONES,
+        )
+
+        // Wings: the red mass keeps the blades reading as one wing, the gold
+        // blades on top leave the notches between them open.
+        val span = 2.05f
         for (side in floatArrayOf(-1f, 1f)) {
             c.save()
+            c.translate(cx, cy)
             c.scale(side, 1f)
-            c.rotate(-13f + 11f * flap)
-            for (f in 3 downTo 0) {
-                val reach = 2.60f - f * 0.42f
-                val lift = -0.62f - f * 0.12f + 0.10f * flap * (1f + f * 0.2f)
-                val feather = Path().apply {
-                    moveTo(r * 0.30f, r * 0.10f)
-                    cubicTo(
-                        r * 1.05f, r * (lift + 0.30f),
-                        r * (reach * 0.70f), r * (lift + 0.05f),
-                        r * reach, r * (lift + 0.30f),
-                    )
-                    cubicTo(
-                        r * (reach * 0.73f), r * (lift + 0.62f),
-                        r * 1.20f, r * (lift + 0.78f),
-                        r * 0.30f, r * 0.34f,
-                    )
-                    close()
+            c.rotate(-2f + 6f * flap)
+            val sx = r * 0.14f
+            val sy = -r * 0.22f
+            val tips = Array(5) { k ->
+                val a = (16f + 15.5f * k) * PI.toFloat() / 180f
+                val len = span * (1f - 0.075f * k) * r
+                floatArrayOf(cos(a) * len, sin(a) * len)
+            }
+            val wing = Path().apply {
+                moveTo(sx, sy)
+                lineTo(tips[0][0], tips[0][1])
+                for (k in 1 until tips.size) {
+                    val mx = (tips[k - 1][0] + tips[k][0]) * 0.5f * 0.70f
+                    val my = (tips[k - 1][1] + tips[k][1]) * 0.5f * 0.70f
+                    quadTo(mx, my, tips[k][0], tips[k][1])
                 }
-                c.drawPath(feather, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    shader = LinearGradient(
-                        r * 0.3f, 0f, r * reach, 0f,
-                        intArrayOf(
-                            ((0.95f - f * 0.10f) * 255).toInt().coerceIn(0, 255) shl 24 or 0xFFF0BE,
-                            ((0.80f - f * 0.11f) * 255).toInt().coerceIn(0, 255) shl 24 or 0xFFA83C,
-                            ((0.52f - f * 0.09f) * 255).toInt().coerceIn(0, 255) shl 24 or 0xE24A14,
-                            0x0F960C08,
-                        ),
-                        floatArrayOf(0f, 0.38f, 0.78f, 1f),
-                        Shader.TileMode.CLAMP,
-                    )
-                })
+                quadTo(r * 0.26f, r * 0.18f, sx, sy)
+                close()
+            }
+            c.drawPath(wing, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = LinearGradient(
+                    0f, -r * 0.2f, span * r, span * 0.5f * r,
+                    intArrayOf(0xD1FF963C.toInt(), 0xC2C63612.toInt(), 0xAD680A06.toInt()),
+                    null,
+                    Shader.TileMode.CLAMP,
+                )
+            })
+            for (k in tips.indices.reversed()) {
+                flameStrand(
+                    c,
+                    sx + tips[k][0] * 0.16f,
+                    sy + tips[k][1] * 0.16f,
+                    tips[k][0],
+                    tips[k][1],
+                    (0.105f - k * 0.006f) * r,
+                    r * 0.05f,
+                    FEATHER_TONES,
+                )
             }
             c.restore()
         }
-        c.restore()
 
-        // The core is a beak now, not a disc: the phoenix is the only head that
-        // reads as a bird, so the round dot at its centre pointed the wrong way
-        // and blurred the silhouette. A four-point tear aimed along the line of
-        // travel keeps a hot centre while staying pointed.
-        val beak = Path().apply {
-            moveTo(cx, cy - r * 1.30f * breathe)
-            quadTo(cx + r * 0.46f, cy - r * 0.20f, cx + r * 0.30f, cy + r * 0.52f)
-            quadTo(cx, cy + r * 0.10f, cx - r * 0.30f, cy + r * 0.52f)
-            quadTo(cx - r * 0.46f, cy - r * 0.20f, cx, cy - r * 1.30f * breathe)
+        // Body: wide at the shoulders, tapering into the tail roots. The white
+        // stays at the head; the chest and hips run gold to deep red.
+        val bw = 0.18f
+        val body = Path().apply {
+            moveTo(cx, cy - r * 0.88f * breathe)
+            quadTo(cx + r * (bw + 0.055f), cy - r * 0.68f, cx + r * bw, cy - r * 0.24f)
+            quadTo(cx + r * bw * 0.92f, cy + r * 0.10f, cx, cy + r * 0.36f)
+            quadTo(cx - r * bw * 0.92f, cy + r * 0.10f, cx - r * bw, cy - r * 0.24f)
+            quadTo(cx - r * (bw + 0.055f), cy - r * 0.68f, cx, cy - r * 0.88f * breathe)
             close()
         }
-        c.drawPath(beak, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = RadialGradient(
-                cx - r * 0.10f, cy - r * 0.30f, r * 1.30f * breathe,
+        c.drawPath(body, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(
+                cx, cy - r * 0.90f, cx, cy + r * 0.42f,
                 intArrayOf(
                     0xFFFFFFFF.toInt(),
-                    0xFFFFF6D0.toInt(),
-                    0xFFFFC247.toInt(),
-                    0xFFFF7A28.toInt(),
-                    0xB3B3120A.toInt(),
+                    0xFFFFF6C4.toInt(),
+                    0xFFFFCC64.toInt(),
+                    0xFAF48E34.toInt(),
+                    0xE6B01E0C.toInt(),
                 ),
-                floatArrayOf(0f, 0.28f, 0.60f, 0.86f, 1f),
+                null,
                 Shader.TileMode.CLAMP,
             )
         })
 
-        // The accent ring follows the beak's own outline; a circle here would
-        // draw the dot straight back over the pointed core.
+        // Crest: one flame a side, swept back off the head.
+        for (side in floatArrayOf(-1f, 1f)) {
+            c.save()
+            c.translate(cx + side * r * 0.05f, cy - r * 0.80f)
+            c.scale(side, 1f)
+            c.rotate(36f)
+            val len = r * 0.55f * breathe
+            val crest = Path().apply {
+                moveTo(0f, -r * 0.06f)
+                quadTo(len * 0.62f, -r * 0.10f, len, 0f)
+                quadTo(len * 0.62f, r * 0.05f, 0f, r * 0.06f)
+                close()
+            }
+            c.drawPath(crest, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = LinearGradient(
+                    0f, 0f, len, 0f,
+                    intArrayOf(0xFAFFFADC.toInt(), 0xE6FFCE6E.toInt(), 0x0DFF8428),
+                    null,
+                    Shader.TileMode.CLAMP,
+                )
+            })
+            c.restore()
+        }
+
+        val beak = Path().apply {
+            moveTo(cx, cy - r * 1.24f * breathe)
+            quadTo(cx + r * 0.135f, cy - r * 0.96f, cx + r * 0.075f, cy - r * 0.82f)
+            quadTo(cx, cy - r * 0.87f, cx - r * 0.075f, cy - r * 0.82f)
+            quadTo(cx - r * 0.135f, cy - r * 0.96f, cx, cy - r * 1.24f * breathe)
+            close()
+        }
         c.drawPath(beak, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = r * 0.09f
-            color = ACCENT
-            alpha = (110 + 80 * pulse).toInt().coerceIn(0, 255)
+            shader = LinearGradient(
+                cx, cy - r * 1.24f, cx, cy - r * 0.82f,
+                intArrayOf(
+                    0xFFFFFFFF.toInt(),
+                    0xFFFFF4BA.toInt(),
+                    0xFFFFC460.toInt(),
+                ),
+                null,
+                Shader.TileMode.CLAMP,
+            )
+        })
+    }
+
+    /**
+     * A tapered flame from [rx, ry] to [tx, ty]. [w0] is the half-width at the
+     * root and [bow] pushes the spine sideways so the strand curls instead of
+     * running dead straight.
+     */
+    private fun flameStrand(
+        c: Canvas,
+        rx: Float,
+        ry: Float,
+        tx: Float,
+        ty: Float,
+        w0: Float,
+        bow: Float,
+        tones: IntArray,
+    ) {
+        val dx = tx - rx
+        val dy = ty - ry
+        val len = hypot(dx, dy).coerceAtLeast(0.001f)
+        val px = -dy / len
+        val py = dx / len
+        val mx = rx + dx * 0.5f + px * bow
+        val my = ry + dy * 0.5f + py * bow
+        val strand = Path().apply {
+            moveTo(rx - px * w0, ry - py * w0)
+            quadTo(mx - px * w0 * 0.5f, my - py * w0 * 0.5f, tx, ty)
+            quadTo(mx + px * w0 * 0.7f, my + py * w0 * 0.7f, rx + px * w0, ry + py * w0)
+            close()
+        }
+        c.drawPath(strand, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(rx, ry, tx, ty, tones, null, Shader.TileMode.CLAMP)
         })
     }
 
