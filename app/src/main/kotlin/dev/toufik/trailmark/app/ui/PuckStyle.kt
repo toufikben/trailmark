@@ -48,10 +48,12 @@ enum class PuckStyle(val key: String, val pro: Boolean) {
 
     /**
      * True when the art glows past its casing. Such a sprite is rendered on a
-     * larger bitmap and scaled back down, so the glow is not clipped.
+     * larger bitmap and scaled back down, so the glow is not clipped. The aurora
+     * is not here: it draws no tail, so nothing leaves its casing and the larger
+     * bitmap only cost memory and softened the marker.
      */
     val wideArt: Boolean
-        get() = this == COMET || this == PHOENIX || this == AURORA ||
+        get() = this == COMET || this == PHOENIX ||
             this == SHOOTING_STAR || this == SPARK || this == INK
 
     companion object {
