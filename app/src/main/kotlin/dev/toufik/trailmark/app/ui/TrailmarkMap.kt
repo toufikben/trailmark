@@ -673,11 +673,49 @@ fun TrailmarkMap(
                     ),
                 )
                 s.addSource(GeoJsonSource("route-source", EMPTY))
+                // The casing separates the accent line from whatever is under it:
+                // a light or busy satellite basemap swallowed a bare 5px stroke.
+                s.addLayer(
+                    LineLayer("route-casing", "route-source").withProperties(
+                        lineColor(if (dark) "#0E1113" else "#FFFFFF"),
+                        lineWidth(8f),
+                        lineOpacity(0.55f),
+                        lineCap(Property.LINE_CAP_ROUND),
+                        lineJoin(Property.LINE_JOIN_ROUND),
+                    ),
+                )
                 s.addLayer(
                     LineLayer("route-layer", "route-source").withProperties(
                         lineColor("#C6FF3D"),
                         lineWidth(5f),
+                        lineCap(Property.LINE_CAP_ROUND),
+                        lineJoin(Property.LINE_JOIN_ROUND),
                     ),
+                )
+                // The exported video pins where the run began and ended; the live
+                // map showed a bare line, so the two views disagreed.
+                s.addSource(GeoJsonSource("route-ends-source", EMPTY))
+                s.addLayer(
+                    CircleLayer("route-end-start", "route-ends-source").withProperties(
+                        circleColor("#C6FF3D"),
+                        circleRadius(7f),
+                        circleStrokeColor("#0E1113"),
+                        circleStrokeWidth(3f),
+                    ),
+                )
+                s.getLayerAs<CircleLayer>("route-end-start")?.setFilter(
+                    Expression.raw("""["==","kind",0]"""),
+                )
+                s.addLayer(
+                    CircleLayer("route-end-finish", "route-ends-source").withProperties(
+                        circleColor("#0E1113"),
+                        circleRadius(7f),
+                        circleStrokeColor("#C6FF3D"),
+                        circleStrokeWidth(3f),
+                    ),
+                )
+                s.getLayerAs<CircleLayer>("route-end-finish")?.setFilter(
+                    Expression.raw("""["==","kind",1]"""),
                 )
                 if (puckStyle.hasTrail) {
                     // One line, several translucent ribbons: MapLibre cannot
@@ -909,6 +947,25 @@ fun TrailmarkMap(
             EMPTY
         }
         s.getSourceAs<GeoJsonSource>("ghost-source")?.setGeoJson(ghostFc)
+        // Start and finish pins, taken from the recorded route rather than the
+        // drawn runs: the tail split trims the drawn path near the live marker.
+        val ends = if (route.size >= 2) {
+            val first = route.first()
+            val last = route.last()
+            FeatureCollection.fromFeatures(
+                arrayOf(
+                    Feature.fromGeometry(Point.fromLngLat(first.lon, first.lat)).apply {
+                        addNumberProperty("kind", 0.0)
+                    },
+                    Feature.fromGeometry(Point.fromLngLat(last.lon, last.lat)).apply {
+                        addNumberProperty("kind", 1.0)
+                    },
+                ),
+            )
+        } else {
+            EMPTY
+        }
+        s.getSourceAs<GeoJsonSource>("route-ends-source")?.setGeoJson(ends)
     }
 
     val tailSourceId = "comet-tail-source"

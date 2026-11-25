@@ -78,6 +78,7 @@ import dev.toufik.trailmark.app.health.HealthSync
 import dev.toufik.trailmark.app.service.TtsVoice
 import dev.toufik.trailmark.app.trialClock
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
