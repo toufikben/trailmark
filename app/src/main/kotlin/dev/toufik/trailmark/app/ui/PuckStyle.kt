@@ -27,13 +27,14 @@ enum class PuckStyle(val key: String, val pro: Boolean) {
     INK("ink", true);
 
     /**
-     * True when the shape paints a trail **on the recording map**. Only the comet
-     * keeps one now: the newer shapes read as they should in the video, but on the
-     * live map their ribbons landed behind the puck at the wrong angle, so they
-     * draw as plain markers there.
+     * True when the shape paints a trail **on the recording map**. The comet,
+     * the phoenix and the three streaks all carry a ribbon in the exported
+     * video, so the live map shows the same tail instead of a bare marker. The
+     * aurora stays out: it has no tail anywhere.
      */
     val hasTrail: Boolean
-        get() = this == COMET
+        get() = this == COMET || this == PHOENIX || this == SHOOTING_STAR ||
+            this == SPARK || this == INK
 
     /**
      * True when the shape paints a ribbon behind the puck in the exported video.

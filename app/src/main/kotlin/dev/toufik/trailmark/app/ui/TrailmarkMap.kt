@@ -253,6 +253,82 @@ private fun frameIconExpr(sport: Sport, style: PuckStyle): Expression {
 /** Metres of route that become the comet's tail behind the live marker. */
 private const val COMET_TAIL_M = 260.0
 
+/**
+ * How far each tailed shape walks its ribbon on the live map. The comet is the
+ * reference; the phoenix sits at three quarters of it and the three streaks run
+ * longer, matching what the exporter already does so the two views agree.
+ */
+private fun mapTailMeters(style: PuckStyle): Double = when (style) {
+    PuckStyle.PHOENIX -> COMET_TAIL_M * 0.85
+    PuckStyle.SHOOTING_STAR, PuckStyle.SPARK, PuckStyle.INK -> COMET_TAIL_M * 1.75
+    else -> COMET_TAIL_M
+}
+
+/**
+ * One ribbon band: colour at the head, peak width in px, and the blur that
+ * turns the flat stroke into a glow. Five bands stacked read as one tail.
+ */
+private data class TailBand(val head: Int, val width: Float, val blur: Float)
+
+/**
+ * The ribbon colours per shape. The comet's five bands are frozen; each other
+ * shape gets a palette taken from its own sprite, so a gold bird does not drag
+ * a blue ribbon behind it.
+ */
+private fun tailBands(style: PuckStyle): List<TailBand> = when (style) {
+    PuckStyle.PHOENIX -> listOf(
+        TailBand(0x2EEFDFA8.toInt(), 26f, 10f),
+        TailBand(0x1FB3120A.toInt(), 64f, 11f),
+        TailBand(0x3DCE3412.toInt(), 44f, 8f),
+        TailBand(0x7AFFC93C.toInt(), 22f, 4f),
+        TailBand(0xD9FFF6CC.toInt(), 8f, 1.5f),
+    )
+    PuckStyle.SHOOTING_STAR -> listOf(
+        TailBand(0x2EBFE6FF.toInt(), 26f, 10f),
+        TailBand(0x1F2340C8.toInt(), 64f, 11f),
+        TailBand(0x3D4F8CFF.toInt(), 44f, 8f),
+        TailBand(0x7A9FC4FF.toInt(), 22f, 4f),
+        TailBand(0xD9F2FAFF.toInt(), 8f, 1.5f),
+    )
+    PuckStyle.SPARK -> listOf(
+        TailBand(0x2EFFF0B0.toInt(), 26f, 10f),
+        TailBand(0x1F8A5A00.toInt(), 64f, 11f),
+        TailBand(0x3DFFC12A.toInt(), 44f, 8f),
+        TailBand(0x7AFFE04A.toInt(), 22f, 4f),
+        TailBand(0xD9FFFDF0.toInt(), 8f, 1.5f),
+    )
+    PuckStyle.INK -> listOf(
+        TailBand(0x2ED6C6FF.toInt(), 26f, 10f),
+        TailBand(0x1F2A1B6B.toInt(), 64f, 11f),
+        TailBand(0x3D8068E0.toInt(), 44f, 8f),
+        TailBand(0x7AAC90FF.toInt(), 22f, 4f),
+        TailBand(0xD9EDE6FF.toInt(), 8f, 1.5f),
+    )
+    else -> listOf(
+        TailBand(0x2E7FE9FF, 26f, 10f),
+        TailBand(0x1FFF6A28, 64f, 11f),
+        TailBand(0x3DFF8A3C, 44f, 8f),
+        TailBand(0x7AFFC93C, 22f, 4f),
+        TailBand(0xD9FFF0C8.toInt(), 8f, 1.5f),
+    )
+}
+
+/**
+ * How much wider than the comet each ribbon is drawn. Taken from the widths the
+ * exporter uses, so a streaking shape does not look stubbed next to the comet.
+ */
+private fun tailWidthScale(style: PuckStyle): Float = when (style) {
+    PuckStyle.PHOENIX -> 0.72f
+    PuckStyle.SHOOTING_STAR -> 1.04f
+    PuckStyle.SPARK -> 0.88f
+    PuckStyle.INK -> 1.00f
+    else -> 1f
+}
+
+private val TAIL_LAYER_IDS = listOf(
+    "-ion", "-dust", "-warm", "-gold", "-core",
+)
+
 /** The comet sprite is rendered larger so its glow is not clipped; scale it back. */
 private val cometIconScale = 1f / COMET_SPRITE_SCALE
 
@@ -283,12 +359,12 @@ private fun cometWidth(base: Float): Expression = Expression.interpolate(
     Expression.stop(18f, base * 4f),
 )
 
-private fun addCometLayer(s: Style, id: String, head: Int, width: Float, blur: Float) {
+private fun addCometLayer(s: Style, id: String, band: TailBand) {
     s.addLayer(
         LineLayer(id, "comet-tail-source").withProperties(
-            lineGradient(cometGradient(head)),
-            lineWidth(cometWidth(width)),
-            lineBlur(blur),
+            lineGradient(cometGradient(band.head)),
+            lineWidth(cometWidth(band.width)),
+            lineBlur(band.blur),
             lineCap(Property.LINE_CAP_ROUND),
             lineJoin(Property.LINE_JOIN_ROUND),
         ),
@@ -728,11 +804,14 @@ fun TrailmarkMap(
                             GeoJsonOptions().withLineMetrics(true),
                         ),
                     )
-                    addCometLayer(s, "comet-tail-ion", 0x2E7FE9FF, 26f, 10f)
-                    addCometLayer(s, "comet-tail-dust", 0x1FFF6A28, 64f, 11f)
-                    addCometLayer(s, "comet-tail-warm", 0x3DFF8A3C, 44f, 8f)
-                    addCometLayer(s, "comet-tail-gold", 0x7AFFC93C, 22f, 4f)
-                    addCometLayer(s, "comet-tail-core", 0xD9FFF0C8.toInt(), 8f, 1.5f)
+                    val widthScale = tailWidthScale(puckStyle)
+                    tailBands(puckStyle).forEachIndexed { i, band ->
+                        addCometLayer(
+                            s,
+                            "comet-tail" + TAIL_LAYER_IDS[i],
+                            band.copy(width = band.width * widthScale),
+                        )
+                    }
                 }
                 Sport.entries.forEach { sp ->
                     for (f in 0 until SPRITE_FRAMES) {
@@ -915,7 +994,12 @@ fun TrailmarkMap(
     // ribbon, so the flat accent line stops where the tail starts.
     val comet = remember(routeRuns, current, puckStyle) {
         if (puckStyle.hasTrail && current != null) {
-            cometSplit(routeRuns, current, COMET_TAIL_M, attachFocus = puckStyle == PuckStyle.COMET)
+            cometSplit(
+                routeRuns,
+                current,
+                mapTailMeters(puckStyle),
+                attachFocus = puckStyle == PuckStyle.COMET,
+            )
         } else {
             null
         }
