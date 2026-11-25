@@ -1263,7 +1263,7 @@ private val EXTRA_TEXT: Map<Lang, Map<String, String>> = mapOf(
 private val PUCK_TEXT: Map<Lang, Map<String, String>> = mapOf(
     Lang.AR to mapOf(
         "puckStyle" to "شكل النقطة",
-        "puckStyleHint" to "يُطبَّق على الفيديو وخريطة التسجيل. الأشكال الاثنا عشر الإضافية تُفتح بعد انتهاء التجربة.",
+        "puckStyleHint" to "يُطبَّق على الفيديو وخريطة التسجيل. الأشكال الاثنا عشر الإضافية متاحة خلال التجربة، وتبقى مع اشتراك Pro.",
         "puckArrow" to "سهم",
         "puckRunner" to "عدّاء",
         "puckBike" to "دراجة",
@@ -1280,7 +1280,7 @@ private val PUCK_TEXT: Map<Lang, Map<String, String>> = mapOf(
     ),
     Lang.EN to mapOf(
         "puckStyle" to "Marker style",
-        "puckStyleHint" to "Applies to the video and the recording map. The twelve extra shapes unlock when the trial ends.",
+        "puckStyleHint" to "Applies to the video and the recording map. The twelve extra shapes are free during the trial and stay yours with Pro.",
         "puckArrow" to "Arrow",
         "puckRunner" to "Runner",
         "puckBike" to "Bicycle",
@@ -1297,7 +1297,7 @@ private val PUCK_TEXT: Map<Lang, Map<String, String>> = mapOf(
     ),
     Lang.FR to mapOf(
         "puckStyle" to "Style du marqueur",
-        "puckStyleHint" to "S’applique à la vidéo et à la carte d’enregistrement. Les douze formes supplémentaires se débloquent à la fin de l’essai.",
+        "puckStyleHint" to "S'applique à la vidéo et à la carte d'enregistrement. Les douze formes supplémentaires sont offertes pendant l'essai et restent acquises avec Pro.",
         "puckArrow" to "Flèche",
         "puckRunner" to "Coureur",
         "puckBike" to "Vélo",
@@ -1314,7 +1314,7 @@ private val PUCK_TEXT: Map<Lang, Map<String, String>> = mapOf(
     ),
     Lang.ES to mapOf(
         "puckStyle" to "Estilo del marcador",
-        "puckStyleHint" to "Se aplica al vídeo y al mapa de grabación. Las doce formas adicionales se desbloquean al acabar la prueba.",
+        "puckStyleHint" to "Se aplica al vídeo y al mapa de grabación. Las doce formas adicionales son gratis durante la prueba y siguen tuyas con Pro.",
         "puckArrow" to "Flecha",
         "puckRunner" to "Corredor",
         "puckBike" to "Bicicleta",
@@ -1331,7 +1331,7 @@ private val PUCK_TEXT: Map<Lang, Map<String, String>> = mapOf(
     ),
     Lang.PT to mapOf(
         "puckStyle" to "Estilo do marcador",
-        "puckStyleHint" to "Aplica-se ao vídeo e ao mapa de gravação. As doze formas adicionais são desbloqueadas no fim do teste.",
+        "puckStyleHint" to "Aplica-se ao vídeo e ao mapa de gravação. As doze formas adicionais são grátis durante o teste e continuam suas com o Pro.",
         "puckArrow" to "Seta",
         "puckRunner" to "Corredor",
         "puckBike" to "Bicicleta",
@@ -1348,7 +1348,7 @@ private val PUCK_TEXT: Map<Lang, Map<String, String>> = mapOf(
     ),
     Lang.DE to mapOf(
         "puckStyle" to "Marker-Stil",
-        "puckStyleHint" to "Gilt für Video und Aufnahmekarte. Die zwölf zusätzlichen Formen werden nach der Testphase freigeschaltet.",
+        "puckStyleHint" to "Gilt für Video und Aufnahmekarte. Die zwölf zusätzlichen Formen sind während der Testphase gratis und bleiben mit Pro erhalten.",
         "puckArrow" to "Pfeil",
         "puckRunner" to "Läufer",
         "puckBike" to "Fahrrad",
@@ -1365,7 +1365,7 @@ private val PUCK_TEXT: Map<Lang, Map<String, String>> = mapOf(
     ),
     Lang.IT to mapOf(
         "puckStyle" to "Stile del segnaposto",
-        "puckStyleHint" to "Si applica al video e alla mappa di registrazione. Le dodici forme extra si sbloccano alla fine della prova.",
+        "puckStyleHint" to "Si applica al video e alla mappa di registrazione. Le dodici forme extra sono gratuite durante la prova e restano tue con Pro.",
         "puckArrow" to "Freccia",
         "puckRunner" to "Corridore",
         "puckBike" to "Bicicletta",
@@ -1382,7 +1382,7 @@ private val PUCK_TEXT: Map<Lang, Map<String, String>> = mapOf(
     ),
     Lang.NL to mapOf(
         "puckStyle" to "Marker-stijl",
-        "puckStyleHint" to "Geldt voor de video en de opnamekaart. De twaalf extra vormen komen vrij na de proefperiode.",
+        "puckStyleHint" to "Geldt voor de video en de opnamekaart. De twaalf extra vormen zijn gratis tijdens de proefperiode en blijven van jou met Pro.",
         "puckArrow" to "Pijl",
         "puckRunner" to "Loper",
         "puckBike" to "Fiets",
@@ -1399,7 +1399,7 @@ private val PUCK_TEXT: Map<Lang, Map<String, String>> = mapOf(
     ),
     Lang.PL to mapOf(
         "puckStyle" to "Styl znacznika",
-        "puckStyleHint" to "Dotyczy wideo i mapy nagrywania. Dwanaście dodatkowych kształtów odblokowuje się po okresie próbnym.",
+        "puckStyleHint" to "Dotyczy wideo i mapy nagrywania. Dwanaście dodatkowych kształtów jest darmowych w okresie próbnym i zostaje z Pro.",
         "puckArrow" to "Strzałka",
         "puckRunner" to "Biegacz",
         "puckBike" to "Rower",
@@ -1416,7 +1416,7 @@ private val PUCK_TEXT: Map<Lang, Map<String, String>> = mapOf(
     ),
     Lang.RU to mapOf(
         "puckStyle" to "Стиль маркера",
-        "puckStyleHint" to "Применяется к видео и карте записи. Двенадцать дополнительных форм открываются после пробного периода.",
+        "puckStyleHint" to "Действует для видео и карты записи. Двенадцать дополнительных форм бесплатны во время пробного периода и остаются с Pro.",
         "puckArrow" to "Стрелка",
         "puckRunner" to "Бегун",
         "puckBike" to "Велосипед",
@@ -1433,7 +1433,7 @@ private val PUCK_TEXT: Map<Lang, Map<String, String>> = mapOf(
     ),
     Lang.TR to mapOf(
         "puckStyle" to "İşaretçi stili",
-        "puckStyleHint" to "Video ve kayıt haritası için geçerli. On iki şekil deneme süresi bitince açılır.",
+        "puckStyleHint" to "Video ve kayıt haritası için geçerli. On iki ek şekil deneme süresince ücretsizdir ve Pro ile sende kalır.",
         "puckArrow" to "Ok",
         "puckRunner" to "Koşucu",
         "puckBike" to "Bisiklet",
@@ -1450,7 +1450,7 @@ private val PUCK_TEXT: Map<Lang, Map<String, String>> = mapOf(
     ),
     Lang.ID to mapOf(
         "puckStyle" to "Gaya penanda",
-        "puckStyleHint" to "Berlaku untuk video dan peta rekaman. Dua belas bentuk terbuka setelah masa uji berakhir.",
+        "puckStyleHint" to "Berlaku untuk video dan peta rekaman. Dua belas bentuk tambahan gratis selama masa uji dan tetap milikmu dengan Pro.",
         "puckArrow" to "Panah",
         "puckRunner" to "Pelari",
         "puckBike" to "Sepeda",
@@ -1467,7 +1467,7 @@ private val PUCK_TEXT: Map<Lang, Map<String, String>> = mapOf(
     ),
     Lang.HI to mapOf(
         "puckStyle" to "मार्कर शैली",
-        "puckStyleHint" to "वीडियो और रिकॉर्डिंग मैप पर लागू। बारह आकार परीक्षण खत्म होने पर खुलते हैं।",
+        "puckStyleHint" to "वीडियो और रिकॉर्डिंग मानचित्र पर लागू। बारह अतिरिक्त आकार ट्रायल के दौरान मुफ़्त हैं और Pro के साथ बने रहते हैं।",
         "puckArrow" to "तीर",
         "puckRunner" to "धावक",
         "puckBike" to "साइकिल",
@@ -1484,7 +1484,7 @@ private val PUCK_TEXT: Map<Lang, Map<String, String>> = mapOf(
     ),
     Lang.JA to mapOf(
         "puckStyle" to "マーカースタイル",
-        "puckStyleHint" to "動画と記録マップに適用されます。12個の形は試用期間の終了後に使えます。",
+        "puckStyleHint" to "ビデオと記録マップに適用されます。追加の12形はトライアル中は無料で、Proでも使えます。",
         "puckArrow" to "矢印",
         "puckRunner" to "ランナー",
         "puckBike" to "自転車",
@@ -1501,7 +1501,7 @@ private val PUCK_TEXT: Map<Lang, Map<String, String>> = mapOf(
     ),
     Lang.KO to mapOf(
         "puckStyle" to "마커 스타일",
-        "puckStyleHint" to "동영상과 기록 지도에 적용됩니다. 열두 가지 모양은 체험 기간이 끝나면 열립니다.",
+        "puckStyleHint" to "비디오와 기록 지도에 적용됩니다. 12가지 추가 형태는 체험 기간 동안 무료이며 Pro와 함께 계속 사용할 수 있습니다.",
         "puckArrow" to "화살표",
         "puckRunner" to "러너",
         "puckBike" to "자전거",
@@ -1518,7 +1518,7 @@ private val PUCK_TEXT: Map<Lang, Map<String, String>> = mapOf(
     ),
     Lang.ZH to mapOf(
         "puckStyle" to "标记样式",
-        "puckStyleHint" to "应用于视频和记录地图。十二种形状在试用期结束后解锁。",
+        "puckStyleHint" to "适用于视频和记录地图。十二种额外形状在试用期间免费，购买 Pro 后永久保留。",
         "puckArrow" to "箭头",
         "puckRunner" to "跑者",
         "puckBike" to "自行车",
