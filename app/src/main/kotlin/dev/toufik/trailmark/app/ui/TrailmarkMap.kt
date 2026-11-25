@@ -471,7 +471,15 @@ private fun gradeRuns(
             out.add(run to ROUTE_PLAIN_COLOR)
             continue
         }
-        val elev = run.map { ElevPoint(it.lat, it.lon, it.altitudeM ?: 0.0) }
+        // A fix without an altitude is not at sea level. Carrying the last known
+        // one forward keeps a gap flat instead of inventing a cliff down to zero
+        // and colouring the repair red.
+        var last = run.firstNotNullOfOrNull { it.altitudeM } ?: 0.0
+        val elev = run.map {
+            val h = it.altitudeM ?: last
+            last = h
+            ElevPoint(it.lat, it.lon, h)
+        }
         val chunks = gradeChunks(elev, maxChunkM)
         if (chunks.isEmpty()) {
             out.add(run to ROUTE_PLAIN_COLOR)
