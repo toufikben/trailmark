@@ -192,7 +192,8 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                 Column(Modifier.padding(16.dp)) {
                     Text(status, color = Palette.accent, fontSize = 14.sp)
                     Text(
-                        paywallText(lang, "subtitle"),
+                        if (premium?.purchasedProduct != null) paywallText(lang, "proSubtitle")
+                        else paywallText(lang, "subtitle"),
                         color = Palette.textSecondary,
                         fontSize = 12.sp,
                         modifier = Modifier.padding(top = 4.dp),

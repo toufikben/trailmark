@@ -100,7 +100,11 @@ fun PaywallScreen(onBack: () -> Unit) {
                 ProBadge()
             }
             Spacer(Modifier.height(8.dp))
-            Text(pw("subtitle"), color = Palette.textSecondary, fontSize = 13.sp)
+            Text(
+                if (active) pw("proSubtitle") else pw("subtitle"),
+                color = Palette.textSecondary,
+                fontSize = 13.sp,
+            )
             Spacer(Modifier.height(14.dp))
 
             StatusCard(
