@@ -35,6 +35,26 @@ class PremiumStateTest {
     }
 
     @Test
+    fun seenClockKeepsTrialMonotonicAcrossRollback() {
+        // Twelve days were actually spent; the user then sets the clock back a year.
+        val seen = start + 12 * day
+        val s = PremiumState(start, null, seenAt = seen)
+        // The rolled-back clock must not resurrect the days already spent.
+        assertEquals(3, s.trialDaysLeft(start - 300 * day))
+        // And moving forward past the boundary ends it.
+        assertEquals(0, s.trialDaysLeft(seen + 4 * day))
+        assertFalse(s.isPro(seen + 4 * day))
+    }
+
+    @Test
+    fun seenClockNeverShortensTrialWhenItRunsAhead() {
+        // The high-water mark only ever grows; a normal day of use still counts down once.
+        val s = PremiumState(start, null, seenAt = start)
+        assertEquals(TRIAL_DAYS - 1, s.trialDaysLeft(start + 1 * day))
+        assertEquals(TRIAL_DAYS, s.trialDaysLeft(start))
+    }
+
+    @Test
     fun purchaseOutlivesTrial() {
         val s = PremiumState(start, PremiumProducts.MONTHLY)
         assertTrue(s.isPro(start + 400 * day))

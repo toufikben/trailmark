@@ -76,6 +76,7 @@ import dev.toufik.trailmark.app.backup.BackupStore
 import dev.toufik.trailmark.app.extraText
 import dev.toufik.trailmark.app.health.HealthSync
 import dev.toufik.trailmark.app.service.TtsVoice
+import dev.toufik.trailmark.app.trialClock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -164,7 +165,13 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
 
             SectionLabel(paywallText(lang, "title"))
             val premium = LocalPremium.current
-            val now = remember { System.currentTimeMillis() }
+            var now by remember { mutableStateOf(trialClock(context)) }
+            LaunchedEffect(Unit) {
+                while (true) {
+                    delay(30_000L)
+                    now = trialClock(context)
+                }
+            }
             val status = when {
                 premium?.purchasedProduct != null -> paywallText(lang, "proActive")
                 (premium?.trialDaysLeft(now) ?: 0) > 0 ->

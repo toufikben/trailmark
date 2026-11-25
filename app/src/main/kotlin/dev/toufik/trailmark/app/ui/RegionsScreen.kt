@@ -36,6 +36,7 @@ import dev.toufik.trailmark.app.maps.MapPacks
 import dev.toufik.trailmark.app.maps.OfflineRegions
 import dev.toufik.trailmark.app.maps.ROUTING_MANIFEST_URL
 import dev.toufik.trailmark.app.maps.SavedRegion
+import dev.toufik.trailmark.app.trialClock
 import dev.toufik.trailmark.app.plan.GhRouter
 import dev.toufik.trailmark.regions.RegionManifest
 import dev.toufik.trailmark.regions.RegionPack
@@ -51,7 +52,7 @@ fun RegionsScreen(onBack: () -> Unit, onPaywall: () -> Unit) {
     val t = LocalTexts.current
     val scope = rememberCoroutineScope()
     val premium = LocalPremium.current
-    val pro = premium?.isPro(System.currentTimeMillis()) == true
+    val pro = premium?.isPro(trialClock(context)) == true
     var manifest by remember { mutableStateOf<RegionManifest?>(null) }
     var routingManifest by remember { mutableStateOf<RegionManifest?>(null) }
     var routingFailed by remember { mutableStateOf(false) }

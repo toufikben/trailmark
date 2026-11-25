@@ -45,6 +45,7 @@ import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.PremiumProducts
 import dev.toufik.trailmark.app.TRIAL_DAYS
+import dev.toufik.trailmark.app.trialClock
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -64,12 +65,12 @@ fun PaywallScreen(onBack: () -> Unit) {
     val prices by (billing?.prices ?: emptyPrices).collectAsState()
     val emptyError = remember { MutableStateFlow<String?>(null) }
     val billingError by (billing?.lastError ?: emptyError).collectAsState()
-    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    var now by remember { mutableStateOf(trialClock(context)) }
 
     LaunchedEffect(Unit) {
         billing?.refresh()
         while (true) {
-            now = System.currentTimeMillis()
+            now = trialClock(context)
             delay(60_000L)
         }
     }

@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import dev.toufik.trailmark.app.LocalLang
+import dev.toufik.trailmark.app.LocalPremium
 import dev.toufik.trailmark.app.LocalTexts
 import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.maps.GlyphStore
@@ -417,9 +418,18 @@ fun TrailmarkMap(
     var userFix by remember { mutableStateOf<StoredPoint?>(null) }
     var pendingLocate by remember { mutableStateOf(false) }
     var frameIndex by remember { mutableStateOf(0) }
-    // Read once per composition: the settings screen disposes this map, so
-    // coming back with another shape rebuilt the composition and picks it up.
-    val puckStyle = remember { PuckStyle.current(context) }
+    // Re-read when the entitlement changes: a paid shape held while the trial
+    // lapses must fall back to the arrow without waiting for a recomposition,
+    // and a purchase made in settings must take effect on the next visit.
+    val premium = LocalPremium.current
+    var puckStyle by remember { mutableStateOf(PuckStyle.current(context)) }
+    LaunchedEffect(premium, premium?.purchasedProduct) {
+        while (true) {
+            val next = PuckStyle.current(context)
+            if (next != puckStyle) puckStyle = next
+            delay(15_000L)
+        }
+    }
     val onMapClickRef = rememberUpdatedState(onMapClick)
     val onUserFixRef = rememberUpdatedState(onUserFix)
     val onMediaTapRef = rememberUpdatedState(onMediaTap)
@@ -564,7 +574,10 @@ fun TrailmarkMap(
         }
     }
 
-    LaunchedEffect(packPath, dark, lang.code, online) {
+    // Rebuilt when the shape changes: the sprite images and the comet layers are
+    // registered per style, so a shape that lapses mid-session must rebuild them
+    // or the marker would reference an image that was never added.
+    LaunchedEffect(packPath, dark, lang.code, online, puckStyle) {
         mapView.getMapAsync { map ->
             val builder = when {
                 packPath != null && !online ->
