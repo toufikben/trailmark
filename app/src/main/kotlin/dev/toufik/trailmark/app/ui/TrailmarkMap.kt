@@ -564,9 +564,22 @@ fun TrailmarkMap(
                 }
             }
             map.addOnMapClickListener { latLng ->
+                val pt = map.projection.toScreenLocation(latLng)
+                val cluster = map.queryRenderedFeatures(pt, "media-clusters").firstOrNull()
+                if (cluster != null) {
+                    // A cluster is not a photo: zoom to where it splits instead of
+                    // opening whichever shot happened to be its representative.
+                    val lat = cluster.geometry.coordinates.latitude
+                    val lon = cluster.geometry.coordinates.longitude
+                    val from = map.cameraPosition.zoom
+                    map.animateCamera(
+                        CameraUpdateFactory.newLatLngZoom(LatLng(lat, lon), (from + 2.0).coerceAtMost(18.0)),
+                        260,
+                    )
+                    return@addOnMapClickListener true
+                }
                 val mk = onMediaTapRef.value
                 if (mk != null) {
-                    val pt = map.projection.toScreenLocation(latLng)
                     val hit = map.queryRenderedFeatures(pt, "media-dots").firstOrNull()
                     val idx = hit?.getNumberProperty("idx")?.toInt()
                     if (idx != null) {
@@ -887,7 +900,50 @@ fun TrailmarkMap(
                         iconIgnorePlacement(true),
                     ),
                 )
-                s.addSource(GeoJsonSource("media-source", EMPTY))
+                // Clustered: a run with fifty photos used to pile the pins into one
+                // red blob. Points merge into a counted bubble until the camera is
+                // close enough for them to stand apart.
+                s.addSource(
+                    GeoJsonSource(
+                        "media-source",
+                        EMPTY,
+                        GeoJsonOptions()
+                            .withCluster(true)
+                            .withClusterMaxZoom(14)
+                            .withClusterRadius(48),
+                    ),
+                )
+                s.addLayer(
+                    CircleLayer("media-clusters", "media-source").withProperties(
+                        circleColor("#E5484D"),
+                        circleRadius(
+                            Expression.step(
+                                Expression.get("point_count"),
+                                Expression.literal(9f),
+                                Expression.stop(5, Expression.literal(12f)),
+                                Expression.stop(20, Expression.literal(15f)),
+                            ),
+                        ),
+                        circleStrokeColor("#FFFFFF"),
+                        circleStrokeWidth(2.5f),
+                    ),
+                )
+                s.getLayerAs<CircleLayer>("media-clusters")?.setFilter(
+                    Expression.raw("""["has","point_count"]"""),
+                )
+                s.addLayer(
+                    SymbolLayer("media-cluster-count", "media-source").withProperties(
+                        textField(Expression.get("point_count_abbreviated")),
+                        textFont(arrayOf(if (offlineVector) "TrailmarkSans" else "Noto Sans Regular")),
+                        textSize(11f),
+                        textColor("#FFFFFF"),
+                        textAllowOverlap(true),
+                        textIgnorePlacement(true),
+                    ),
+                )
+                s.getLayerAs<SymbolLayer>("media-cluster-count")?.setFilter(
+                    Expression.raw("""["has","point_count"]"""),
+                )
                 s.addLayer(
                     CircleLayer("media-dots", "media-source").withProperties(
                         circleColor("#E5484D"),
@@ -895,6 +951,9 @@ fun TrailmarkMap(
                         circleStrokeColor("#FFFFFF"),
                         circleStrokeWidth(2.5f),
                     ),
+                )
+                s.getLayerAs<CircleLayer>("media-dots")?.setFilter(
+                    Expression.raw("""["!",["has","point_count"]]"""),
                 )
                 style = s
             }
