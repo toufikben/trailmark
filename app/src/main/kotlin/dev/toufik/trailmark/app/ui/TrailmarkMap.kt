@@ -49,8 +49,10 @@ import dev.toufik.trailmark.app.Palette
 import dev.toufik.trailmark.app.maps.GlyphStore
 import dev.toufik.trailmark.app.maps.ONLINE_STYLE_URL
 import dev.toufik.trailmark.app.maps.ONLINE_STYLE_URL_LIGHT
+import dev.toufik.trailmark.core.geo.ElevPoint
 import dev.toufik.trailmark.core.geo.RouteChunk
 import dev.toufik.trailmark.core.geo.douglasPeucker
+import dev.toufik.trailmark.core.geo.gradeChunks
 import dev.toufik.trailmark.core.geo.splitRuns
 import dev.toufik.trailmark.core.geo.haversineMeters
 import dev.toufik.trailmark.core.model.StoredPoint
@@ -449,6 +451,42 @@ private fun cometSplit(
 /** A media capture pinned to the map; idx points back into the caller's media list. */
 data class MediaMark(val idx: Int, val lat: Double?, val lon: Double?, val kind: String)
 
+/**
+ * The recorded route tinted by steepness, chunk by chunk, using the same
+ * palette the planner paints its own route with. Returns the plain coordinate
+ * runs when the track carries no usable elevation, so a flat indoor run and a
+ * track recorded without a barometer still draw exactly as before.
+ */
+private fun gradeRuns(
+    runs: List<List<StoredPoint>>,
+    maxChunkM: Double = 120.0,
+): List<Pair<List<StoredPoint>, String>> {
+    val out = ArrayList<Pair<List<StoredPoint>, String>>()
+    for (run in runs) {
+        if (run.size < 2) continue
+        val withEle = run.count { it.altitudeM != null }
+        if (withEle * 2 < run.size) {
+            // Less than half the track has an altitude: colouring it would paint
+            // long flat grey stretches that say nothing about the ground.
+            out.add(run to ROUTE_PLAIN_COLOR)
+            continue
+        }
+        val elev = run.map { ElevPoint(it.lat, it.lon, it.altitudeM ?: 0.0) }
+        val chunks = gradeChunks(elev, maxChunkM)
+        if (chunks.isEmpty()) {
+            out.add(run to ROUTE_PLAIN_COLOR)
+            continue
+        }
+        for (c in chunks) {
+            val pts = c.points.map { StoredPoint(it.lat, it.lon, 0L, 0.0, WaypointType.NORMAL) }
+            out.add(pts to gradeColorHex(c.gradePercent))
+        }
+    }
+    return out
+}
+
+private const val ROUTE_PLAIN_COLOR = "#C6FF3D"
+
 @Composable
 fun TrailmarkMap(
     points: List<StoredPoint>,
@@ -478,6 +516,7 @@ fun TrailmarkMap(
     val lang = LocalLang.current
     val prefs = remember { context.getSharedPreferences("trailmark", Context.MODE_PRIVATE) }
     var pois by remember { mutableStateOf(prefs.getBoolean("map_pois", false)) }
+    var routeColor by remember { mutableStateOf(prefs.getBoolean("route_color", false)) }
     val route = remember(points) { points.filter { it.type != WaypointType.REJECTED } }
     val ghost = remember(ghostRoute) { ghostRoute.filter { it.type != WaypointType.REJECTED } }
     val glyphsBase = remember { GlyphStore.ensure(context).absolutePath }
@@ -569,11 +608,12 @@ fun TrailmarkMap(
                 if (cluster != null) {
                     // A cluster is not a photo: zoom to where it splits instead of
                     // opening whichever shot happened to be its representative.
-                    val lat = cluster.geometry.coordinates.latitude
-                    val lon = cluster.geometry.coordinates.longitude
                     val from = map.cameraPosition.zoom
                     map.animateCamera(
-                        CameraUpdateFactory.newLatLngZoom(LatLng(lat, lon), (from + 2.0).coerceAtMost(18.0)),
+                        CameraUpdateFactory.newLatLngZoom(
+                            latLng,
+                            (from + 2.0).coerceAtMost(18.0),
+                        ),
                         260,
                     )
                     return@addOnMapClickListener true
@@ -775,7 +815,7 @@ fun TrailmarkMap(
                 )
                 s.addLayer(
                     LineLayer("route-layer", "route-source").withProperties(
-                        lineColor("#C6FF3D"),
+                        lineColor(Expression.get("color")),
                         lineWidth(5f),
                         lineCap(Property.LINE_CAP_ROUND),
                         lineJoin(Property.LINE_JOIN_ROUND),
@@ -1064,16 +1104,25 @@ fun TrailmarkMap(
         }
     }
     val drawnRuns = comet?.runs ?: routeRuns
-    LaunchedEffect(drawnRuns, ghostRuns, style) {
+    // The route carries a per-feature colour so one layer can draw a plain line
+    // or a graded one. Grade colouring is a choice: the accent green is the
+    // app's own mark and stays the default.
+    val routeFeatures = remember(drawnRuns, routeColor) {
+        val pieces = if (routeColor) {
+            gradeRuns(drawnRuns)
+        } else {
+            drawnRuns.map { it to ROUTE_PLAIN_COLOR }
+        }
+        pieces.map { (pts, hex) ->
+            Feature.fromGeometry(
+                LineString.fromLngLats(pts.map { Point.fromLngLat(it.lon, it.lat) }),
+            ).apply { addStringProperty("color", hex) }
+        }
+    }
+    LaunchedEffect(routeFeatures, ghostRuns, style) {
         val s = style.live() ?: return@LaunchedEffect
-        val routeFc = if (drawnRuns.isNotEmpty()) {
-            FeatureCollection.fromFeatures(
-                drawnRuns.map { run ->
-                    Feature.fromGeometry(
-                        LineString.fromLngLats(run.map { Point.fromLngLat(it.lon, it.lat) }),
-                    )
-                }.toTypedArray(),
-            )
+        val routeFc = if (routeFeatures.isNotEmpty()) {
+            FeatureCollection.fromFeatures(routeFeatures.toTypedArray())
         } else {
             EMPTY
         }

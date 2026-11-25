@@ -93,6 +93,7 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
     var voice by remember { mutableStateOf(prefs.getBoolean("voice_coach", true)) }
     var ghostVoice by remember { mutableStateOf(prefs.getBoolean("ghost_voice", true)) }
     var snapRoad by remember { mutableStateOf(prefs.getBoolean("snap_road", true)) }
+    var routeColorOn by remember { mutableStateOf(prefs.getBoolean("route_color", false)) }
     var autoPauseOn by remember { mutableStateOf(prefs.getBoolean("auto_pause", true)) }
     var puck by remember { mutableStateOf(PuckStyle.current(context)) }
     var showPucks by remember { mutableStateOf(false) }
@@ -225,6 +226,14 @@ fun SettingsScreen(lang: Lang, onLang: (Lang) -> Unit, onPaywall: () -> Unit) {
                     }
                 }
                 SettingsHint(extraText(lang, "snapRoadHint"))
+                CardDivider()
+                SettingsRow(extraText(lang, "routeColor")) {
+                    SettingsSwitch(checked = routeColorOn) {
+                        routeColorOn = it
+                        prefs.edit().putBoolean("route_color", it).apply()
+                    }
+                }
+                SettingsHint(extraText(lang, "routeColorHint"))
                 CardDivider()
                 SettingsRow(t.units) {
                     Segmented(
